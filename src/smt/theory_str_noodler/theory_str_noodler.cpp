@@ -194,6 +194,17 @@ namespace smt::noodler {
             else ctx.mark_as_relevant(expr);
         }
 
+        if(init && (
+            m_util_s.str.is_index(expr) || 
+            m_util_s.str.is_at(expr) ||
+            m_util_s.str.is_extract(expr) ||
+            m_util_s.str.is_replace(expr) || 
+            m_util_s.str.is_replace_all(expr) ||
+            m_util_s.str.is_replace_re_all(expr)
+        )) {
+            ctx.mark_as_relevant(expr);
+        }
+
         // Check if we already axiomatized the expr
         if (propagated_string_theory.contains(expr)) {
             return;

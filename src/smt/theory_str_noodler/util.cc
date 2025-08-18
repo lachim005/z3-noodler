@@ -20,6 +20,13 @@ namespace smt::noodler::util {
 #endif
     }
 
+    void check_limit(ast_manager& m) {
+        if (m.limit().is_canceled()) {
+            STRACE(str, tout << "LIMIT REACHED\n";);
+            throw default_exception("Limit reached");
+        }
+    }
+
     void get_str_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res, obj_map<expr, expr*>* pred_map) {
         if(m_util_s.str.is_string(ex)) {
             return;

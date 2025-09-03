@@ -4,7 +4,7 @@
 #include "util.h"
 #include <mata/nfa/delta.hh>
 #include <mata/nfa/nfa.hh>
-#include <mata/nfa/strings.hh>
+#include <mata/applications/strings.hh>
 #include <unordered_map>
 #include <mata/parser/re2parser.hh>
 

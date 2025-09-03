@@ -12,7 +12,7 @@
 #include <unordered_set>
 #include <vector>
 #include <mata/nft/nft.hh>
-#include <mata/nft/strings.hh>
+#include <mata/applications/strings.hh>
 
 #include "params/smt_params.h"
 #include "ast/arith_decl_plugin.h"

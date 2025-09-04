@@ -564,7 +564,7 @@ namespace smt::noodler {
          * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
          * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
          **/
-        auto noodles = mata::strings::seg_nfa::noodlify_for_equation(left_side_automata,
+        auto noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
                                                                     right_side_automata,
                                                                     false,
                                                                     {{"reduce", "forward"}});
@@ -713,7 +713,7 @@ namespace smt::noodler {
 
             // we create new inclusion, either output_var ⊆ application_to_literal or application_to_literal ⊆ input_vars
             Predicate new_inclusion = input_is_literal ? Predicate::create_equation(non_literal_side, {}) : Predicate::create_equation({}, non_literal_side);
-            if (!mata::strings::is_lang_eps(application_to_literal)) {
+            if (!mata::applications::strings::is_lang_eps(application_to_literal)) {
                 // if the application does not lead to empty string we need to create a new var for literal side and replace it with its language set to application_to_literal
                 BasicTerm fresh_var = solving_state.add_fresh_var(std::make_shared<mata::nfa::Nfa>(application_to_literal), std::string("literalsideapp_") + std::to_string(noodlification_no), false, true);
                 if (input_is_literal) {
@@ -737,7 +737,7 @@ namespace smt::noodler {
         SASSERT(output_vars_automata.size() == output_vars_divisions.size());
         SASSERT(output_vars_divisions.size() == output_vars.size());
 
-        std::vector<mata::strings::seg_nfa::TransducerNoodle> noodles = mata::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true);
+        std::vector<mata::applications::strings::seg_nfa::TransducerNoodle> noodles = mata::applications::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true);
         for (const auto& noodle : noodles) {
             // each noodle is a vector of tuples (T,i,Ai,o,Ao) where
             //      - T is a transducer, which will take one input and one output var: xo = T(xi)
@@ -1083,7 +1083,7 @@ namespace smt::noodler {
             // chars in the language of c (except dummy symbol)
             std::set<mata::Symbol> real_symbols_of_code_var;
             bool is_there_dummy_symbol = false;
-            for (mata::Symbol s : mata::strings::get_accepted_symbols(*solution.aut_ass.at(c))) { // iterate trough chars of c
+            for (mata::Symbol s : mata::applications::strings::get_accepted_symbols(*solution.aut_ass.at(c))) { // iterate trough chars of c
                 if (!util::is_dummy_symbol(s)) {
                     real_symbols_of_code_var.insert(s);
                 } else {
@@ -2063,7 +2063,7 @@ namespace smt::noodler {
                     transducer = transducer.apply(*solution.aut_ass.at(tape_vars[tape_num]), tape_num, false);
                 }
             }
-            std::vector<mata::Word> words_for_tape_vars = mata::strings::get_words_of_lengths(transducer, lengths).value();
+            std::vector<mata::Word> words_for_tape_vars = mata::applications::strings::get_words_of_lengths(transducer, lengths).value();
             for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
                 update_model_and_aut_ass(tape_vars[tape_num], regex::Alphabet{solution.aut_ass.get_alphabet()}.get_string_from_mata_word(words_for_tape_vars[tape_num]));
             }

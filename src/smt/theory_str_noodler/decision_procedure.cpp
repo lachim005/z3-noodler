@@ -69,10 +69,6 @@ namespace smt::noodler {
             }
         }
         predicates_to_process = new_predicates_to_process;
-
-        for (auto& [subst_var, substitution] : substitution_map) {
-            substitution = substitute_vector(substitution);
-        }
     }
 
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {
@@ -831,6 +827,9 @@ namespace smt::noodler {
             // disequations nor conversions), it is not needed to create the lengths formula.
             return {LenNode(LenFormulaType::TRUE), precision};
         }
+
+        // some formulas (lie the one for conversions) assumes that we have flattened substitution map
+        solution.flatten_substition_map();
 
         // collect all variables that substitute some string_var of some conversion (we do it here
         // because we need to know which variables are used in conversions for parikh image of variables
@@ -2045,7 +2044,7 @@ namespace smt::noodler {
             STRACE(str_model_transducer,
                 tout << "Constructing model for vars:";
                 for (const BasicTerm& var : tape_vars) {
-                    tout << " " << var << " (length " << arith_model.at(var) << ")";
+                    tout << " " << var;
                 }
                 if (is_trace_enabled(TraceTag::str_model_nfa)) {
                     tout << " and for transducer:\n" << transducer.print_to_dot(true, true);

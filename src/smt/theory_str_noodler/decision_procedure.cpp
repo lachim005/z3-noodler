@@ -2044,7 +2044,7 @@ namespace smt::noodler {
             STRACE(str_model_transducer,
                 tout << "Constructing model for vars:";
                 for (const BasicTerm& var : tape_vars) {
-                    tout << " " << var;
+                    tout << " " << var << " (length " << arith_model.at(var) << ")";
                 }
                 if (is_trace_enabled(TraceTag::str_model_nfa)) {
                     tout << " and for transducer:\n" << transducer.print_to_dot(true, true);

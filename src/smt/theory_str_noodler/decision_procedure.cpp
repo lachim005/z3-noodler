@@ -1723,6 +1723,7 @@ namespace smt::noodler {
             }
         }
 
+        init_solving_state.flatten_substition_map();
 
         STRACE(str_noodle_dot, tout << "digraph Procedure {\ninit[shape=none, label=\"\"]\n";);
         push_to_worklist(std::move(init_solving_state), true);

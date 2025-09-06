@@ -419,10 +419,34 @@ namespace smt::noodler {
                 return l_true;
             }
 
-            // we will now process one inclusion from the inclusion graph which is at front
+            // we will now process one inclusion from the inclusion graph
+            // we will pick and pop the inclusion which has the most outgoing connections
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+            unsigned max_connections = 0;
+            unsigned max_connections_idx = 0;
+            for (size_t candidate_idx = 0; candidate_idx < element_to_process.predicates_to_process.size(); candidate_idx++)
+            {
+                auto candidate = element_to_process.predicates_to_process[candidate_idx];
+                unsigned current_connections = 0;
+                for (size_t incl_idx = 0; incl_idx < element_to_process.predicates_to_process.size(); incl_idx++)
+                {
+                    if (candidate_idx == incl_idx) continue;
+                    auto incl = element_to_process.predicates_to_process[incl_idx];
+                    if (SolvingState::is_dependent(candidate.get_left_set(), incl.get_right_set()))
+                    {
+                        current_connections++;
+                    }
+                }
+                if (current_connections > max_connections)
+                {
+                    max_connections = current_connections;
+                    max_connections_idx = candidate_idx;
+                }
+            }
+
+            Predicate predicate_to_process = element_to_process.predicates_to_process[max_connections_idx];
+            element_to_process.predicates_to_process[max_connections_idx] = element_to_process.predicates_to_process.back();
+            element_to_process.predicates_to_process.pop_back();
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);

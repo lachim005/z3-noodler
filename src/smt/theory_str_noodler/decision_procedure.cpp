@@ -428,11 +428,10 @@ namespace smt::noodler {
             {
                 auto candidate = element_to_process.predicates_to_process[candidate_idx];
                 unsigned current_connections = 0;
-                for (size_t incl_idx = 0; incl_idx < element_to_process.predicates_to_process.size(); incl_idx++)
+                auto left_vars = candidate.get_left_set();
+                for (auto incl : element_to_process.inclusions)
                 {
-                    if (candidate_idx == incl_idx) continue;
-                    auto incl = element_to_process.predicates_to_process[incl_idx];
-                    if (SolvingState::is_dependent(candidate.get_left_set(), incl.get_right_set()))
+                    if (SolvingState::is_dependent(left_vars, incl.get_right_set()))
                     {
                         current_connections++;
                     }

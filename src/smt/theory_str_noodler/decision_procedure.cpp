@@ -1686,6 +1686,8 @@ namespace smt::noodler {
             }
         );
 
+        set_initial_variables(equations_and_transducers);
+
         SolvingState init_solving_state;
         init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
@@ -2231,8 +2233,8 @@ namespace smt::noodler {
         return needed_vars;
     }
 
-    void DecisionProcedure::set_initial_variables() {
-        initial_variables = formula.get_vars();
+    void DecisionProcedure::set_initial_variables(const Formula& f) {
+        initial_variables = f.get_vars();
         for (const auto& [var,_aut] : init_aut_ass) {
             initial_variables.insert(var);
         }
@@ -2241,6 +2243,11 @@ namespace smt::noodler {
         }
         for (const auto& conv : conversions) {
             initial_variables.insert(conv.string_var);
+        }
+        for (const auto& incl : inclusions_from_preprocessing) {
+            for (const auto& var : incl.get_vars()) {
+                initial_variables.insert(var);
+            }
         }
     }
 

@@ -515,7 +515,7 @@ namespace smt::noodler {
 
         std::set<BasicTerm> initial_variables;
 
-        void set_initial_variables();
+        void set_initial_variables(const Formula& f);
 
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
@@ -739,7 +739,6 @@ namespace smt::noodler {
             init_aut_ass(init_aut_ass),
             conversions(conversions),
             m_params(par) {
-                set_initial_variables();
         }
         
         /**

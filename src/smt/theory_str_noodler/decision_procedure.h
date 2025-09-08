@@ -339,7 +339,7 @@ namespace smt::noodler {
          * both in the corresponding sets and in the worklist of predicates to process (if two nodes become equal, keeps only
          * one). Furthermore, it removes inclusions that have both sides equal after substitution.
          */
-        void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
+        void substitute_vars(const std::set<BasicTerm>& vars_to_substitute, const std::set<BasicTerm>& initial_variables);
 
         /**
          * @brief Get the length constraints for variable @p var
@@ -420,7 +420,7 @@ namespace smt::noodler {
          * @param inclusions Inclusion to process
          * @param on_cycle Whether the inclusions should be on cycle or not
          */
-        void process_substituting_inclusions_from_right(const std::vector<Predicate>& inclusions, bool on_cycle);
+        void process_substituting_inclusions_from_right(const std::vector<Predicate>& inclusions, bool on_cycle, const std::set<BasicTerm>& initial_variables);
 
         /**
          * @brief Similar to process_substituting_inclusions_from_right but opposite (left var should be substituted by right side).
@@ -439,7 +439,7 @@ namespace smt::noodler {
          * @param inclusions Inclusions to process
          * @param on_cycle Whether the inclusions should be on cycle or not
          */
-        void process_substituting_inclusions_from_left(const std::vector<Predicate>& inclusions, bool on_cycle);
+        void process_substituting_inclusions_from_left(const std::vector<Predicate>& inclusions, bool on_cycle, const std::set<BasicTerm>& initial_variables);
 
 
         /**
@@ -512,6 +512,10 @@ namespace smt::noodler {
         std::set<BasicTerm> code_subst_vars_handled_by_parikh;
 
         const theory_str_noodler_params& m_params;
+
+        std::set<BasicTerm> initial_variables;
+
+        void set_initial_variables();
 
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
@@ -735,7 +739,7 @@ namespace smt::noodler {
             init_aut_ass(init_aut_ass),
             conversions(conversions),
             m_params(par) {
-            
+                set_initial_variables();
         }
         
         /**

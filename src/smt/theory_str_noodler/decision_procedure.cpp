@@ -374,7 +374,7 @@ namespace smt::noodler {
                            << "Getting another solution"
                            << "------------------------" << std::endl;);
 
-        while (!worklist.empty()) {
+        while (!is_worklist_empty()) {
             SolvingState element_to_process = pop_from_worklist();
 
             if (element_to_process.predicates_to_process.empty()) {

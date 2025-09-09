@@ -524,6 +524,10 @@ namespace smt::noodler {
         void process_inclusion(const Predicate& inclusion_to_process, SolvingState& solving_state);
         void process_transducer(const Predicate& transducer_to_process, SolvingState& solving_state);
 
+        bool is_worklist_empty() {
+            return (worklist.empty() && possible_solutions.empty());
+        }
+
         void push_to_worklist(SolvingState solving_state, bool to_back) {
             std::string old_DOT_name = solving_state.DOT_name;
             solving_state.set_new_DOT_name();

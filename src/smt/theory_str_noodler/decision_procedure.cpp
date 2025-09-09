@@ -310,73 +310,59 @@ namespace smt::noodler {
             }
             return res.str();
         };
-
-        auto print_predicate_container_to_DOT = [&print_predicate_to_DOT]<typename T>(T predicate_container) {
+        
+        auto print_strings = [](std::vector<std::string>& strings, bool order, std::string del = "\\n") {
+            if (order) {
+                std::sort(strings.begin(), strings.end());
+            }
             bool first = true;
             std::ostringstream res;
-            for (const Predicate& pred : predicate_container) {
+            for (const std::string& string : strings) {
                 if (first) {
                     first = false;
-                    res << print_predicate_to_DOT(pred);
+                    res << string;
                 } else {
-                    res << "\\n" << print_predicate_to_DOT(pred);
+                    res << del << string;
                 }
             }
             return res.str(); 
         };
 
+        auto print_predicate_container_to_DOT = [&print_predicate_to_DOT, &print_strings]<typename T>(const T& predicate_container, bool order) {
+            std::vector<std::string> predicate_strings(predicate_container.size());
+            std::transform(predicate_container.begin(), predicate_container.end(), predicate_strings.begin(), print_predicate_to_DOT);
+            return print_strings(predicate_strings, order);
+        };
 
-        auto print_vars_to_DOT = [&escape_DOT_string](const std::vector<BasicTerm>& vars) {
-            bool first = true;
-            std::ostringstream res;
-            for (const BasicTerm& var : vars) {
-                if (first) {
-                    first = false;
-                    res << escape_DOT_string(var.to_string());
-                } else {
-                    res << "\\n" << escape_DOT_string(var.to_string());
-                }
-            }
-            return res.str(); 
+
+        auto print_vars_to_DOT = [&escape_DOT_string, &print_strings]<typename T>(const T& vars, bool order, bool delimit_by_space) {
+            std::vector<std::string> var_names(vars.size());
+            std::transform(vars.begin(), vars.end(), var_names.begin(), [&escape_DOT_string](const BasicTerm& var) { return escape_DOT_string(var.to_string());});
+            return print_strings(var_names, order, (delimit_by_space ? "\\ " : "\\n"));
         };
 
         std::ostringstream res;
-        res << DOT_name << "[shape=record,label=\"" << print_predicate_container_to_DOT(inclusions);
+        res << DOT_name << "[shape=record,label=\"" << print_predicate_container_to_DOT(inclusions, true);
         if (!inclusions.empty() && !transducers.empty()) {
             res << "\\n";
         }
-        res << print_predicate_container_to_DOT(transducers) << "|" << print_predicate_container_to_DOT(predicates_to_process) << "|";
+        res << print_predicate_container_to_DOT(transducers, true) << "|" << print_predicate_container_to_DOT(predicates_to_process, false) << "|";
 
-        bool first = true;
+        std::vector<std::string> strings_to_print;
         for (const auto& [var,subst_vars] : substitution_map) {
-            if (first) {
-                first = false;
-                res << escape_DOT_string(var.to_string()) << "\\ -\\>\\ " << print_vars_to_DOT(subst_vars);
-            } else {
-                res << "\\n" << escape_DOT_string(var.to_string()) << "\\ -\\>\\ " << print_vars_to_DOT(subst_vars);
-            }
+            strings_to_print.push_back(escape_DOT_string(var.to_string()) + std::string("\\ -\\>\\ ") + print_vars_to_DOT(subst_vars, false, true));
         }
         for (const BasicTerm& var : aut_ass.get_keys()) {
-            if (var.is_literal()) { continue; }
-            if (first) {
-                first = false;
-                res << escape_DOT_string(var.to_string()) << "\\ -\\>\\ NFA";
-            } else {
-                res << "\\n" << escape_DOT_string(var.to_string()) << "\\ -\\>\\ NFA";
+            if (!var.is_literal()) { 
+                strings_to_print.push_back(escape_DOT_string(var.to_string()) + std::string("\\ -\\>\\ NFA"));
             }
         }
+        res << print_strings(strings_to_print, true);
 
         res << "|";
 
-        first = true;
-        for (const BasicTerm& var : length_sensitive_vars) {
-            if (first) {
-                first = false;
-                res << escape_DOT_string(var.to_string());
-            } else {
-                res << "\\n" << escape_DOT_string(var.to_string());
-            }
-        }
+        res << print_vars_to_DOT(length_sensitive_vars, true, false);
+
         res << "\"];";
         return res.str();
     }

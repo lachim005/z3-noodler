@@ -477,6 +477,8 @@ namespace smt::noodler {
 
         // a deque containing states of decision procedure, each of them can lead to a solution
         std::deque<SolvingState> worklist;
+        // if a solving state has nothing to process, it can lead to solution, we keep these solving states here instead of worklist so we can process them immediately
+        std::vector<SolvingState> possible_solutions;
 
         /// State of a found satisfiable solution set when one is computed using
         ///  compute_next_solution() or after preprocess()
@@ -526,17 +528,27 @@ namespace smt::noodler {
             std::string old_DOT_name = solving_state.DOT_name;
             solving_state.set_new_DOT_name();
             STRACE(str_noodle_dot, tout << solving_state.print_to_DOT() << std::endl << old_DOT_name << " -> " << solving_state.DOT_name << ";\n");
-            if (to_back) {
-                worklist.push_back(std::move(solving_state));
+            if (solving_state.predicates_to_process.empty()) {
+                possible_solutions.push_back(std::move(solving_state));
             } else {
-                worklist.push_front(std::move(solving_state));
+                if (to_back) {
+                    worklist.push_back(std::move(solving_state));
+                } else {
+                    worklist.push_front(std::move(solving_state));
+                }
             }
         }
 
         unsigned num_of_popped_elements = 0;
         SolvingState pop_from_worklist() {
-            SolvingState element_to_process = std::move(worklist.front());
-            worklist.pop_front();
+            SolvingState element_to_process;
+            if (!possible_solutions.empty()) {
+                element_to_process = std::move(possible_solutions.back());
+                possible_solutions.pop_back();
+            } else {
+                element_to_process = std::move(worklist.front());
+                worklist.pop_front();
+            }
             STRACE(str_noodle_dot, tout << element_to_process.DOT_name << " -> " << element_to_process.DOT_name << " [penwidth=0,dir=none,label=" << num_of_popped_elements << "];\n";);
             ++num_of_popped_elements;
             return element_to_process;

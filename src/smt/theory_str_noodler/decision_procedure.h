@@ -411,7 +411,7 @@ namespace smt::noodler {
          * @brief Processes inclusions from noodlification that are of the form where the right side var should be substituted by left side.
          * 
          * It assumes that left sides contain fresh variables, right sides are not substituted yet and all inclusions hold.
-         * This function then takes each inclusions t_1 t_2 ... t_n ⊆ x where x is length var  and substitutes substitution_map[x] = t_1 t_2 ... t_n.
+         * This function then takes each inclusions t_1 t_2 ... t_n ⊆ x where x is length var and substitutes substitution_map[x] = t_1 t_2 ... t_n.
          * It is possible that x is on the right side of two inclusions, the first one substitutes it and the second one is added into this SolvingState
          * and also it is added for processing.
          * There can be inclusions t_1 t_2 ... t_n ⊆ x y ... z where there are multiple variables on the right side, but all the variables on the right
@@ -421,6 +421,7 @@ namespace smt::noodler {
          * 
          * @param inclusions Inclusion to process
          * @param on_cycle Whether the inclusions should be on cycle or not
+         * @return std::set<BasicTerm> The set of variables that were substituted
          */
         std::set<BasicTerm> process_substituting_inclusions_from_right(const std::vector<Predicate>& inclusions, bool on_cycle);
 
@@ -440,6 +441,7 @@ namespace smt::noodler {
          * 
          * @param inclusions Inclusions to process
          * @param on_cycle Whether the inclusions should be on cycle or not
+         * @return std::set<BasicTerm> The set of variables that were substituted
          */
         std::set<BasicTerm> process_substituting_inclusions_from_left(const std::vector<Predicate>& inclusions, bool on_cycle);
 

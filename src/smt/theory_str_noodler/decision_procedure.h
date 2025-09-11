@@ -341,6 +341,9 @@ namespace smt::noodler {
          */
         void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
 
+        /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
+        void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
+
         /**
          * @brief Get the length constraints for variable @p var
          * 
@@ -409,7 +412,7 @@ namespace smt::noodler {
          * @brief Processes inclusions from noodlification that are of the form where the right side var should be substituted by left side.
          * 
          * It assumes that left sides contain fresh variables, right sides are not substituted yet and all inclusions hold.
-         * This function then takes each inclusions t_1 t_2 ... t_n ⊆ x where x is length var  and substitutes substitution_map[x] = t_1 t_2 ... t_n.
+         * This function then takes each inclusions t_1 t_2 ... t_n ⊆ x where x is length var and substitutes substitution_map[x] = t_1 t_2 ... t_n.
          * It is possible that x is on the right side of two inclusions, the first one substitutes it and the second one is added into this SolvingState
          * and also it is added for processing.
          * There can be inclusions t_1 t_2 ... t_n ⊆ x y ... z where there are multiple variables on the right side, but all the variables on the right
@@ -419,8 +422,9 @@ namespace smt::noodler {
          * 
          * @param inclusions Inclusion to process
          * @param on_cycle Whether the inclusions should be on cycle or not
+         * @return std::set<BasicTerm> The set of variables that were substituted
          */
-        void process_substituting_inclusions_from_right(const std::vector<Predicate>& inclusions, bool on_cycle);
+        std::set<BasicTerm> process_substituting_inclusions_from_right(const std::vector<Predicate>& inclusions, bool on_cycle);
 
         /**
          * @brief Similar to process_substituting_inclusions_from_right but opposite (left var should be substituted by right side).
@@ -438,8 +442,9 @@ namespace smt::noodler {
          * 
          * @param inclusions Inclusions to process
          * @param on_cycle Whether the inclusions should be on cycle or not
+         * @return std::set<BasicTerm> The set of variables that were substituted
          */
-        void process_substituting_inclusions_from_left(const std::vector<Predicate>& inclusions, bool on_cycle);
+        std::set<BasicTerm> process_substituting_inclusions_from_left(const std::vector<Predicate>& inclusions, bool on_cycle);
 
 
         /**
@@ -512,6 +517,12 @@ namespace smt::noodler {
         std::set<BasicTerm> code_subst_vars_handled_by_parikh;
 
         const theory_str_noodler_params& m_params;
+
+        /// @brief We save here all string variables that exist before the decision procedure is run (useful for removing variables created in decision procedure, @sa SolvingState::remove_vars())
+        std::set<BasicTerm> initial_variables;
+
+        /// @brief Sets the initial_variables by adding all variables from @p f and other stuff (init_aut_ass, init_length_sensitive_vars, conversions, inclusions_from_preprocessing)
+        void set_initial_variables(const Formula& f);
 
         /**
          * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
@@ -735,7 +746,6 @@ namespace smt::noodler {
             init_aut_ass(init_aut_ass),
             conversions(conversions),
             m_params(par) {
-            
         }
         
         /**

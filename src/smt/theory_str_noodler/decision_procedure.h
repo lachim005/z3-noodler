@@ -496,6 +496,7 @@ namespace smt::noodler {
         std::unordered_map<BasicTerm, std::vector<BasicTerm>> init_substitution_map;
         // contains to/from_code/int conversions
         std::vector<TermConversion> conversions;
+        ast_manager& m;
 
         // length vars that occur as input/output of some transducer formula
         std::set<BasicTerm> length_vars_with_transducers;
@@ -740,11 +741,13 @@ namespace smt::noodler {
              Formula formula, AutAssignment init_aut_ass,
              std::unordered_set<BasicTerm> init_length_sensitive_vars,
              const theory_str_noodler_params &par,
-             std::vector<TermConversion> conversions
+             std::vector<TermConversion> conversions,
+             ast_manager& m
         ) : init_length_sensitive_vars(init_length_sensitive_vars),
             formula(formula),
             init_aut_ass(init_aut_ass),
             conversions(conversions),
+            m(m),
             m_params(par) {
         }
         

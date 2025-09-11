@@ -55,6 +55,11 @@ namespace smt::noodler::util {
     void throw_error(std::string errMsg);
 
     /**
+     * @brief Check if we reached some resource limit (timeout) and throws error if yes
+     */
+    void check_limit(ast_manager& m);
+
+    /**
     Get variables from a given expression @p ex. Append to the output parameter @p res.
     @param ex Expression to be checked for variables.
     @param m_util_s Seq util for AST

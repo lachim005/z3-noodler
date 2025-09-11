@@ -393,6 +393,7 @@ namespace smt::noodler {
                            << "------------------------" << std::endl;);
 
         while (!is_worklist_empty()) {
+            util::check_limit(m);
             SolvingState element_to_process = pop_from_worklist();
 
             if (element_to_process.predicates_to_process.empty()) {
@@ -571,6 +572,7 @@ namespace smt::noodler {
                                                                     {{"reduce", "forward"}});
 
         for (const auto &noodle : noodles) {
+            util::check_limit(m);
             STRACE(str, tout << "Processing noodle" << (is_trace_enabled(TraceTag::str_nfa) ? " with automata:" : "") << std::endl;);
             SolvingState new_element = solving_state;
 
@@ -744,6 +746,7 @@ namespace smt::noodler {
 
         std::vector<mata::applications::strings::seg_nfa::TransducerNoodle> noodles = mata::applications::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true);
         for (const auto& noodle : noodles) {
+            util::check_limit(m);
             // each noodle is a vector of tuples (T,i,Ai,o,Ao) where
             //      - T is a transducer, which will take one input and one output var: xo = T(xi)
             //      - i is the number denoting which input variable is connected with T
@@ -854,9 +857,11 @@ namespace smt::noodler {
 
         // compute formula for vars in transducers (lengths and code-point conversions)
         conjuncts.push_back(get_formula_for_transducers());
+        util::check_limit(m);
 
         // formula for encoding lengths
         conjuncts.push_back(get_formula_for_len_vars());
+        util::check_limit(m);
 
         // add formula for conversions
         auto conv_form_with_precision = get_formula_for_conversions();

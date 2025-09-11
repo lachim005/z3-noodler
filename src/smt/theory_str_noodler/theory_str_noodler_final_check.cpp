@@ -214,7 +214,7 @@ namespace smt::noodler {
         }
 
         // we do not put into dec_proc directly, because we might do underapproximation that saves into dec_proc
-        std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions, m);
 
         // the skip_len_sat preprocessing rule requires that the input formula is length satisfiable
         // --> before we apply the preprocessing, we need to be sure that it is indeed true.
@@ -287,6 +287,7 @@ namespace smt::noodler {
 
         expr_ref block_len(m.mk_false(), m);
         while (true) {
+            util::check_limit(m);
             result = dec_proc->compute_next_solution();
             if (result == l_true) {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
@@ -725,7 +726,7 @@ namespace smt::noodler {
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<TermConversion> conversions) {
-        dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions);
+        dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions, m);
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
             return l_undef;
         }

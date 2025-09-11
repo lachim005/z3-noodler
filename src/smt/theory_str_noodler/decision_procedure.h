@@ -515,8 +515,10 @@ namespace smt::noodler {
 
         const theory_str_noodler_params& m_params;
 
+        /// @brief We save here all string variables that exist before the decision procedure is run (useful for removing variables created in decision procedure)
         std::set<BasicTerm> initial_variables;
 
+        /// @brief Sets the initial_variables by adding all variables from @p f and other stuff (init_aut_ass, init_length_sensitive_vars, conversions, inclusions_from_preprocessing)
         void set_initial_variables(const Formula& f);
 
         /**

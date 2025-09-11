@@ -341,6 +341,7 @@ namespace smt::noodler {
          */
         void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
 
+        /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
         void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
 
         /**
@@ -517,7 +518,7 @@ namespace smt::noodler {
 
         const theory_str_noodler_params& m_params;
 
-        /// @brief We save here all string variables that exist before the decision procedure is run (useful for removing variables created in decision procedure)
+        /// @brief We save here all string variables that exist before the decision procedure is run (useful for removing variables created in decision procedure, @sa SolvingState::remove_vars())
         std::set<BasicTerm> initial_variables;
 
         /// @brief Sets the initial_variables by adding all variables from @p f and other stuff (init_aut_ass, init_length_sensitive_vars, conversions, inclusions_from_preprocessing)

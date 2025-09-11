@@ -492,7 +492,7 @@ namespace smt::noodler {
                 solving_state.push_dependent_predicates(non_empty_side_vars, is_inclusion_to_process_on_cycle);
             }
             solving_state.substitute_vars(non_empty_side_vars); // we need to substitute the variables in other predicates
-            solving_state.remove_vars(non_empty_side_vars, initial_variables);
+            solving_state.remove_vars(non_empty_side_vars, initial_variables); // remove unneccesary variables that were substituted
             // it is possible that some transducer become non-simple (one of its side becomes empty), we want to process these again
             solving_state.push_non_simple_transducers_to_processing();
 
@@ -636,8 +636,9 @@ namespace smt::noodler {
              */
             std::set<BasicTerm> newly_substituted_vars_from_left = new_element.process_substituting_inclusions_from_left(left_side_inclusions, is_inclusion_to_process_on_cycle);
 
-            new_element.remove_vars(newly_substituted_vars_from_right, initial_variables);
-            new_element.remove_vars(newly_substituted_vars_from_left, initial_variables);
+            // Remove unneccesary variables that were substituted (we do it here, because we the code before depends on the newly substituted vars to be in subtitution_map)
+            new_element.remove_vars(newly_substituted_vars_from_right, initial_variables); // remove unneccesary variables that were substituted
+            new_element.remove_vars(newly_substituted_vars_from_left, initial_variables); // remove unneccesary variables that were substituted
 
             // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
             // and if there is no cycle, we do not need to do BFS, the algorithm should end
@@ -797,6 +798,7 @@ namespace smt::noodler {
             std::vector<Predicate> output_inclusions = util::create_inclusions_from_multiple_sides(output_vars_divisions, output_vars_to_new_output_vars);
             std::set<BasicTerm> newly_substituted_vars_from_left = new_element.process_substituting_inclusions_from_left(output_inclusions, false);
 
+            // Remove unneccesary variables that were substituted (we do it here, because we the code before depends on the newly substituted vars to be in subtitution_map)
             new_element.remove_vars(newly_substituted_vars_from_right, initial_variables);
             new_element.remove_vars(newly_substituted_vars_from_left, initial_variables);
 

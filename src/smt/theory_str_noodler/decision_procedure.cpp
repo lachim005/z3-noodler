@@ -1,3 +1,5 @@
+#include <climits>
+#include <mata/nfa/nfa.hh>
 #include <queue>
 #include <utility>
 #include <algorithm>
@@ -419,10 +421,69 @@ namespace smt::noodler {
                 return l_true;
             }
 
-            // we will now process one inclusion from the inclusion graph which is at front
+            // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+
+            unsigned long min_score = ULONG_MAX;
+            unsigned long min_score_item_idx = 0;
+            for (size_t candidate_idx = 0; candidate_idx < element_to_process.predicates_to_process.size(); candidate_idx++) {
+                Predicate& candidate = element_to_process.predicates_to_process[candidate_idx];
+
+                // Checks if the inclusion has any ingoing connections
+                auto cand_right_vars = candidate.get_right_set();
+                bool has_ingoing_connections = false;
+                for (size_t incl_idx = 0; incl_idx < element_to_process.predicates_to_process.size(); incl_idx++) {
+                    if (candidate_idx == incl_idx) { continue; }
+                    Predicate& incl = element_to_process.predicates_to_process[incl_idx];
+                    if (SolvingState::is_dependent(incl.get_left_set(), cand_right_vars)) {
+                        has_ingoing_connections = true;
+                        break;
+                    }
+                }
+                if (has_ingoing_connections) { continue; }
+
+                // Now, we will calculate the score of this inclusion
+
+                // Stolen from https://github.com/VeriFIT/z3-noodler/pull/237
+                unsigned num_of_splits_on_left = candidate.get_left_set().size();
+                unsigned num_of_splits_on_right = 0;
+                bool last_was_length = true;
+                for (const BasicTerm& right_var : candidate.get_right_side()) {
+                    if (element_to_process.length_sensitive_vars.contains(right_var)) {
+                        ++num_of_splits_on_right;
+                        last_was_length = true;
+                    } else {
+                        if (last_was_length) {
+                            ++num_of_splits_on_right;
+                        }
+                        last_was_length = false;
+                    }
+                }
+                unsigned long split_score = num_of_splits_on_left*num_of_splits_on_right;
+
+                // Sums the amount of states on each side
+                unsigned right_states = 0;
+                unsigned left_states = 0;
+                for (auto aut_ass : element_to_process.aut_ass) {
+                    if (candidate.get_left_set().contains(aut_ass.first)) {
+                        left_states += aut_ass.second->num_of_states();
+                    }
+                    if (candidate.get_right_set().contains(aut_ass.first)) {
+                        right_states += aut_ass.second->num_of_states();
+                    }
+                }
+                unsigned long state_score = right_states * left_states;
+
+                unsigned long score = split_score * state_score;
+                if (score < min_score) {
+                    min_score = score;
+                    min_score_item_idx = candidate_idx;
+                }
+            }
+
+            Predicate predicate_to_process = element_to_process.predicates_to_process[min_score_item_idx];
+            element_to_process.predicates_to_process[min_score_item_idx] = element_to_process.predicates_to_process.back();
+            element_to_process.predicates_to_process.pop_back();
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);

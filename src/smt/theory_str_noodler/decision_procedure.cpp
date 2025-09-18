@@ -464,13 +464,13 @@ namespace smt::noodler {
                 // Sums the amount of states on each side
                 unsigned right_states = 0;
                 unsigned left_states = 0;
-                for (auto aut_ass : element_to_process.aut_ass) {
-                    if (candidate.get_left_set().contains(aut_ass.first)) {
-                        left_states += aut_ass.second->num_of_states();
-                    }
-                    if (candidate.get_right_set().contains(aut_ass.first)) {
-                        right_states += aut_ass.second->num_of_states();
-                    }
+                for (auto x : candidate.get_right_side())
+                {
+                    right_states += element_to_process.aut_ass.at(x)->num_of_states();
+                }
+                for (auto x : candidate.get_left_side())
+                {
+                    left_states += element_to_process.aut_ass.at(x)->num_of_states();
                 }
                 unsigned long state_score = right_states * left_states;
 

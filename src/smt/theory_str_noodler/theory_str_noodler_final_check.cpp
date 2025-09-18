@@ -1,5 +1,6 @@
 #include <mata/nfa/builder.hh>
 #include "formula.h"
+#include "smt/theory_str_noodler/aut_assignment.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "memb_heuristics_procedures.h"
 
@@ -204,7 +205,7 @@ namespace smt::noodler {
         }
 
         // try Nielsen transformation (if enabled) to solve
-        if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars)) {
+        if(m_params.m_try_nielsen && is_nielsen_suitable(instance, init_length_sensitive_vars, aut_assignment)) {
             lbool result = run_nielsen(instance, aut_assignment, init_length_sensitive_vars);
             if(result == l_true) {
                 return FC_DONE;
@@ -825,7 +826,7 @@ namespace smt::noodler {
         STRACE(str_block, tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
     }
 
-    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) const {
+    bool theory_str_noodler::is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars, const AutAssignment& init_aut_ass) const {
         if(!this->m_membership_todo_rel.empty() || !this->m_not_contains_todo_rel.empty() || !this->m_conversion_todo.empty() || !this->m_word_diseq_todo_rel.empty() || instance.contains_pred_type(PredicateType::Transducer)) {
             return false;
         }
@@ -834,7 +835,7 @@ namespace smt::noodler {
             return false;
         }
 
-        FormulaGraph incl = FormulaGraph::create_inclusion_graph(instance);
+        FormulaGraph incl = FormulaGraph::create_inclusion_graph(instance, init_length_sensitive_vars, init_aut_ass);
         return incl.is_cyclic();
     }
 

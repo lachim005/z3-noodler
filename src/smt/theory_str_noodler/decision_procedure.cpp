@@ -744,7 +744,7 @@ namespace smt::noodler {
         SASSERT(output_vars_automata.size() == output_vars_divisions.size());
         SASSERT(output_vars_divisions.size() == output_vars.size());
 
-        std::vector<mata::applications::strings::seg_nfa::TransducerNoodle> noodles = mata::applications::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true);
+        std::vector<mata::applications::strings::seg_nfa::TransducerNoodle> noodles = mata::applications::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true, m_params.m_homomorphism_heuristic);
         for (const auto& noodle : noodles) {
             util::check_limit(m);
             // each noodle is a vector of tuples (T,i,Ai,o,Ao) where
@@ -1795,7 +1795,7 @@ namespace smt::noodler {
         prep_handler.remove_trivial();
         prep_handler.reduce_regular_sequence(3);
         prep_handler.remove_regular();
-        if(prep_handler.has_unsat_transducers()) {
+        if(m_params.m_preprocess_nft && prep_handler.has_unsat_transducers()) {
             return l_false;
         }
 

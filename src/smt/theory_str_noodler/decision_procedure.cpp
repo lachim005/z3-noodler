@@ -426,6 +426,7 @@ namespace smt::noodler {
 
             unsigned long min_score = ULONG_MAX;
             unsigned long min_score_item_idx = 0;
+            bool min_is_initial = false;
             for (size_t candidate_idx = 0; candidate_idx < element_to_process.predicates_to_process.size(); candidate_idx++) {
                 Predicate& candidate = element_to_process.predicates_to_process[candidate_idx];
 
@@ -440,7 +441,8 @@ namespace smt::noodler {
                         break;
                     }
                 }
-                if (has_ingoing_connections) { continue; }
+
+                if (has_ingoing_connections && min_is_initial) { continue; }
 
                 // Now, we will calculate the score of this inclusion
 
@@ -475,9 +477,12 @@ namespace smt::noodler {
                 unsigned long state_score = right_states * left_states;
 
                 unsigned long score = split_score * state_score;
-                if (score < min_score) {
+                // We want to save an inclusion with the least score
+                // but we prefer inclusions with no ingoing connections
+                if (score < min_score || (!has_ingoing_connections && !min_is_initial)) {
                     min_score = score;
                     min_score_item_idx = candidate_idx;
+                    min_is_initial = !has_ingoing_connections;
                 }
             }
 

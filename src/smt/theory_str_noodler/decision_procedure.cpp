@@ -951,11 +951,12 @@ namespace smt::noodler {
         // inclusion graph and we create the composed transducer for them.
         for (const auto& [output_var,transducers] : output_var_to_its_transducers) {
             if (!length_input_vars.contains(output_var)) {
-                transducers_with_vars_on_tapes.push_back(get_composed_trans_with_tapes(output_var));
+                auto composed_trans_with_tapes = get_composed_trans_with_tapes(output_var);
+                transducers_with_vars_on_tapes.emplace_back(std::move(composed_trans_with_tapes.first), std::move(composed_trans_with_tapes.second), std::map<mata::nft::Transition, BasicTerm>{});
             }
         }
 
-        for (const auto& [transducer, vars_on_tapes] : transducers_with_vars_on_tapes) {
+        for (auto& [transducer, vars_on_tapes, transition_to_var] : transducers_with_vars_on_tapes) {
             std::set<mata::nft::Level> levels_of_code_subst_vars;
             for (size_t i = 0; i < vars_on_tapes.size(); ++i) {
                 const BasicTerm& var = vars_on_tapes[i];
@@ -970,18 +971,58 @@ namespace smt::noodler {
                 }
             }
 
+            const mata::Symbol ONE_LETTER_SYMBOL = util::get_dummy_symbol() + 1;
+
             // we only need the length dependency between variables given by the transducers, therefore we can replace all symbols in the transducer by one symbol
             // except for code-point variables, for these we need exact value (but still dependency of this variable on other non-code-point variables is only
             // trough lengths)
-            mata::nft::Nft one_symbol_transducer = transducer.get_one_letter_aut(levels_of_code_subst_vars);
+            mata::nft::Nft one_symbol_transducer = transducer.get_one_letter_aut(levels_of_code_subst_vars, ONE_LETTER_SYMBOL);
 
-            one_symbol_transducer = mata::nft::reduce(mata::nft::remove_epsilon(one_symbol_transducer).trim()).trim();
+            auto combine_state_renamings = [](mata::nft::StateRenaming& sr_l, const mata::nft::StateRenaming& sr_r) {
+                for (auto it = sr_l.begin(); it != sr_l.end(); ) {
+                    if (!sr_r.contains(it->first)) {
+                        it = sr_l.erase(it);
+                    } else {
+                        it->second = sr_r.at(it->first);
+                        ++it;
+                    }
+                }
+            };
+
+            mata::nft::StateRenaming state_renaming;
+            if (m_params.m_produce_models) {
+                one_symbol_transducer = mata::nft::remove_epsilon(one_symbol_transducer).trim(&state_renaming);
+                mata::nft::StateRenaming other_state_renaming;
+                one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &other_state_renaming);
+                combine_state_renamings(state_renaming, other_state_renaming);
+                one_symbol_transducer = one_symbol_transducer.trim(&other_state_renaming);
+                combine_state_renamings(state_renaming, other_state_renaming);
+            } else {
+                one_symbol_transducer = mata::nft::reduce(mata::nft::remove_epsilon(one_symbol_transducer).trim()).trim();
+            }
 
             STRACE(str_parikh, tout << "Formula for transducer of size " << one_symbol_transducer.num_of_states() << " with variables " << vars_on_tapes << " is: ";);
             parikh::ParikhImageTransducer parikh_transducer{one_symbol_transducer, vars_on_tapes, code_subst_vars};
             LenNode parikh_of_transducer = parikh_transducer.compute_parikh_image();
             STRACE(str_parikh, tout << parikh_of_transducer << "\n";);
             result.succ.push_back(parikh_of_transducer);
+
+            if (m_params.m_produce_models) {
+                const auto& parikh_transducer_to_var = parikh_transducer.get_trans_vars();
+                for (const auto& trans : transducer.delta.transitions()) {
+                    if (!state_renaming.contains(trans.source) || !state_renaming.contains(trans.target)) continue;
+
+                    if (levels_of_code_subst_vars.contains(transducer.levels[trans.source])) {
+                        transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), trans.symbol, state_renaming.at(trans.target)});
+                    } else {
+                        if (trans.symbol == mata::nft::EPSILON) {
+                            transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), mata::nft::EPSILON, state_renaming.at(trans.target)});
+                        } else {
+                            transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), ONE_LETTER_SYMBOL, state_renaming.at(trans.target)});
+                        }
+                    }
+                }
+            }
 
             // Handle code-point vars that occur in this transducer
             for (const BasicTerm& var : vars_on_tapes) {
@@ -2066,7 +2107,7 @@ namespace smt::noodler {
         }
 
         // TODO the following is very inefficient and will probably be slow (and it is also incorrect, dummy symbols are handled wrongly if there are more symbols to replace with)
-        for (auto& [transducer, tape_vars] : transducers_with_vars_on_tapes) {
+        for (auto& [transducer, tape_vars, transition_to_var] : transducers_with_vars_on_tapes) {
             util::replace_dummy_symbol_in_transducer_with(transducer, set_of_symbols_to_replace_dummy_symbol_with);
             STRACE(str_model_transducer,
                 tout << "Constructing model for vars:";
@@ -2248,6 +2289,11 @@ namespace smt::noodler {
                 if (code_subst_vars.contains(len_var)) {
                     needed_vars.push_back(code_version_of(len_var));
                 }
+            }
+        }
+        for (const auto& [_transducer, _vars_on_tapes, transition_to_var] : transducers_with_vars_on_tapes) {
+            for (const auto& [_trans, var] : transition_to_var) {
+                needed_vars.push_back(var);
             }
         }
         return needed_vars;

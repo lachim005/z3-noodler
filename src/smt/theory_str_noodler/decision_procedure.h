@@ -121,6 +121,7 @@ namespace smt::noodler {
         // set of inclusions/transducers from the previous sets that for sure are not on cycle in the inclusion graph
         // that would be generated from inclusions
         std::set<Predicate> predicates_not_on_cycle;
+        std::set<Predicate> schrodinger_predicates;
 
         // contains inclusions/transducers we need to process (for inclusions we want them to hold under aut_ass and substitution_map, for transducers we want to simplify them)
         std::deque<Predicate> predicates_to_process;

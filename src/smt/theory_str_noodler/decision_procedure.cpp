@@ -1,9 +1,11 @@
 #include <queue>
+#include <unordered_set>
 #include <utility>
 #include <algorithm>
 #include <functional>
 
 #include <mata/nfa/strings.hh>
+#include <vector>
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -53,6 +55,7 @@ namespace smt::noodler {
 
         inclusions = substitute_set(inclusions);
         transducers = substitute_set(transducers);
+        schrodinger_predicates = substitute_set(schrodinger_predicates);
         predicates_not_on_cycle = substitute_set(predicates_not_on_cycle);
 
         // substituting predicates to process is bit harder, it is possible that two predicates that were supposed to
@@ -419,10 +422,173 @@ namespace smt::noodler {
                 return l_true;
             }
 
-            // we will now process one inclusion from the inclusion graph which is at front
+            auto is_initial = [](const Predicate &predicate, std::deque<Predicate> &predicates_to_process, std::set<Predicate> &schrodinger_predicates) {
+                // Checks if the inclusion has any ingoing connections
+                auto cand_right_vars = predicate.get_right_set();
+                bool has_ingoing_connections = false;
+                for (auto &x : predicates_to_process) {
+                    if (schrodinger_predicates.contains(x))
+                    {
+                        if (!SolvingState::is_dependent(x.get_right_set(), cand_right_vars)) {
+                            continue;
+                        }
+                    }
+                    if (!SolvingState::is_dependent(x.get_left_set(), cand_right_vars)) {
+                        continue;
+                    }
+                    has_ingoing_connections = true;
+                    break;
+                }
+                return !has_ingoing_connections;
+            };
+
+            auto calculate_score = [](Predicate predicate, std::unordered_set<BasicTerm> &length_vars, AutAssignment &aut_ass) {
+                // Now, we will calculate the score of this inclusion
+
+                // Stolen from https://github.com/VeriFIT/z3-noodler/pull/237
+                unsigned num_of_splits_on_left = predicate.get_left_set().size();
+                unsigned num_of_splits_on_right = 0;
+                bool last_was_length = true;
+                for (const BasicTerm& right_var : predicate.get_right_side()) {
+                    if (length_vars.contains(right_var)) {
+                        ++num_of_splits_on_right;
+                        last_was_length = true;
+                    } else {
+                        if (last_was_length) {
+                            ++num_of_splits_on_right;
+                        }
+                        last_was_length = false;
+                    }
+                }
+                unsigned long split_score = num_of_splits_on_left*num_of_splits_on_right;
+
+                // Sums the amount of states on each side
+                unsigned right_states = 0;
+                unsigned left_states = 0;
+                for (auto x : predicate.get_right_side())
+                {
+                    right_states += aut_ass.at(x)->num_of_states();
+                }
+                for (auto x : predicate.get_left_side())
+                {
+                    left_states += aut_ass.at(x)->num_of_states();
+                }
+                unsigned long state_score = right_states * left_states;
+
+                unsigned long score = split_score * state_score;
+                return score;
+            };
+
+            // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+            unsigned long best_predicate_score = ULONG_MAX;
+            Predicate best_predicate = element_to_process.predicates_to_process[0];
+            bool best_is_initial = false;
+            bool best_is_reversed = false;
+            for (auto candidate : element_to_process.predicates_to_process) {
+                if (element_to_process.schrodinger_predicates.contains(candidate)) {
+                    Predicate switched_pred = candidate.get_switched_sides_predicate();
+                    bool schrodinger_initial = is_initial(switched_pred, element_to_process.predicates_to_process, element_to_process.schrodinger_predicates);
+                    if (schrodinger_initial || !best_is_initial) {
+                        unsigned long schrodinger_score = calculate_score(switched_pred, element_to_process.length_sensitive_vars, element_to_process.aut_ass);
+                        if (schrodinger_score < best_predicate_score)
+                        {
+                            best_predicate = candidate;
+                            best_predicate_score = schrodinger_score;
+                            best_is_initial = schrodinger_initial;
+                            best_is_reversed = true;
+                        }
+                    }
+                }
+
+                bool cand_initial = is_initial(candidate, element_to_process.predicates_to_process, element_to_process.schrodinger_predicates);
+                if (!cand_initial && best_is_initial) {
+                    continue;
+                }
+
+                unsigned long score = calculate_score(candidate, element_to_process.length_sensitive_vars, element_to_process.aut_ass);
+
+                if (score < best_predicate_score)
+                {
+                    best_predicate = candidate;
+                    best_predicate_score = score;
+                    best_is_initial = cand_initial;
+                    best_is_reversed = false;
+                }
+            }
+
+            auto it = find(element_to_process.predicates_to_process.begin(), element_to_process.predicates_to_process.end(), best_predicate);
+            if (it != element_to_process.predicates_to_process.end())
+            {
+                element_to_process.predicates_to_process.erase(it);
+            }
+            element_to_process.schrodinger_predicates.erase(best_predicate);
+
+            Predicate predicate_to_process = best_is_reversed ? best_predicate.get_switched_sides_predicate() : best_predicate;
+            if (best_is_reversed) {
+                if (element_to_process.inclusions.contains(best_predicate)) {
+                    element_to_process.inclusions.erase(best_predicate);
+                    element_to_process.inclusions.insert(predicate_to_process);
+                }
+                if (element_to_process.predicates_not_on_cycle.contains(best_predicate)) {
+                    element_to_process.predicates_not_on_cycle.erase(best_predicate);
+                    element_to_process.predicates_not_on_cycle.insert(predicate_to_process);
+                }
+                if (element_to_process.transducers.contains(best_predicate)) {
+                    element_to_process.transducers.erase(best_predicate);
+                    element_to_process.transducers.insert(predicate_to_process);
+                }
+            }
+
+            // Collapses other
+            std::set<Predicate> schrodinger_to_remove{};
+            for (auto pred : element_to_process.schrodinger_predicates) {
+                bool normal_leads_into = SolvingState::is_dependent(pred.get_left_set(), predicate_to_process.get_right_set());
+                bool reversed_leads_into = SolvingState::is_dependent(pred.get_right_set(), predicate_to_process.get_right_set());
+
+                if (!normal_leads_into && !reversed_leads_into) { continue; }
+
+                // One has to go. Removes the placeholder predicate
+                schrodinger_to_remove.insert(pred);
+
+                auto switched_pred = pred.get_switched_sides_predicate();
+
+                if (normal_leads_into && reversed_leads_into) {
+                    unsigned long normal_score = calculate_score(pred, element_to_process.length_sensitive_vars, element_to_process.aut_ass);
+                    unsigned long reversed_score = calculate_score(switched_pred, element_to_process.length_sensitive_vars, element_to_process.aut_ass);
+                    if (normal_score < reversed_score)
+                        continue;
+                }
+
+                if (reversed_leads_into) {
+                    continue;
+                }
+
+                auto it = find(element_to_process.predicates_to_process.begin(), element_to_process.predicates_to_process.end(), pred);
+                if (it != element_to_process.predicates_to_process.end())
+                {
+                    element_to_process.predicates_to_process.erase(it);
+                }
+                element_to_process.predicates_to_process.push_back(switched_pred);
+
+                if (element_to_process.inclusions.contains(pred)) {
+                    element_to_process.inclusions.erase(pred);
+                    element_to_process.inclusions.insert(switched_pred);
+                }
+                if (element_to_process.predicates_not_on_cycle.contains(pred)) {
+                    element_to_process.predicates_not_on_cycle.erase(pred);
+                    element_to_process.predicates_not_on_cycle.insert(switched_pred);
+                }
+                if (element_to_process.transducers.contains(pred)) {
+                    element_to_process.transducers.erase(pred);
+                    element_to_process.transducers.insert(switched_pred);
+                }
+
+            }
+            for (auto sch : schrodinger_to_remove)
+            {
+                element_to_process.schrodinger_predicates.erase(sch);
+            }
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);
@@ -1715,6 +1881,7 @@ namespace smt::noodler {
 
                 if (!incl_graph.is_on_cycle(node)) {
                     init_solving_state.predicates_not_on_cycle.insert(node_pred);
+                    init_solving_state.schrodinger_predicates.insert(node_pred);
                 }
 
                 // we assume that nodes of incl_graph are ordered by the topological order

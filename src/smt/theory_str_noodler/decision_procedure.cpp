@@ -1013,12 +1013,12 @@ namespace smt::noodler {
                     if (!state_renaming.contains(trans.source) || !state_renaming.contains(trans.target)) continue;
 
                     if (levels_of_code_subst_vars.contains(transducer.levels[trans.source])) {
-                        transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), trans.symbol, state_renaming.at(trans.target)});
+                        transition_to_var.insert({trans, parikh_transducer_to_var.at({state_renaming.at(trans.source), trans.symbol, state_renaming.at(trans.target)})});
                     } else {
                         if (trans.symbol == mata::nft::EPSILON) {
-                            transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), mata::nft::EPSILON, state_renaming.at(trans.target)});
+                            transition_to_var.insert({trans, parikh_transducer_to_var.at({state_renaming.at(trans.source), mata::nft::EPSILON, state_renaming.at(trans.target)})});
                         } else {
-                            transition_to_var[trans] = parikh_transducer_to_var.at({state_renaming.at(trans.source), ONE_LETTER_SYMBOL, state_renaming.at(trans.target)});
+                            transition_to_var.insert({trans, parikh_transducer_to_var.at({state_renaming.at(trans.source), ONE_LETTER_SYMBOL, state_renaming.at(trans.target)})});
                         }
                     }
                 }

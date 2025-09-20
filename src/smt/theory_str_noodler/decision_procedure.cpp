@@ -990,9 +990,9 @@ namespace smt::noodler {
             };
 
             if (m_params.m_produce_models) {
-                one_symbol_transducer = mata::nft::remove_epsilon(one_symbol_transducer).trim(&parikh_mapping.state_renaming);
+                // we do not do removing epsilons, as this operation can add new transitions which we cannot map to from the original transducer transitions
+                one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &parikh_mapping.state_renaming);
                 mata::nft::StateRenaming other_state_renaming;
-                one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &other_state_renaming);
                 combine_state_renamings(parikh_mapping.state_renaming, other_state_renaming);
                 one_symbol_transducer = one_symbol_transducer.trim(&other_state_renaming);
                 combine_state_renamings(parikh_mapping.state_renaming, other_state_renaming);
@@ -1012,16 +1012,13 @@ namespace smt::noodler {
                 for (const auto& trans : transducer.delta.transitions()) {
                     if (!parikh_mapping.state_renaming.contains(trans.source) || !parikh_mapping.state_renaming.contains(trans.target)) continue;
 
-                    mata::nft::State mapped_source_state = parikh_mapping.state_renaming.at(trans.source);
-                    mata::nft::State mapped_target_state = parikh_mapping.state_renaming.at(trans.target);
-                    if (levels_of_code_subst_vars.contains(transducer.levels[trans.source])) {
-                        parikh_mapping.transition_to_var.insert({trans, parikh_transducer_to_var.at({mapped_source_state, trans.symbol, mapped_target_state})});
-                    } else {
-                        if (trans.symbol == mata::nft::EPSILON) {
-                            parikh_mapping.transition_to_var.insert({trans, parikh_transducer_to_var.at({mapped_source_state, mata::nft::EPSILON, mapped_target_state})});
-                        } else {
-                            parikh_mapping.transition_to_var.insert({trans, parikh_transducer_to_var.at({mapped_source_state, ONE_LETTER_SYMBOL, mapped_target_state})});
-                        }
+                    parikh::Transition parikh_transition{
+                        parikh_mapping.state_renaming.at(trans.source),
+                        ((levels_of_code_subst_vars.contains(transducer.levels[trans.source]) || trans.symbol == mata::nft::EPSILON) ? trans.symbol : ONE_LETTER_SYMBOL),
+                        parikh_mapping.state_renaming.at(trans.target)
+                    };
+                    if (parikh_transducer_to_var.contains(parikh_transition)) {
+                        parikh_mapping.transition_to_var.insert({trans, parikh_transducer_to_var.at(parikh_transition)});
                     }
                 }
             }

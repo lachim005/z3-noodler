@@ -491,7 +491,7 @@ namespace smt::noodler::util {
             if (is_trace_enabled(TraceTag::str_model_nfa)) {
                 tout << "Transitions with number of times we have to pass them (some number can be shared):\n";
                 for (const auto& [trans, value] : num_of_transitions_passes) {
-                    tout << trans << " : " << *value << "\n";
+                    tout << trans << " : " << *value << " " << value << "\n";
                 }
             }
         );
@@ -533,14 +533,13 @@ namespace smt::noodler::util {
                 if (state_post_it != state_post_end) {
                     mata::Symbol cur_symbol = state_post_it->symbol;
                     mata::nft::Level cur_level = nft.levels[cur_state];
-                    if (targets_it == state_post_it->targets.cend()) {
+                    if (targets_it == state_post_it->targets.cend() || (cur_symbol != mata::nft::EPSILON && lengths[cur_level] == result[cur_level].size())) {
                         ++state_post_it;
                         if (state_post_it != state_post_end) { targets_it = state_post_it->cbegin(); }
                     } else {
                         mata::nft::Transition cur_transition{cur_state, cur_symbol, *targets_it};
-                        if ((cur_symbol != mata::nft::EPSILON && lengths[cur_level] == result[cur_level].size()) || !cur_num_of_transitions_passes.contains(cur_transition) || *cur_num_of_transitions_passes.at(cur_transition) == 0) {
-                            ++state_post_it;
-                            if (state_post_it != state_post_end) { targets_it = state_post_it->cbegin(); }
+                        if (!cur_num_of_transitions_passes.contains(cur_transition) || *cur_num_of_transitions_passes.at(cur_transition) == 0) {
+                            ++targets_it;
                         } else {
                             if (cur_symbol != mata::nft::EPSILON) {
                                 result[cur_level].push_back(cur_symbol);

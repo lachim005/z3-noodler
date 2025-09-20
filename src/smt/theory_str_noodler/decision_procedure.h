@@ -690,7 +690,13 @@ namespace smt::noodler {
         // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
         std::vector<Predicate> inclusions_from_preprocessing;
 
-        std::vector<std::tuple<mata::nft::Nft,std::vector<BasicTerm>,std::map<mata::nft::Transition, BasicTerm>>> transducers_with_vars_on_tapes;
+        struct ParikhMapping {
+            mata::nft::StateRenaming state_renaming;
+            std::vector<BasicTerm> gamma_init {};
+            std::map<mata::nft::Transition, BasicTerm> transition_to_var;
+        };
+
+        std::vector<std::tuple<mata::nft::Nft,std::vector<BasicTerm>,ParikhMapping>> transducers_with_vars_on_tapes;
         
         bool is_model_initialized = false;
         /**

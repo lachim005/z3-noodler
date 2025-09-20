@@ -2070,6 +2070,40 @@ namespace smt::noodler {
         // TODO it is incorrect, dummy symbols need to be replaced on the level of transducer transitions, not on nfa transitions (works only if there is one symbol to replace with)
         solution.replace_dummy_symbol_in_transducers_with(set_of_symbols_to_replace_dummy_symbol_with);
 
+        for (auto& [transducer, tape_vars, parikh_mapping] : transducers_with_vars_on_tapes) {
+            // TODO this can handle only one dummy symbol (and it should be correct with only one)
+            util::replace_dummy_symbol_in_transducer_with(transducer, set_of_symbols_to_replace_dummy_symbol_with);
+            parikh_mapping.replace_dummy_symbol(set_of_symbols_to_replace_dummy_symbol_with);
+            STRACE(str_model_transducer,
+                tout << "Constructing model for vars:";
+                for (const BasicTerm& var : tape_vars) {
+                    tout << " " << var;
+                }
+                if (is_trace_enabled(TraceTag::str_model_nfa)) {
+                    tout << " and for transducer:\n" << transducer.print_to_dot(true, true);
+                }
+                tout << "\n";
+            );
+
+            std::set<mata::nft::State> potentional_initial_states;
+            for (mata::nft::State initial_state : transducer.initial) {
+                if (parikh_mapping.can_state_be_initial(initial_state, arith_model)) {
+                    potentional_initial_states.insert(initial_state);
+                }
+            }
+
+            std::vector<unsigned> lengths;
+            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
+                rational len = arith_model.at(tape_vars[tape_num]);
+                lengths.push_back(len.get_unsigned());
+            }
+
+            std::vector<mata::Word> words_for_tape_vars = util::get_word_from_nft(transducer, lengths, potentional_initial_states, parikh_mapping.get_transition_to_value(arith_model)).value();
+            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
+                update_model_and_aut_ass(tape_vars[tape_num], regex::Alphabet{solution.aut_ass.get_alphabet()}.get_string_from_mata_word(words_for_tape_vars[tape_num]));
+            }
+        }
+
         // Restrict the languages in solution of length variables and int conversion variables by their models
         for (auto& [var, nfa] : solution.aut_ass) {
             // literals should have the correct language already and we process only length vars which were not already processed in the dummy-symbol step
@@ -2102,36 +2136,6 @@ namespace smt::noodler {
                         update_model_and_aut_ass(var, to_int_str);
                     }
                 }
-            }
-        }
-
-        // TODO the following is very inefficient and will probably be slow (and it is also incorrect, dummy symbols are handled wrongly if there are more symbols to replace with)
-        for (auto& [transducer, tape_vars, parikh_mapping] : transducers_with_vars_on_tapes) {
-            util::replace_dummy_symbol_in_transducer_with(transducer, set_of_symbols_to_replace_dummy_symbol_with);
-            STRACE(str_model_transducer,
-                tout << "Constructing model for vars:";
-                for (const BasicTerm& var : tape_vars) {
-                    tout << " " << var;
-                }
-                if (is_trace_enabled(TraceTag::str_model_nfa)) {
-                    tout << " and for transducer:\n" << transducer.print_to_dot(true, true);
-                }
-                tout << "\n";
-            );
-            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
-                transducer = transducer.apply(*solution.aut_ass.at(tape_vars[tape_num]), tape_num, false);
-            }
-            mata::Word accepting_word = transducer.get_word(std::nullopt).value();
-            std::vector<mata::Word> words_for_tape_vars{tape_vars.size()};
-            size_t current_tape_var = 0;
-            for (unsigned current_symbol : accepting_word) {
-                if (current_symbol != mata::nft::EPSILON) {
-                    words_for_tape_vars[current_tape_var].push_back(current_symbol);
-                }
-                current_tape_var = (current_tape_var+1) % tape_vars.size();
-            }
-            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
-                update_model_and_aut_ass(tape_vars[tape_num], regex::Alphabet{solution.aut_ass.get_alphabet()}.get_string_from_mata_word(words_for_tape_vars[tape_num]));
             }
         }
 

@@ -694,6 +694,42 @@ namespace smt::noodler {
             mata::nft::StateRenaming state_renaming;
             std::vector<BasicTerm> gamma_init {};
             std::map<mata::nft::Transition, BasicTerm> transition_to_var;
+
+            bool can_state_be_initial(mata::nft::State state, const std::map<BasicTerm,rational>& arith_model) {
+                if (!state_renaming.contains(state)) return false;
+                return (arith_model.at(gamma_init[state_renaming.at(state)]) == 1);
+            }
+
+            std::map<mata::nft::Transition,std::shared_ptr<unsigned>> get_transition_to_value(const std::map<BasicTerm,rational>& arith_model) {
+                std::map<BasicTerm, std::shared_ptr<unsigned>> var_to_value;
+                std::map<mata::nft::Transition,std::shared_ptr<unsigned>> result;
+                for (const auto& [trans, var] : transition_to_var) {
+                    if (!var_to_value.contains(var)) {
+                        var_to_value[var] = std::make_shared<unsigned>(arith_model.at(var).get_unsigned());
+                    }
+                    result[trans] = var_to_value.at(var);
+                }
+                return result;
+            }
+
+            void replace_dummy_symbol(const std::set<mata::Symbol>& set_of_symbols_to_replace_dummy_symbol_with) {
+                if (set_of_symbols_to_replace_dummy_symbol_with.size() > 1) {
+                    // TODO fix this? if we had more dummy symbols, for code-points vars, we can only have transitions with the correct code-point value
+                    util::throw_error("We cannot replace dummy symbol by more than one symbol in transducers yet");
+                }
+                std::vector<std::pair<mata::nft::Transition, BasicTerm>> new_elements;
+                for (auto it = transition_to_var.begin(); it != transition_to_var.end();) {
+                    if (it->first.symbol == util::get_dummy_symbol()) {
+                        for (mata::Symbol s : set_of_symbols_to_replace_dummy_symbol_with) {
+                            new_elements.emplace_back(mata::nft::Transition{it->first.source, s, it->first.target}, it->second);
+                        }
+                        it = transition_to_var.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                transition_to_var.insert(new_elements.begin(), new_elements.end());
+            }
         };
 
         std::vector<std::tuple<mata::nft::Nft,std::vector<BasicTerm>,ParikhMapping>> transducers_with_vars_on_tapes;

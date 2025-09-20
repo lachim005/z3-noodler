@@ -194,7 +194,7 @@ namespace smt::noodler::util {
 
     bool is_concatenation_of_literals(const std::vector<BasicTerm>& concatenation, zstring& literal);
 
-    std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
+    std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::vector<unsigned>& lengths, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
 }
 
 #endif

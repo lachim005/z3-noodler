@@ -485,7 +485,6 @@ namespace smt::noodler::util {
         std::map<mata::nft::Transition,std::shared_ptr<unsigned>> cur_num_of_transitions_passes = num_of_transitions_passes;
         /// Current state, its state post iterator, its end iterator, and iterator in the current symbol post to target states.
         std::vector<std::tuple<mata::nft::State, mata::nft::StatePost::const_iterator, mata::nft::StatePost::const_iterator, mata::nft::StateSet::const_iterator>> worklist{};
-        std::vector<mata::Word> result(lengths.size());
         auto is_result_correct = [&result, &lengths]() {
             for (size_t i = 0; i < lengths.size(); ++i) {
                 if (result[i].size() != lengths[i]) {

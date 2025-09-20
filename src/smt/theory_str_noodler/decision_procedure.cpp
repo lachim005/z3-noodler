@@ -993,7 +993,6 @@ namespace smt::noodler {
                 // we do not do removing epsilons, as this operation can add new transitions which we cannot map to from the original transducer transitions
                 one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &parikh_mapping.state_renaming);
                 mata::nft::StateRenaming other_state_renaming;
-                combine_state_renamings(parikh_mapping.state_renaming, other_state_renaming);
                 one_symbol_transducer = one_symbol_transducer.trim(&other_state_renaming);
                 combine_state_renamings(parikh_mapping.state_renaming, other_state_renaming);
             } else {
@@ -2074,11 +2073,15 @@ namespace smt::noodler {
             // TODO this can handle only one dummy symbol (and it should be correct with only one)
             util::replace_dummy_symbol_in_transducer_with(transducer, set_of_symbols_to_replace_dummy_symbol_with);
             parikh_mapping.replace_dummy_symbol(set_of_symbols_to_replace_dummy_symbol_with);
+
+            STRACE(str_model_transducer, tout << "Constructing model for vars:";);
+            std::vector<unsigned> lengths;
+            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
+                rational len = arith_model.at(tape_vars[tape_num]);
+                lengths.push_back(len.get_unsigned());
+                STRACE(str_model_transducer, tout << " " << tape_vars[tape_num] << " (" << len.get_unsigned() << ")";);
+            }
             STRACE(str_model_transducer,
-                tout << "Constructing model for vars:";
-                for (const BasicTerm& var : tape_vars) {
-                    tout << " " << var;
-                }
                 if (is_trace_enabled(TraceTag::str_model_nfa)) {
                     tout << " and for transducer:\n" << transducer.print_to_dot(true, true);
                 }
@@ -2090,12 +2093,6 @@ namespace smt::noodler {
                 if (parikh_mapping.can_state_be_initial(initial_state, arith_model)) {
                     potentional_initial_states.insert(initial_state);
                 }
-            }
-
-            std::vector<unsigned> lengths;
-            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
-                rational len = arith_model.at(tape_vars[tape_num]);
-                lengths.push_back(len.get_unsigned());
             }
 
             std::vector<mata::Word> words_for_tape_vars = util::get_word_from_nft(transducer, lengths, potentional_initial_states, parikh_mapping.get_transition_to_value(arith_model)).value();

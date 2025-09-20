@@ -980,10 +980,10 @@ namespace smt::noodler {
 
             auto combine_state_renamings = [](mata::nft::StateRenaming& sr_l, const mata::nft::StateRenaming& sr_r) {
                 for (auto it = sr_l.begin(); it != sr_l.end(); ) {
-                    if (!sr_r.contains(it->first)) {
+                    if (!sr_r.contains(it->second)) {
                         it = sr_l.erase(it);
                     } else {
-                        it->second = sr_r.at(it->first);
+                        it->second = sr_r.at(it->second);
                         ++it;
                     }
                 }

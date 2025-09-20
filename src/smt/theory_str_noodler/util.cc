@@ -472,4 +472,92 @@ namespace smt::noodler::util {
         }
         return l_false;
     }
+
+    std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::vector<unsigned>& lengths, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes) {
+        assert(nft.num_of_levels == lengths.size());
+        assert(!nft.contains_jump_transitions());
+        if (potentional_initial_states.empty() || nft.final.empty()) { return std::nullopt; }
+        if (nft.initial.intersects_with(nft.final) && std::ranges::all_of(lengths, [](int x) { return x == 0; })) { return std::vector<mata::Word>(nft.num_of_levels, mata::Word()); }
+
+
+    for (const mata::nft::State initial_state: potentional_initial_states) {
+        std::vector<mata::Word> result(lengths.size());
+        std::map<mata::nft::Transition,std::shared_ptr<unsigned>> cur_num_of_transitions_passes = num_of_transitions_passes;
+        /// Current state, its state post iterator, its end iterator, and iterator in the current symbol post to target states.
+        std::vector<std::tuple<mata::nft::State, mata::nft::StatePost::const_iterator, mata::nft::StatePost::const_iterator, mata::nft::StateSet::const_iterator>> worklist{};
+        std::vector<mata::Word> result(lengths.size());
+        auto is_result_correct = [&result, &lengths]() {
+            for (size_t i = 0; i < lengths.size(); ++i) {
+                if (result[i].size() != lengths[i]) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        const mata::nft::StatePost& initial_state_post{ nft.delta[initial_state] };
+        auto initial_symbol_post_it{ initial_state_post.cbegin() };
+        auto initial_symbol_post_end{ initial_state_post.cend() };
+
+        if (initial_symbol_post_it == initial_symbol_post_end) { continue; }
+
+        worklist.emplace_back(initial_state, initial_symbol_post_it, initial_symbol_post_end, initial_symbol_post_it->targets.cbegin());
+
+        while (!worklist.empty()) {
+            // Using references to iterators to be able to increment the top-most element in the worklist in place.
+            auto& [cur_state, state_post_it, state_post_end, targets_it]{ worklist.back() };
+            if (state_post_it != state_post_end) {
+                mata::Symbol cur_symbol = state_post_it->symbol;
+                mata::nft::Level cur_level = nft.levels[cur_state];
+                if (targets_it == state_post_it->targets.cend()) {
+                    ++state_post_it;
+                    if (state_post_it != state_post_end) { targets_it = state_post_it->cbegin(); }
+                } else {
+                    mata::nft::Transition cur_transition{cur_state, cur_symbol, *targets_it};
+                    if ((cur_symbol != mata::nft::EPSILON && lengths[cur_level] == result[cur_level].size()) || !cur_num_of_transitions_passes.contains(cur_transition) || *cur_num_of_transitions_passes.at(cur_transition) == 0) {
+                        ++state_post_it;
+                        if (state_post_it != state_post_end) { targets_it = state_post_it->cbegin(); }
+                    }
+                    if (cur_symbol != mata::nft::EPSILON) {
+                        result[cur_level].push_back(cur_symbol);
+                    }
+                    --(*cur_num_of_transitions_passes.at(cur_transition));
+                    if (nft.final.contains(*targets_it) && is_result_correct()) {
+                        return result;
+                    }
+                    const mata::nft::StatePost& state_post{ nft.delta[*targets_it] };
+                    if (!state_post.empty()) {
+                        auto new_state_post_it{ state_post.cbegin() };
+                        auto new_targets_it{ new_state_post_it->cbegin() };
+                        worklist.emplace_back(*targets_it, new_state_post_it, state_post.cend(), new_targets_it);
+                    } else {
+                        if (cur_symbol != mata::nft::EPSILON) {
+                            result[cur_level].pop_back();
+                        }
+                        ++(*cur_num_of_transitions_passes.at(cur_transition));
+                        ++targets_it;
+                    }
+                }
+            } else { // state_post_it == state_post_end.
+                worklist.pop_back();
+                if (!worklist.empty()) {
+                    auto& [prev_state, prev_state_post_it, prev_state_post_end, prev_targets_it]{ worklist.back() };
+                    assert(prev_state_post_it != prev_state_post_end);
+                    mata::Symbol prev_symbol = prev_state_post_it->symbol;
+                    mata::nft::Level prev_level = nft.levels[prev_state];
+                    if (prev_symbol != mata::nft::EPSILON) {
+                        assert(!result[prev_level].empty() && result[prev_level].back() == prev_symbol);
+                        result[prev_level].pop_back();
+                    }
+                    assert(prev_targets_it != prev_state_post_it->targets.cend());
+                    mata::nft::Transition prev_transition{prev_state, prev_symbol, *prev_targets_it};
+                    ++(*cur_num_of_transitions_passes.at(prev_transition));
+                    ++prev_targets_it;
+                }
+            }
+        }
+    }
+
+    return std::nullopt;
+    }
 }

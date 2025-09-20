@@ -193,6 +193,8 @@ namespace smt::noodler::util {
     void replace_dummy_symbol_in_transducer_with(mata::nft::Nft& transducer, const std::set<mata::Symbol>& symbols_to_replace_with);
 
     bool is_concatenation_of_literals(const std::vector<BasicTerm>& concatenation, zstring& literal);
+
+    std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
 }
 
 #endif

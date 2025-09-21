@@ -2,6 +2,7 @@
 #include <utility>
 #include <algorithm>
 #include <functional>
+#include <ranges>
 
 #include <mata/applications/strings.hh>
 #include "util.h"
@@ -884,7 +885,7 @@ namespace smt::noodler {
 
         length_vars_with_transducers = {};
         code_subst_vars_handled_by_parikh = {};
-        transducers_with_vars_on_tapes = {};
+        transducers_with_parikh_information = {};
 
         // We collect transducers in which length variable occurs in the input (right) side (which also means it must
         // occur also in the output). We do not need transducers where we have length variable only in the output, for
@@ -949,14 +950,15 @@ namespace smt::noodler {
 
         // We now find each output_var which is NOT an input var of some transducer, meaning they are at the end of
         // inclusion graph and we create the composed transducer for them.
-        for (const auto& [output_var,transducers] : output_var_to_its_transducers) {
-            if (!length_input_vars.contains(output_var)) {
-                auto composed_trans_with_tapes = get_composed_trans_with_tapes(output_var);
-                transducers_with_vars_on_tapes.emplace_back(std::move(composed_trans_with_tapes.first), std::move(composed_trans_with_tapes.second), ParikhMapping{});
-            }
-        }
+        for (const auto& [output_var,transducers] : output_var_to_its_transducers | std::views::filter([&length_input_vars](const auto& item){ return !length_input_vars.contains(item.first); })) {
+            auto [combined_transducer, vars_on_tapes] = get_composed_trans_with_tapes(output_var);
 
-        for (auto& [transducer, vars_on_tapes, parikh_mapping] : transducers_with_vars_on_tapes) {
+            // We are now going to build a parikh formula for combined_transducer. We firstly simplify combined_transducer
+            // to a one that contains only epsilon transitions and transitions with just one specific symbol. This is because
+            // lengths of words of different tapes depend on each other just based on the number of transitions with concrete
+            // symbols. However, for code vars, we need to keep exact symbols, so that we are able to compute the exact code-point.
+            
+            // we build a parikh image for the transducer (first we collect all levels of code_vars)
             std::set<mata::nft::Level> levels_of_code_subst_vars;
             for (size_t i = 0; i < vars_on_tapes.size(); ++i) {
                 const BasicTerm& var = vars_on_tapes[i];
@@ -971,13 +973,14 @@ namespace smt::noodler {
                 }
             }
 
+            // We only need the length dependency between variables given by the transducers, therefore we can replace all symbols
+            // in the transducer by one symbol except for code-point variables, for these we need exact value (but still, the dependency
+            // of this variable on other non-code-point variables is only trough lengths).
             const mata::Symbol ONE_LETTER_SYMBOL = util::get_dummy_symbol() + 1;
+            mata::nft::Nft one_symbol_transducer = combined_transducer.get_one_letter_aut(levels_of_code_subst_vars, ONE_LETTER_SYMBOL);
 
-            // we only need the length dependency between variables given by the transducers, therefore we can replace all symbols in the transducer by one symbol
-            // except for code-point variables, for these we need exact value (but still dependency of this variable on other non-code-point variables is only
-            // trough lengths)
-            mata::nft::Nft one_symbol_transducer = transducer.get_one_letter_aut(levels_of_code_subst_vars, ONE_LETTER_SYMBOL);
-
+            mata::nft::StateRenaming state_renaming; // will map states of combined_transducer to one_symbol_transducer (if needed for model generation)
+            // helping function to combine state renamings
             auto combine_state_renamings = [](mata::nft::StateRenaming& sr_l, const mata::nft::StateRenaming& sr_r) {
                 for (auto it = sr_l.begin(); it != sr_l.end(); ) {
                     if (!sr_r.contains(it->second)) {
@@ -989,37 +992,53 @@ namespace smt::noodler {
                 }
             };
 
-            if (m_params.m_produce_models) {
+            if (m_params.m_produce_models) { // model generation is enabled, we need to compute state renaming
                 // we do not do removing epsilons, as this operation can add new transitions which we cannot map to from the original transducer transitions
-                one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &parikh_mapping.state_renaming);
+                one_symbol_transducer = mata::nft::reduce(one_symbol_transducer, &state_renaming);
                 mata::nft::StateRenaming other_state_renaming;
                 one_symbol_transducer = one_symbol_transducer.trim(&other_state_renaming);
-                combine_state_renamings(parikh_mapping.state_renaming, other_state_renaming);
-            } else {
+                combine_state_renamings(state_renaming, other_state_renaming);
+            } else { // model generation is not enabled, we can ignore state renaming
                 one_symbol_transducer = mata::nft::reduce(mata::nft::remove_epsilon(one_symbol_transducer).trim()).trim();
             }
 
+            // we compute the parikh formula for one_symbol_transducer
             STRACE(str_parikh, tout << "Formula for transducer of size " << one_symbol_transducer.num_of_states() << " with variables " << vars_on_tapes << " is: ";);
             parikh::ParikhImageTransducer parikh_transducer{one_symbol_transducer, vars_on_tapes, code_subst_vars};
             LenNode parikh_of_transducer = parikh_transducer.compute_parikh_image();
             STRACE(str_parikh, tout << parikh_of_transducer << "\n";);
-            result.succ.push_back(parikh_of_transducer);
+            result.succ.push_back(parikh_of_transducer); // add it to the LIA formula
 
-            if (m_params.m_produce_models) {
-                parikh_mapping.gamma_init = parikh_transducer.get_gamma_init();
-                const auto& parikh_transducer_to_var = parikh_transducer.get_trans_vars();
-                for (const auto& trans : transducer.delta.transitions()) {
-                    if (!parikh_mapping.state_renaming.contains(trans.source) || !parikh_mapping.state_renaming.contains(trans.target)) continue;
+            if (m_params.m_produce_models) { // models are enabled, we need to compute the mapping from combined_transducer transitions and states to parikh variables
+                TransducerParikhInformation transducer_with_parikh_information {
+                    .nft = std::move(combined_transducer),
+                    .vars_on_tapes = vars_on_tapes,
+                };
 
-                    parikh::Transition parikh_transition{
-                        parikh_mapping.state_renaming.at(trans.source),
-                        ((levels_of_code_subst_vars.contains(transducer.levels[trans.source]) || trans.symbol == mata::nft::EPSILON) ? trans.symbol : ONE_LETTER_SYMBOL),
-                        parikh_mapping.state_renaming.at(trans.target)
-                    };
-                    if (parikh_transducer_to_var.contains(parikh_transition)) {
-                        parikh_mapping.transition_to_var.insert({trans, parikh_transducer_to_var.at(parikh_transition)});
+                const auto& gamma_init = parikh_transducer.get_gamma_init();
+                for (mata::nft::State s = 0; s < transducer_with_parikh_information.nft.num_of_states(); ++s) {
+                    if (state_renaming.contains(s)) {
+                        transducer_with_parikh_information.state_to_gamma_init.insert({s, gamma_init[state_renaming.at(s)]});
                     }
                 }
+
+                const auto& parikh_transducer_to_var = parikh_transducer.get_trans_vars();
+                for (const auto& trans : transducer_with_parikh_information.nft.delta.transitions()) {
+                    if (!state_renaming.contains(trans.source) || !state_renaming.contains(trans.target)) continue;
+
+                    // the parikh transition to which trans is mapped
+                    parikh::Transition parikh_transition{
+                        state_renaming.at(trans.source),
+                        // the transitions of code vars levels and epsilon transitions were kept in one_symbol_transducer, so they will be mapped to the same transition, otherwise we map to ONE_LETTER_SYMBOL transition
+                        ((levels_of_code_subst_vars.contains(transducer_with_parikh_information.nft.levels[trans.source]) || trans.symbol == mata::nft::EPSILON) ? trans.symbol : ONE_LETTER_SYMBOL),
+                        state_renaming.at(trans.target)
+                    };
+                    if (parikh_transducer_to_var.contains(parikh_transition)) {
+                        transducer_with_parikh_information.transition_to_var.insert({trans, parikh_transducer_to_var.at(parikh_transition)});
+                    }
+                }
+
+                transducers_with_parikh_information.push_back(transducer_with_parikh_information);
             }
 
             // Handle code-point vars that occur in this transducer
@@ -2069,35 +2088,32 @@ namespace smt::noodler {
         // TODO it is incorrect, dummy symbols need to be replaced on the level of transducer transitions, not on nfa transitions (works only if there is one symbol to replace with)
         solution.replace_dummy_symbol_in_transducers_with(set_of_symbols_to_replace_dummy_symbol_with);
 
-        for (auto& [transducer, tape_vars, parikh_mapping] : transducers_with_vars_on_tapes) {
+        for (auto& transducer_with_parikh_information : transducers_with_parikh_information) {
             // TODO this can handle only one dummy symbol (and it should be correct with only one)
-            util::replace_dummy_symbol_in_transducer_with(transducer, set_of_symbols_to_replace_dummy_symbol_with);
-            parikh_mapping.replace_dummy_symbol(set_of_symbols_to_replace_dummy_symbol_with);
+            transducer_with_parikh_information.replace_dummy_symbol(set_of_symbols_to_replace_dummy_symbol_with);
 
             STRACE(str_model_transducer, tout << "Constructing model for vars:";);
             std::vector<unsigned> lengths;
-            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
-                rational len = arith_model.at(tape_vars[tape_num]);
+            for (size_t tape_num = 0; tape_num < transducer_with_parikh_information.vars_on_tapes.size(); ++tape_num) {
+                rational len = arith_model.at(transducer_with_parikh_information.vars_on_tapes[tape_num]);
                 lengths.push_back(len.get_unsigned());
-                STRACE(str_model_transducer, tout << " " << tape_vars[tape_num] << " (" << len.get_unsigned() << ")";);
+                STRACE(str_model_transducer, tout << " " << transducer_with_parikh_information.vars_on_tapes[tape_num] << " (" << len.get_unsigned() << ")";);
             }
             STRACE(str_model_transducer,
                 if (is_trace_enabled(TraceTag::str_model_nfa)) {
-                    tout << " and for transducer:\n" << transducer.print_to_dot(true, true);
+                    tout << " and for transducer:\n" << transducer_with_parikh_information.nft.print_to_dot(true, true);
                 }
                 tout << "\n";
             );
 
-            std::set<mata::nft::State> potentional_initial_states;
-            for (mata::nft::State initial_state : transducer.initial) {
-                if (parikh_mapping.can_state_be_initial(initial_state, arith_model)) {
-                    potentional_initial_states.insert(initial_state);
-                }
-            }
-
-            std::vector<mata::Word> words_for_tape_vars = util::get_word_from_nft(transducer, lengths, potentional_initial_states, parikh_mapping.get_transition_to_value(arith_model)).value();
-            for (size_t tape_num = 0; tape_num < tape_vars.size(); ++tape_num) {
-                update_model_and_aut_ass(tape_vars[tape_num], regex::Alphabet{solution.aut_ass.get_alphabet()}.get_string_from_mata_word(words_for_tape_vars[tape_num]));
+            std::vector<mata::Word> words_for_tape_vars = util::get_word_from_nft(
+                                                                    transducer_with_parikh_information.nft,
+                                                                    lengths,
+                                                                    transducer_with_parikh_information.get_potentional_initial_states(arith_model),
+                                                                    transducer_with_parikh_information.get_transition_to_value(arith_model)
+                                                                ).value();
+            for (size_t tape_num = 0; tape_num < transducer_with_parikh_information.vars_on_tapes.size(); ++tape_num) {
+                update_model_and_aut_ass(transducer_with_parikh_information.vars_on_tapes[tape_num], regex::Alphabet{solution.aut_ass.get_alphabet()}.get_string_from_mata_word(words_for_tape_vars[tape_num]));
             }
         }
 
@@ -2291,11 +2307,8 @@ namespace smt::noodler {
                 }
             }
         }
-        for (const auto& [_transducer, _vars_on_tapes, parikh_mapping] : transducers_with_vars_on_tapes) {
-            for (const auto& [_trans, var] : parikh_mapping.transition_to_var) {
-                needed_vars.push_back(var);
-            }
-            for (const auto& var : parikh_mapping.gamma_init) {
+        for (const auto& transducer_with_parikh_information : transducers_with_parikh_information) {
+            for (const BasicTerm& var : transducer_with_parikh_information.get_all_parikh_vars()) {
                 needed_vars.push_back(var);
             }
         }

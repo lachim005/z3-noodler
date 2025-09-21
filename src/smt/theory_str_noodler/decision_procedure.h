@@ -714,7 +714,6 @@ namespace smt::noodler {
                 std::set<mata::nft::State> potentional_initial_states;
                 for (const auto& [state, var] : state_to_gamma_init) {
                     if (arith_model.at(var) == 1) {
-                        assert(nft.initial.contains(state));
                         potentional_initial_states.insert(state);
                     }
                 }

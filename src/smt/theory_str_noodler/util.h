@@ -210,7 +210,7 @@ namespace smt::noodler::util {
      * 
      * @param nft Transducer whose accepting word we are looking for
      * @param lengths Lengths of accepting words (lengths.size() must be equal to number of tapes of @p nft )
-     * @param potentional_initial_states One of these states must be the starting point of the accepting run (should be a subset of nft.initial)
+     * @param potentional_initial_states One of these states must be the starting point of the accepting run (does not need to be a subset of nft.initial)
      * @param num_of_transitions_passes Maps transitions of @p nft to number of the given transition must be taken in the accepting run combined
      * @return std::optional<std::vector<mata::Word>> The accepting words or std::nullopt if none exist.
      */

@@ -194,6 +194,26 @@ namespace smt::noodler::util {
 
     bool is_concatenation_of_literals(const std::vector<BasicTerm>& concatenation, zstring& literal);
 
+    /**
+     * @brief Get a word from each tape of @p nft of lengths from @p lengths starting from some initial state in @p potentional_initial_states and passing transitions based on @p num_of_transitions_passes
+     * 
+     * More specifically, if (w1, w2, ..., wn) is an accepting word of @p nft, then it is returned by this function if
+     *      - it starts in some state from @p potentional_initial_states
+     *      - |wi| == lengths[i] (n is the number of tapes and it must hold that lengths.size() == n)
+     *      - the accepting run must fulfill @p num_of_transitions_passes (see below)
+     * Transitions of @p nft can be mapped to some number in @p num_of_transitions_passes representing the number of times
+     * the transition needs to be taken on the accepting run. If a transition is not mapped, then it is assumed that the
+     * transition cannot be taken. Futhermore, two (or more) transitions t1 and t2 can share one number l. This means that
+     * in the accepting run, t1 and t2 must be taken l number of times combined.
+     * 
+     * If no such run exists, we return std::nullopt
+     * 
+     * @param nft Transducer whose accepting word we are looking for
+     * @param lengths Lengths of accepting words (lengths.size() must be equal to number of tapes of @p nft )
+     * @param potentional_initial_states One of these states must be the starting point of the accepting run (should be a subset of nft.initial)
+     * @param num_of_transitions_passes Maps transitions of @p nft to number of the given transition must be taken in the accepting run combined
+     * @return std::optional<std::vector<mata::Word>> The accepting words or std::nullopt if none exist.
+     */
     std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::vector<unsigned>& lengths, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
 }
 

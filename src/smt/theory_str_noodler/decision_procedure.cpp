@@ -951,7 +951,10 @@ namespace smt::noodler {
         // We now find each output_var which is NOT an input var of some transducer, meaning they are at the end of
         // inclusion graph and we create the composed transducer for them.
         for (const auto& [output_var,transducers] : output_var_to_its_transducers | std::views::filter([&length_input_vars](const auto& item){ return !length_input_vars.contains(item.first); })) {
+            // The tapes of combined_transducer represent the vars in vars_on_tapes. We want to encode the length dependencies
+            // between these vars. We will do it trought parikh formula.
             auto [combined_transducer, vars_on_tapes] = get_composed_trans_with_tapes(output_var);
+            assert(combined_transducer.num_of_levels == vars_on_tapes.size());
 
             // We are now going to build a parikh formula for combined_transducer. We firstly simplify combined_transducer
             // to a one that contains only epsilon transitions and transitions with just one specific symbol. This is because

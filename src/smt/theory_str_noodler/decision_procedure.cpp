@@ -1881,7 +1881,25 @@ namespace smt::noodler {
 
                 if (!incl_graph.is_on_cycle(node)) {
                     init_solving_state.predicates_not_on_cycle.insert(node_pred);
-                    init_solving_state.schrodinger_predicates.insert(node_pred);
+
+                    // TODO: move elsewhere
+                    auto have_some_var_twice = [](const std::vector<BasicTerm>& v) {
+                        std::set<BasicTerm> vars_in_v;
+                        for (const BasicTerm& var : v) {
+                            if (var.is_variable()) {
+                                if (vars_in_v.contains(var)) {
+                                    return true;
+                                }
+                                vars_in_v.insert(var);
+                            }
+                        }
+                        return false;
+                    };
+                    // left side shouldn't have the same var twice so it
+                    // doesn't end up on the right side if it gets reversed
+                    if (!have_some_var_twice(node_pred.get_left_side())) {
+                        init_solving_state.schrodinger_predicates.insert(node_pred);
+                    }
                 }
 
                 // we assume that nodes of incl_graph are ordered by the topological order

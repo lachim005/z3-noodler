@@ -1,5 +1,6 @@
 #include "inclusion_graph.h"
 #include "util.h"
+#include <cmath>
 #include <iostream>
 #include <map>
 
@@ -95,18 +96,6 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
 
     NodeSet erased_nodes;
 
-    auto factorial = [](unsigned n) {
-        unsigned long res = 1;
-        for (unsigned i = 2; i <= n; i++) {
-            res *= i;
-        }
-        return res;
-    };
-
-    auto combination_num = [&factorial](unsigned n, unsigned k) {
-        return factorial(n) / (factorial(k) * factorial(n - k));
-    };
-
     while (true) {
         std::map<FormulaGraphNode, unsigned long> init_nodes_with_score;
 
@@ -142,7 +131,7 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
                 left_states += aut_ass.at(x)->num_of_states();
             }
 
-            unsigned long score = combination_num(right_states + 1, num_of_splits_on_left) * combination_num(left_states + 1, num_of_splits_on_right);
+            unsigned long score = std::pow(right_states + 1, num_of_splits_on_left) * std::pow(left_states + 1, num_of_splits_on_right);
 
             init_nodes_with_score[node] = score;
         }

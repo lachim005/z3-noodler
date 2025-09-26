@@ -1,4 +1,5 @@
 #include <climits>
+#include <cmath>
 #include <mata/nfa/nfa.hh>
 #include <queue>
 #include <utility>
@@ -424,19 +425,6 @@ namespace smt::noodler {
             // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
 
-            auto factorial = [](unsigned n) {
-                unsigned long res = 1;
-                for (unsigned i = 2; i <= n; i++) {
-                    res *= i;
-                }
-                return res;
-            };
-
-            auto combination_num = [&factorial](unsigned n, unsigned k) {
-                return factorial(n) / (factorial(k) * factorial(n - k));
-            };
-
-
             unsigned long min_score = ULONG_MAX;
             unsigned long min_score_item_idx = 0;
             bool min_is_initial = false;
@@ -487,7 +475,7 @@ namespace smt::noodler {
                     left_states += element_to_process.aut_ass.at(x)->num_of_states();
                 }
 
-                unsigned long score = combination_num(right_states + 1, num_of_splits_on_left) * combination_num(left_states + 1, num_of_splits_on_right);
+                unsigned long score = std::pow(right_states + 1, num_of_splits_on_left) * std::pow(left_states + 1, num_of_splits_on_right);
 
                 // We want to save an inclusion with the least score
                 // but we prefer inclusions with no ingoing connections

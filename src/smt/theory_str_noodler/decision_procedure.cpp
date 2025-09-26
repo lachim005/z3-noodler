@@ -424,6 +424,19 @@ namespace smt::noodler {
             // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
 
+            auto factorial = [](unsigned n) {
+                unsigned long res = 1;
+                for (unsigned i = 2; i <= n; i++) {
+                    res *= i;
+                }
+                return res;
+            };
+
+            auto combination_num = [&factorial](unsigned n, unsigned k) {
+                return factorial(n) / (factorial(k) * factorial(n - k));
+            };
+
+
             unsigned long min_score = ULONG_MAX;
             unsigned long min_score_item_idx = 0;
             bool min_is_initial = false;
@@ -447,7 +460,7 @@ namespace smt::noodler {
                 // Now, we will calculate the score of this inclusion
 
                 // Stolen from https://github.com/VeriFIT/z3-noodler/pull/237
-                unsigned num_of_splits_on_left = candidate.get_left_set().size();
+                unsigned num_of_splits_on_left = candidate.get_left_side().size();
                 unsigned num_of_splits_on_right = 0;
                 bool last_was_length = true;
                 for (const BasicTerm& right_var : candidate.get_right_side()) {
@@ -461,7 +474,6 @@ namespace smt::noodler {
                         last_was_length = false;
                     }
                 }
-                unsigned long split_score = num_of_splits_on_left*num_of_splits_on_right;
 
                 // Sums the amount of states on each side
                 unsigned right_states = 0;
@@ -474,9 +486,9 @@ namespace smt::noodler {
                 {
                     left_states += element_to_process.aut_ass.at(x)->num_of_states();
                 }
-                unsigned long state_score = right_states * left_states;
 
-                unsigned long score = split_score * state_score;
+                unsigned long score = combination_num(right_states + 1, num_of_splits_on_left) * combination_num(left_states + 1, num_of_splits_on_right);
+
                 // We want to save an inclusion with the least score
                 // but we prefer inclusions with no ingoing connections
                 if (score < min_score || (!has_ingoing_connections && !min_is_initial)) {

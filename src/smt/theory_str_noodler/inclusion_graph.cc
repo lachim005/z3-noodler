@@ -1,5 +1,6 @@
 #include "inclusion_graph.h"
 #include "util.h"
+#include <iostream>
 #include <map>
 
 namespace {
@@ -93,6 +94,19 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
     FormulaGraph inclusion_graph{};
 
     NodeSet erased_nodes;
+
+    auto factorial = [](unsigned n) {
+        unsigned long res = 1;
+        for (unsigned i = 2; i <= n; i++) {
+            res *= i;
+        }
+        return res;
+    };
+
+    auto combination_num = [&factorial](unsigned n, unsigned k) {
+        return factorial(n) / (factorial(k) * factorial(n - k));
+    };
+
     while (true) {
         std::map<FormulaGraphNode, unsigned long> init_nodes_with_score;
 
@@ -115,7 +129,6 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
                     last_was_length = false;
                 }
             }
-            unsigned long split_score = num_of_splits_on_left * num_of_splits_on_right;
 
             // Sums the amount of states on each side
             unsigned right_states = 0;
@@ -128,9 +141,10 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
             {
                 left_states += aut_ass.at(x)->num_of_states();
             }
-            unsigned long state_score = right_states * left_states;
 
-            init_nodes_with_score[node] = split_score * state_score;
+            unsigned long score = combination_num(right_states + 1, num_of_splits_on_left) * combination_num(left_states + 1, num_of_splits_on_right);
+
+            init_nodes_with_score[node] = score;
         }
 
         if (init_nodes_with_score.empty()) {

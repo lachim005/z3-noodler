@@ -425,9 +425,9 @@ namespace smt::noodler {
             // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
 
-            unsigned long min_score = ULONG_MAX;
-            unsigned long min_score_item_idx = 0;
-            bool min_is_initial = false;
+            unsigned long max_score = 0;
+            unsigned long max_score_item_idx = 0;
+            bool max_is_initial = false;
             for (size_t candidate_idx = 0; candidate_idx < element_to_process.predicates_to_process.size(); candidate_idx++) {
                 Predicate& candidate = element_to_process.predicates_to_process[candidate_idx];
 
@@ -443,7 +443,7 @@ namespace smt::noodler {
                     }
                 }
 
-                if (has_ingoing_connections && min_is_initial) { continue; }
+                if (has_ingoing_connections && max_is_initial) { continue; }
 
                 // Now, we will calculate the score of this inclusion
 
@@ -479,15 +479,15 @@ namespace smt::noodler {
 
                 // We want to save an inclusion with the least score
                 // but we prefer inclusions with no ingoing connections
-                if (score < min_score || (!has_ingoing_connections && !min_is_initial)) {
-                    min_score = score;
-                    min_score_item_idx = candidate_idx;
-                    min_is_initial = !has_ingoing_connections;
+                if (score > max_score || (!has_ingoing_connections && !max_is_initial)) {
+                    max_score = score;
+                    max_score_item_idx = candidate_idx;
+                    max_is_initial = !has_ingoing_connections;
                 }
             }
 
-            Predicate predicate_to_process = element_to_process.predicates_to_process[min_score_item_idx];
-            element_to_process.predicates_to_process[min_score_item_idx] = element_to_process.predicates_to_process.back();
+            Predicate predicate_to_process = element_to_process.predicates_to_process[max_score_item_idx];
+            element_to_process.predicates_to_process[max_score_item_idx] = element_to_process.predicates_to_process.back();
             element_to_process.predicates_to_process.pop_back();
 
             if (predicate_to_process.is_equation()) { // inclusion

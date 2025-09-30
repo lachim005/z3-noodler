@@ -690,7 +690,73 @@ namespace smt::noodler {
         // inclusions that resulted from preprocessing, we use them to generate model (we can pretend that they were all already refined)
         std::vector<Predicate> inclusions_from_preprocessing;
 
-        std::vector<std::pair<mata::nft::Nft,std::vector<BasicTerm>>> transducers_with_vars_on_tapes;
+        /// Keeps transducer with parikh information needed to compute model
+        struct TransducerParikhInformation {
+            mata::nft::Nft nft; // the transducer
+            std::vector<BasicTerm> vars_on_tapes; // each tape of the transducer represent some length variable
+            std::map<mata::nft::State, BasicTerm> state_to_gamma_init; // states of the transducer are mapped to parikh variable representing that the solution starts in the given state
+            std::map<mata::nft::Transition, BasicTerm> transition_to_var; // transitions of the transducer are mapped to parikh variables representing how often we need to pass it (vars can be shared)
+
+            /// Get all parikh vars connected with the transducer
+            std::set<BasicTerm> get_all_parikh_vars() const {
+                std::set<BasicTerm> parikh_vars;
+                for (const auto& [_state, var] : state_to_gamma_init) {
+                    parikh_vars.insert(var);
+                }
+                for (const auto& [_trans, var] : transition_to_var) {
+                    parikh_vars.insert(var);
+                }
+                return parikh_vars;
+            }
+
+            /// Given an @p arith_model (maps gamma_init vars to numbers), we get all states that be an initial state (their gamma_init var is equal to 1)
+            std::set<mata::nft::State> get_potentional_initial_states(const std::map<BasicTerm,rational>& arith_model) const {
+                std::set<mata::nft::State> potentional_initial_states;
+                for (const auto& [state, var] : state_to_gamma_init) {
+                    if (arith_model.at(var) == 1) {
+                        potentional_initial_states.insert(state);
+                    }
+                }
+                return potentional_initial_states;
+            }
+
+            /// Given an @p arith_model (maps transition vars to numbers), we return a mapping that maps transitions to a (possibly shared) number representing how many times a transition need to be taken
+            std::map<mata::nft::Transition,std::shared_ptr<unsigned>> get_transition_to_value(const std::map<BasicTerm,rational>& arith_model) const {
+                std::map<BasicTerm, std::shared_ptr<unsigned>> var_to_value;
+                std::map<mata::nft::Transition,std::shared_ptr<unsigned>> result;
+                for (const auto& [trans, var] : transition_to_var) {
+                    if (!var_to_value.contains(var)) {
+                        var_to_value[var] = std::make_shared<unsigned>(arith_model.at(var).get_unsigned());
+                    }
+                    result[trans] = var_to_value.at(var);
+                }
+                return result;
+            }
+
+            /// Replaces transitions with dummy symbol in @c nft and @c transition_to_var by new transitions with the symbols from @p set_of_symbols_to_replace_dummy_symbol_with and maps them to the same var
+            void replace_dummy_symbol(const std::set<mata::Symbol>& set_of_symbols_to_replace_dummy_symbol_with) {
+                if (set_of_symbols_to_replace_dummy_symbol_with.size() > 1) {
+                    // TODO fix this? if we had more dummy symbols, for code-points vars, we can only have transitions with the correct code-point value
+                    util::throw_error("We cannot replace dummy symbol by more than one symbol in transducers yet");
+                }
+                util::replace_dummy_symbol_in_transducer_with(nft, set_of_symbols_to_replace_dummy_symbol_with);
+                std::vector<std::pair<mata::nft::Transition, BasicTerm>> new_elements;
+                for (auto it = transition_to_var.begin(); it != transition_to_var.end();) {
+                    if (it->first.symbol == util::get_dummy_symbol()) {
+                        for (mata::Symbol s : set_of_symbols_to_replace_dummy_symbol_with) {
+                            new_elements.emplace_back(mata::nft::Transition{it->first.source, s, it->first.target}, it->second);
+                        }
+                        it = transition_to_var.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                transition_to_var.insert(new_elements.begin(), new_elements.end());
+            }
+        };
+
+        /// Transducers that combine multiple length variables
+        std::vector<TransducerParikhInformation> transducers_with_parikh_information;
         
         bool is_model_initialized = false;
         /**

@@ -748,7 +748,7 @@ namespace smt::noodler {
         // where the inclusion must be processed to update the languages of output_vars.
         // Note: It would seem that we could also use this optimization for when we have one input length var (that leads to one automaton). However,
         // this would not work, after processing the inclusion, the fresh_var (which would need to be length) would be substituted and then "fresh_var = T(input_vars)"
-        // woudl be processed again, but input_vars still lead to one automaton so we would repeat this and get stuck.
+        // would be processed again, but input_vars still lead to one automaton so we would repeat this and get stuck.
         if (input_vars_automata.size() == 1 && !solving_state.contains_length_var(input_vars)) {
             mata::nfa::Nfa application_to_input_automaton = transducer_to_process.get_transducer()->apply(*input_vars_automata[0], 0).to_nfa_move();
             application_to_input_automaton = mata::nfa::reduce(mata::nfa::remove_epsilon(application_to_input_automaton.trim()));

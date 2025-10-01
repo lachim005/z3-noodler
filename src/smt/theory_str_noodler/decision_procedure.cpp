@@ -740,6 +740,33 @@ namespace smt::noodler {
         auto [input_vars_automata, input_vars_divisions] = solving_state.get_automata_and_division_of_concatenation(input_vars, true);
         SASSERT(input_vars_automata.size() == input_vars_divisions.size());
 
+        // In the case that input side leads to one automaton, i.e., either there is only one (length) var, or multiple non-length vars,
+        // then we can apply this automaton directly to the transducer. So if we have
+        //   output_vars = T(input_vars),
+        // we take the language of applying automaton from input_vars on T and create a new fresh_var with this language, where we create
+        //    fresh_var = T(input_vars)         and         output_vars ⊆ fresh_var
+        // We also set fresh_var as length if input_vars contain any length var (in that case input_vars contain exactly one var, which is length).
+        if (input_vars_automata.size() == 1) {
+            mata::nfa::Nfa application_to_input_automaton = transducer_to_process.get_transducer()->apply(*input_vars_automata[0], 0).to_nfa_move();
+            application_to_input_automaton = mata::nfa::reduce(mata::nfa::remove_epsilon(application_to_input_automaton.trim()));
+            
+            if (application_to_input_automaton.is_lang_empty()) {
+                // applying input on the transducer results in empty language, this solving_state cannot lead to solution
+                return;
+            }
+
+            // the language of fresh_var is the application, it is length if input_vars contain length
+            BasicTerm fresh_var = solving_state.add_fresh_var(std::make_shared<mata::nfa::Nfa>(application_to_input_automaton), std::string("onevarapp_") + std::to_string(noodlification_no), solving_state.contains_length_var(input_vars), true);
+            // we add transducer "fresh_var = T(input_vars)"
+            solving_state.add_transducer(transducer_to_process.get_transducer(), input_vars, {fresh_var}, false);
+            // we add inclusion "output_vars ⊆ fresh_var"
+            Predicate new_inclusion = Predicate::create_equation(output_vars, {fresh_var});
+            solving_state.add_predicate(new_inclusion, false);
+            solving_state.push_front_unique(new_inclusion); // we need to process the inclusion, to update the languages of output_vars
+            push_to_worklist(std::move(solving_state), false);
+            return;
+        }
+
         STRACE(str_nfa, tout << "Output automata:" << std::endl);
         auto [output_vars_automata, output_vars_divisions] = solving_state.get_automata_and_division_of_concatenation(output_vars, false);
         SASSERT(output_vars_automata.size() == output_vars_divisions.size());

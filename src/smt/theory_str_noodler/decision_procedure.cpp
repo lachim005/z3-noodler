@@ -75,7 +75,7 @@ namespace smt::noodler {
 
                 auto edges_from = graph.get_edges_from(node);
                 for (auto target : edges_from) {
-                    new_graph.add_edge(new_node, target);
+                    new_graph.add_edge(new_node, new_node_map.at(target));
                 }
             }
             return new_graph;

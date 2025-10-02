@@ -86,6 +86,57 @@ namespace smt::noodler {
         }
     }
 
+    SolvingState::Score SolvingState::calculate_predicate_score(Predicate &predicate) {
+        return 1;
+    }
+
+    bool SolvingState::predicate_has_ingoing_connections(Predicate &predicate) {
+        for (auto c : this->predicates_to_process) {
+            if (c == predicate) { continue; }
+            if (SolvingState::is_dependent(c.get_left_set(), predicate.get_right_set())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Predicate SolvingState::get_predicate_to_process() {
+        SASSERT(this->predicates_to_process.size() > 0);
+        unsigned best_idx = 0;
+        Score best_score = ~((Score)0);
+        bool best_is_initial = false;
+
+        for (unsigned cand_idx = 0; cand_idx < this->predicates_to_process.size(); cand_idx++) {
+            Predicate candidate = this->predicates_to_process[cand_idx];
+
+            bool cand_initial = !predicate_has_ingoing_connections(candidate);
+            if (best_is_initial && !cand_initial) {
+                // This predicate may be better, but it is not initial and the
+                // currently best one is, so we skip this one
+                continue;
+            }
+
+            Score cand_score = calculate_predicate_score(candidate);
+            if (cand_score < best_score) {
+                best_idx = cand_idx;
+                best_score = cand_score;
+                best_is_initial = cand_initial;
+            }
+        }
+
+        Predicate predicate_to_process = this->predicates_to_process[best_idx];
+        // Removes predicate from worklist
+        unsigned last_idx = this->predicates_to_process.size() - 1;
+        this->predicates_to_process[best_idx] = this->predicates_to_process[last_idx];
+        this->predicates_to_process.pop_back();
+
+        return predicate_to_process;
+    }
+
+    bool SolvingState::has_predicates_to_process() {
+        return !this->predicates_to_process.empty();
+    }
+
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {
         if (aut_ass.count(var) > 0) {
             // if var is not substituted, get length constraint from its automaton
@@ -397,7 +448,7 @@ namespace smt::noodler {
             util::check_limit(m);
             SolvingState element_to_process = pop_from_worklist();
 
-            if (element_to_process.predicates_to_process.empty()) {
+            if (!element_to_process.has_predicates_to_process()) {
                 // we found another solution, element_to_process contain the automata
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
@@ -427,8 +478,7 @@ namespace smt::noodler {
 
             // we will now process one inclusion from the inclusion graph which is at front
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+            Predicate predicate_to_process = element_to_process.get_predicate_to_process();
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);

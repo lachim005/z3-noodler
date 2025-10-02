@@ -344,6 +344,16 @@ namespace smt::noodler {
         /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
         void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
 
+        using Score = unsigned long;
+        /// @brief Returns score indicating how suitable the predicate is to process
+        Score calculate_predicate_score(Predicate &predicate);
+        /// @brief True if @p predicate has some edges going into it from currently unprocessed inclusions
+        bool predicate_has_ingoing_connections(Predicate &predicate);
+        /// @brief Returns a predicate to process which is found to be the most suitable and removes it from the worklist
+        Predicate get_predicate_to_process();
+        /// @brief True if there are still predicates that need to be processed
+        bool has_predicates_to_process();
+
         /**
          * @brief Get the length constraints for variable @p var
          * 
@@ -544,7 +554,7 @@ namespace smt::noodler {
             std::string old_DOT_name = solving_state.DOT_name;
             solving_state.set_new_DOT_name();
             STRACE(str_noodle_dot, tout << solving_state.print_to_DOT() << std::endl << old_DOT_name << " -> " << solving_state.DOT_name << ";\n");
-            if (solving_state.predicates_to_process.empty()) {
+            if (!solving_state.has_predicates_to_process()) {
                 possible_solutions.push_back(std::move(solving_state));
             } else {
                 if (to_back) {

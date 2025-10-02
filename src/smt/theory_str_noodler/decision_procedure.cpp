@@ -548,12 +548,23 @@ namespace smt::noodler {
             return print_strings(var_names, order, (delimit_by_space ? "\\ " : "\\n"));
         };
 
+        auto print_ssg_to_DOT = [&print_predicate_to_DOT](FormulaGraph ssg, std::set<Predicate> erased_nodes) {
+            std::ostringstream res;
+            for (auto node : ssg.get_nodes()) {
+                auto pred = node.get_real_predicate();
+                if (erased_nodes.contains(pred)) { continue; }
+                res << print_predicate_to_DOT(pred) << "\\n";
+            }
+            return res.str();
+        };
+
         std::ostringstream res;
         res << DOT_name << "[shape=record,label=\"" << print_predicate_container_to_DOT(inclusions, true);
         if (!inclusions.empty() && !transducers.empty()) {
             res << "\\n";
         }
         res << print_predicate_container_to_DOT(transducers, true) << "|" << print_predicate_container_to_DOT(predicates_to_process, false) << "|";
+        res << print_ssg_to_DOT(simplified_splitting_graph, ssg_erased_nodes) << "|";
 
         std::vector<std::string> strings_to_print;
         for (const auto& [var,subst_vars] : substitution_map) {

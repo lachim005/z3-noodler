@@ -210,7 +210,7 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Adds all transducers that are not simple (that do not have one input and one output var) back to processing.
+         * @brief Adds all transducers that contain length vars on input and are not simple (they do not have one input and one output var) back to processing.
          * 
          * It pushes a transducer only if it is not pushed already.
          * Useful after calling substitute_vars().

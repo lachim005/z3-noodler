@@ -5,6 +5,8 @@
 #include <ranges>
 
 #include <mata/applications/strings.hh>
+#include "smt/theory_str_noodler/formula.h"
+#include "smt/theory_str_noodler/inclusion_graph.h"
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -52,9 +54,38 @@ namespace smt::noodler {
             return new_predicates;
         };
 
+        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides, this](const FormulaGraph &graph) {
+            FormulaGraph new_graph{};
+            std::map<FormulaGraphNode, FormulaGraphNode> new_node_map;
+            // Substitutes nodes
+            for (auto node : graph.get_nodes()) {
+                Predicate new_pred = substitute_predicate(node.get_real_predicate());
+                FormulaGraphNode new_node = new_graph.add_node(new_pred);
+                new_node_map.insert({node, new_node});
+
+                // We don't need inclusions with the same sides
+                if (inclusion_has_same_sides(new_pred)) {
+                    ssg_erased_nodes.insert(new_pred);
+                }
+            }
+            // Substitutes edges
+            for (auto node : graph.get_nodes()) {
+                FormulaGraphNode new_node = new_node_map.at(node);
+
+                auto edges_from = graph.get_edges_from(node);
+                for (auto target : edges_from) {
+                    new_graph.add_edge(new_node, target);
+                }
+            }
+            return new_graph;
+        };
+
         inclusions = substitute_set(inclusions);
         transducers = substitute_set(transducers);
         predicates_not_on_cycle = substitute_set(predicates_not_on_cycle);
+
+        ssg_erased_nodes = substitute_set(ssg_erased_nodes);
+        simplified_splitting_graph = substitute_formula_graph(simplified_splitting_graph);
 
         // substituting predicates to process is bit harder, it is possible that two predicates that were supposed to
         // be processed become same after substituting, so we do not want to keep both in predicates to process
@@ -101,11 +132,57 @@ namespace smt::noodler {
     }
 
     Predicate SolvingState::get_predicate_to_process() {
-        SASSERT(this->predicates_to_process.size() > 0);
-        unsigned best_idx = 0;
+        Predicate best_predicate;
         Score best_score = ~((Score)0);
         bool best_is_initial = false;
+        bool best_is_from_ssg = false;
 
+        // First, we try to pick predicates from simplified_splitting_graph
+        if (!this->ssg_empty) {
+            bool ran_out_of_initial_nodes = true;
+            for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
+                Predicate node_pred = node.get_real_predicate();
+
+                // Node has been erased
+                if (ssg_erased_nodes.contains(node_pred)) { continue; }
+
+                // Node is not initial
+                auto edges_to_node = this->simplified_splitting_graph.get_edges_to(node);
+                if (!edges_to_node.empty()) { continue; }
+
+                ran_out_of_initial_nodes = false;
+
+                Score node_score = calculate_predicate_score(node_pred);
+
+                if (node_score < best_score) {
+                    best_predicate = node_pred;
+                    best_score = node_score;
+                    best_is_initial = true;
+                    best_is_from_ssg = true;
+                }
+            }
+
+            if (ran_out_of_initial_nodes) {
+                // We ran out of initial nodes in simplified_splitting_graph,
+                // so we push the rest of them into the worklist
+                for (auto node : this->simplified_splitting_graph.get_nodes()) {
+                    Predicate node_pred = node.get_real_predicate();
+                    if (ssg_erased_nodes.contains(node_pred)) { continue; }
+
+                    if (node_pred.is_equation()) {
+                        this->inclusions.insert(node_pred);
+                    } else { // transducer
+                        SASSERT(node_pred.is_transducer());
+                        util::throw_error("We cannot handle non-chain free constraints with transducers");
+                    }
+                    this->predicates_to_process.push_back(node_pred);
+                }
+
+                this->ssg_empty = true;
+            }
+        }
+
+        // Then we try to pick inclusions from the worklist
         for (unsigned cand_idx = 0; cand_idx < this->predicates_to_process.size(); cand_idx++) {
             Predicate candidate = this->predicates_to_process[cand_idx];
 
@@ -118,23 +195,54 @@ namespace smt::noodler {
 
             Score cand_score = calculate_predicate_score(candidate);
             if (cand_score < best_score) {
-                best_idx = cand_idx;
+                best_predicate = candidate;
                 best_score = cand_score;
                 best_is_initial = cand_initial;
+                best_is_from_ssg = false;
             }
         }
 
-        Predicate predicate_to_process = this->predicates_to_process[best_idx];
-        // Removes predicate from worklist
-        unsigned last_idx = this->predicates_to_process.size() - 1;
-        this->predicates_to_process[best_idx] = this->predicates_to_process[last_idx];
-        this->predicates_to_process.pop_back();
+        if (best_is_from_ssg) {
+            // Removes predicate from simplified_splitting_graph
+            FormulaGraphNode node{ best_predicate };
+            FormulaGraphNode reversed_node{ node.get_reversed() };
+            ssg_erased_nodes.insert(best_predicate);
+            simplified_splitting_graph.remove_edges_with(node);
+            ssg_erased_nodes.insert(reversed_node.get_real_predicate());
+            simplified_splitting_graph.remove_edges_with(reversed_node);
 
-        return predicate_to_process;
+            // The predicate is new, so we add it to all sets
+            if (best_predicate.is_equation()) {
+                this->inclusions.insert(best_predicate);
+            } else { // transducer
+                SASSERT(best_predicate.is_transducer());
+                this->transducers.insert(best_predicate);
+            }
+            this->predicates_not_on_cycle.insert(best_predicate);
+        } else {
+            // Removes predicate from worklist
+            auto best_it = find(predicates_to_process.begin(), predicates_to_process.end(), best_predicate);
+            predicates_to_process.erase(best_it);
+        }
+
+        return best_predicate;
     }
 
     bool SolvingState::has_predicates_to_process() {
-        return !this->predicates_to_process.empty();
+        if (ssg_empty && this->predicates_to_process.empty()) { return false; }
+
+        if (!this->predicates_to_process.empty()) { return true; }
+
+        // If ssg_empty is false, we have to check, because ssg could be
+        // empty, but we haven't updated the variable yet
+        for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
+            Predicate node_pred = node.get_real_predicate();
+
+            // Node has been erased
+            if (ssg_erased_nodes.contains(node_pred)) { continue; }
+            return true;
+        }
+        return false;
     }
 
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {
@@ -1828,26 +1936,8 @@ namespace smt::noodler {
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
 
         if (!equations_and_transducers.get_predicates().empty()) {
-            FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers);
-            for (const FormulaGraphNode &node : incl_graph.get_nodes()) {
-                Predicate node_pred = node.get_real_predicate();
-                if (node_pred.is_equation()) { // inclusion
-                    init_solving_state.inclusions.insert(node_pred);
-                } else { // transducer
-                    SASSERT(node_pred.is_transducer());
-                    if (incl_graph.is_on_cycle(node)) {
-                        util::throw_error("We cannot handle non-chain free constraints with transducers");
-                    }
-                    init_solving_state.transducers.insert(node_pred);
-                }
-
-                if (!incl_graph.is_on_cycle(node)) {
-                    init_solving_state.predicates_not_on_cycle.insert(node_pred);
-                }
-
-                // we assume that nodes of incl_graph are ordered by the topological order
-                init_solving_state.predicates_to_process.push_back(node_pred);
-            }
+            FormulaGraph ssg = FormulaGraph::create_simplified_splitting_graph(equations_and_transducers);
+            init_solving_state.simplified_splitting_graph = ssg;
         }
 
         init_solving_state.flatten_substition_map();
@@ -1994,7 +2084,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {});
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, {});
             return l_true;
         } else {
             // preprocessing was not able to solve it

@@ -128,6 +128,14 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // Simplified splitting graph from which we will be taking inclusions and adding them to the other sets
+        FormulaGraph simplified_splitting_graph;
+        // Nodes we have erased from simplified_splitting_graph
+        std::set<Predicate> ssg_erased_nodes;
+        // Will become true once we get all the nodes from simplified_splitting_graph
+        // HOWEVER, even if this variable is false, the simplified_splitting_graph could be empty
+        bool ssg_empty = false;
+
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
@@ -136,14 +144,16 @@ namespace smt::noodler {
                      std::set<Predicate> transducers,
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
-                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
+                     FormulaGraph simplified_splitting_graph)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
                           transducers(transducers),
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
-                          length_sensitive_vars(length_sensitive_vars) {}
+                          length_sensitive_vars(length_sensitive_vars),
+                          simplified_splitting_graph(simplified_splitting_graph) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
         void push_front_unique(const Predicate &predicate) {

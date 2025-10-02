@@ -1,3 +1,4 @@
+#include <cmath>
 #include <queue>
 #include <utility>
 #include <algorithm>
@@ -118,7 +119,35 @@ namespace smt::noodler {
     }
 
     SolvingState::Score SolvingState::calculate_predicate_score(Predicate &predicate) {
-        return 1;
+        Score num_of_splits_on_left = predicate.get_left_side().size();
+        Score num_of_splits_on_right = 0;
+        bool last_was_length = true;
+        for (const BasicTerm& right_var : predicate.get_right_side()) {
+            if (this->length_sensitive_vars.contains(right_var)) {
+                ++num_of_splits_on_right;
+                last_was_length = true;
+            } else {
+                if (last_was_length) {
+                    ++num_of_splits_on_right;
+                }
+                last_was_length = false;
+            }
+        }
+
+        // Sums the amount of states on each side
+        Score right_states = 0;
+        Score left_states = 0;
+        for (auto x : predicate.get_right_side())
+        {
+            right_states += aut_ass.at(x)->num_of_states();
+        }
+        for (auto x : predicate.get_left_side())
+        {
+            left_states += aut_ass.at(x)->num_of_states();
+        }
+
+        Score score = std::pow(right_states + 1, num_of_splits_on_left) * std::pow(left_states + 1, num_of_splits_on_right);
+        return score;
     }
 
     bool SolvingState::predicate_has_ingoing_connections(Predicate &predicate) {

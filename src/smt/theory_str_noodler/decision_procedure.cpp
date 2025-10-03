@@ -62,14 +62,14 @@ namespace smt::noodler {
 
             // Substitutes nodes
             for (auto node : graph.get_nodes()) {
-                Predicate new_pred = substitute_predicate(node.get_real_predicate());
+                Predicate new_pred = substitute_predicate(node.get_predicate());
 
                 // We don't need inclusions with the same sides
                 if (inclusion_has_same_sides(new_pred)) {
                     removed_nodes.insert(node);
                 }
 
-                FormulaGraphNode new_node = new_graph.add_node(new_pred);
+                FormulaGraphNode new_node = new_graph.add_node(new_pred, node.is_reversed());
                 new_node_map.insert({node, new_node});
             }
             // Substitutes edges

@@ -169,6 +169,11 @@ namespace smt::noodler {
         Score best_score = ~((Score)0);
         bool best_is_initial = false;
         bool best_is_from_ssg = false;
+        // Indicates whether to reverse the inclusion before removing
+        // it from the simplified splitting graph, because the node comparison
+        // works weirdly (node with a=b, reversed=true != node with b=a, reversed=false)
+        // TODO: fix FormulaGraphNode comparison?
+        bool ssg_reversed = false;
 
         // First, we try to pick predicates from simplified_splitting_graph
         if (!this->ssg_empty) {
@@ -189,6 +194,7 @@ namespace smt::noodler {
                     best_score = node_score;
                     best_is_initial = true;
                     best_is_from_ssg = true;
+                    ssg_reversed = node.is_reversed();
                 }
             }
 
@@ -233,7 +239,7 @@ namespace smt::noodler {
 
         if (best_is_from_ssg) {
             // Removes predicate from simplified_splitting_graph
-            FormulaGraphNode node{ best_predicate };
+            FormulaGraphNode node{ ssg_reversed ? best_predicate.get_switched_sides_predicate() : best_predicate };
             FormulaGraphNode reversed_node{ node.get_reversed() };
             simplified_splitting_graph.remove_node(node);
             simplified_splitting_graph.remove_node(reversed_node);

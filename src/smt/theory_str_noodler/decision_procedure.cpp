@@ -55,26 +55,31 @@ namespace smt::noodler {
             return new_predicates;
         };
 
-        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides, this](const FormulaGraph &graph) {
+        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides](const FormulaGraph &graph) {
             FormulaGraph new_graph{};
             std::map<FormulaGraphNode, FormulaGraphNode> new_node_map;
+            std::set<FormulaGraphNode> removed_nodes;
+
             // Substitutes nodes
             for (auto node : graph.get_nodes()) {
                 Predicate new_pred = substitute_predicate(node.get_real_predicate());
-                FormulaGraphNode new_node = new_graph.add_node(new_pred);
-                new_node_map.insert({node, new_node});
 
                 // We don't need inclusions with the same sides
                 if (inclusion_has_same_sides(new_pred)) {
-                    ssg_erased_nodes.insert(new_pred);
+                    removed_nodes.insert(node);
                 }
+
+                FormulaGraphNode new_node = new_graph.add_node(new_pred);
+                new_node_map.insert({node, new_node});
             }
             // Substitutes edges
             for (auto node : graph.get_nodes()) {
+                if (removed_nodes.contains(node)) { continue; }
                 FormulaGraphNode new_node = new_node_map.at(node);
 
                 auto edges_from = graph.get_edges_from(node);
                 for (auto target : edges_from) {
+                    if (removed_nodes.contains(target)) { continue; }
                     new_graph.add_edge(new_node, new_node_map.at(target));
                 }
             }
@@ -85,7 +90,6 @@ namespace smt::noodler {
         transducers = substitute_set(transducers);
         predicates_not_on_cycle = substitute_set(predicates_not_on_cycle);
 
-        ssg_erased_nodes = substitute_set(ssg_erased_nodes);
         simplified_splitting_graph = substitute_formula_graph(simplified_splitting_graph);
 
         // substituting predicates to process is bit harder, it is possible that two predicates that were supposed to
@@ -172,9 +176,6 @@ namespace smt::noodler {
             for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
                 Predicate node_pred = node.get_real_predicate();
 
-                // Node has been erased
-                if (ssg_erased_nodes.contains(node_pred)) { continue; }
-
                 // Node is not initial
                 auto edges_to_node = this->simplified_splitting_graph.get_edges_to(node);
                 if (!edges_to_node.empty()) { continue; }
@@ -196,7 +197,6 @@ namespace smt::noodler {
                 // so we push the rest of them into the worklist
                 for (auto node : this->simplified_splitting_graph.get_nodes()) {
                     Predicate node_pred = node.get_real_predicate();
-                    if (ssg_erased_nodes.contains(node_pred)) { continue; }
 
                     if (node_pred.is_equation()) {
                         this->inclusions.insert(node_pred);
@@ -235,10 +235,8 @@ namespace smt::noodler {
             // Removes predicate from simplified_splitting_graph
             FormulaGraphNode node{ best_predicate };
             FormulaGraphNode reversed_node{ node.get_reversed() };
-            ssg_erased_nodes.insert(best_predicate);
-            simplified_splitting_graph.remove_edges_with(node);
-            ssg_erased_nodes.insert(reversed_node.get_real_predicate());
-            simplified_splitting_graph.remove_edges_with(reversed_node);
+            simplified_splitting_graph.remove_node(node);
+            simplified_splitting_graph.remove_node(reversed_node);
 
             // The predicate is new, so we add it to all sets
             if (best_predicate.is_equation()) {
@@ -264,14 +262,7 @@ namespace smt::noodler {
 
         // If ssg_empty is false, we have to check, because ssg could be
         // empty, but we haven't updated the variable yet
-        for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
-            Predicate node_pred = node.get_real_predicate();
-
-            // Node has been erased
-            if (ssg_erased_nodes.contains(node_pred)) { continue; }
-            return true;
-        }
-        return false;
+        return this->simplified_splitting_graph.get_nodes().size() > 0;
     }
 
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {
@@ -548,11 +539,10 @@ namespace smt::noodler {
             return print_strings(var_names, order, (delimit_by_space ? "\\ " : "\\n"));
         };
 
-        auto print_ssg_to_DOT = [&print_predicate_to_DOT](FormulaGraph ssg, std::set<Predicate> erased_nodes) {
+        auto print_ssg_to_DOT = [&print_predicate_to_DOT](FormulaGraph ssg) {
             std::ostringstream res;
             for (auto node : ssg.get_nodes()) {
                 auto pred = node.get_real_predicate();
-                if (erased_nodes.contains(pred)) { continue; }
                 res << print_predicate_to_DOT(pred) << "\\n";
             }
             return res.str();
@@ -564,7 +554,7 @@ namespace smt::noodler {
             res << "\\n";
         }
         res << print_predicate_container_to_DOT(transducers, true) << "|" << print_predicate_container_to_DOT(predicates_to_process, false) << "|";
-        res << print_ssg_to_DOT(simplified_splitting_graph, ssg_erased_nodes) << "|";
+        res << print_ssg_to_DOT(simplified_splitting_graph) << "|";
 
         std::vector<std::string> strings_to_print;
         for (const auto& [var,subst_vars] : substitution_map) {

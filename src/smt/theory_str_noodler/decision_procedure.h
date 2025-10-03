@@ -130,8 +130,6 @@ namespace smt::noodler {
 
         // Simplified splitting graph from which we will be taking inclusions and adding them to the other sets
         FormulaGraph simplified_splitting_graph;
-        // Nodes we have erased from simplified_splitting_graph
-        std::set<Predicate> ssg_erased_nodes;
         // Will become true once we get all the nodes from simplified_splitting_graph
         // HOWEVER, even if this variable is false, the simplified_splitting_graph could be empty
         bool ssg_empty = false;

@@ -150,7 +150,9 @@ namespace smt::noodler {
             left_states += aut_ass.at(x)->num_of_states();
         }
 
-        Score score = std::pow(right_states + 1, num_of_splits_on_left) * std::pow(left_states + 1, num_of_splits_on_right);
+        Score split_score = num_of_splits_on_left * num_of_splits_on_right;
+        Score state_score = right_states * left_states;
+        Score score = state_score * split_score;
         return score;
     }
 

@@ -215,6 +215,7 @@ namespace smt::noodler {
                     this->predicates_to_process.push_back(node_pred);
                 }
 
+                this->simplified_splitting_graph = {};
                 this->ssg_empty = true;
             }
         }

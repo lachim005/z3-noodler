@@ -169,11 +169,12 @@ namespace smt::noodler {
         Score best_score = ~((Score)0);
         bool best_is_initial = false;
         bool best_is_from_ssg = false;
-        // Indicates whether to reverse the inclusion before removing
-        // it from the simplified splitting graph, because the node comparison
+        // Indicates whether best_predicate is reversed. Used when removing it
+        // from the simplified splitting graph, because the node comparison
         // works weirdly (node with a=b, reversed=true != node with b=a, reversed=false)
         // TODO: fix FormulaGraphNode comparison?
-        bool ssg_reversed = false;
+        bool best_reversed = false;
+        Predicate best_real_predicate;
 
         // First, we try to pick predicates from simplified_splitting_graph
         if (!this->ssg_empty) {
@@ -190,11 +191,12 @@ namespace smt::noodler {
                 Score node_score = calculate_predicate_score(node_pred);
 
                 if (node_score < best_score) {
-                    best_predicate = node_pred;
+                    best_predicate = node.get_predicate();
+                    best_real_predicate = node_pred;
                     best_score = node_score;
                     best_is_initial = true;
                     best_is_from_ssg = true;
-                    ssg_reversed = node.is_reversed();
+                    best_reversed = node.is_reversed();
                 }
             }
 
@@ -231,6 +233,7 @@ namespace smt::noodler {
             Score cand_score = calculate_predicate_score(candidate);
             if (cand_score < best_score) {
                 best_predicate = candidate;
+                best_real_predicate = candidate;
                 best_score = cand_score;
                 best_is_initial = cand_initial;
                 best_is_from_ssg = false;
@@ -239,26 +242,26 @@ namespace smt::noodler {
 
         if (best_is_from_ssg) {
             // Removes predicate from simplified_splitting_graph
-            FormulaGraphNode node{ ssg_reversed ? best_predicate.get_switched_sides_predicate() : best_predicate };
+            FormulaGraphNode node{ best_predicate, best_reversed };
             FormulaGraphNode reversed_node{ node.get_reversed() };
             simplified_splitting_graph.remove_node(node);
             simplified_splitting_graph.remove_node(reversed_node);
 
             // The predicate is new, so we add it to all sets
-            if (best_predicate.is_equation()) {
-                this->inclusions.insert(best_predicate);
+            if (best_real_predicate.is_equation()) {
+                this->inclusions.insert(best_real_predicate);
             } else { // transducer
-                SASSERT(best_predicate.is_transducer());
-                this->transducers.insert(best_predicate);
+                SASSERT(best_real_predicate.is_transducer());
+                this->transducers.insert(best_real_predicate);
             }
-            this->predicates_not_on_cycle.insert(best_predicate);
+            this->predicates_not_on_cycle.insert(best_real_predicate);
         } else {
             // Removes predicate from worklist
             auto best_it = find(predicates_to_process.begin(), predicates_to_process.end(), best_predicate);
             predicates_to_process.erase(best_it);
         }
 
-        return best_predicate;
+        return best_real_predicate;
     }
 
     bool SolvingState::has_predicates_to_process() {

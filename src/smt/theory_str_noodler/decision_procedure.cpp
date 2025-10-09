@@ -122,11 +122,14 @@ namespace smt::noodler {
         }
     }
 
-    SolvingState::Score SolvingState::calculate_predicate_score(Predicate &predicate) {
-        Score num_of_splits_on_left = predicate.get_left_side().size();
+    SolvingState::Score SolvingState::calculate_node_score(FormulaGraphNode node) {
+        std::vector<BasicTerm> left_side = node.get_real_left_side();
+        std::vector<BasicTerm> right_side = node.get_real_right_side();
+
+        Score num_of_splits_on_left = left_side.size();
         Score num_of_splits_on_right = 0;
         bool last_was_length = true;
-        for (const BasicTerm& right_var : predicate.get_right_side()) {
+        for (const BasicTerm& right_var : right_side) {
             if (this->length_sensitive_vars.contains(right_var)) {
                 ++num_of_splits_on_right;
                 last_was_length = true;
@@ -141,13 +144,13 @@ namespace smt::noodler {
         // Sums the amount of states on each side
         Score right_states = 0;
         Score left_states = 0;
-        for (auto x : predicate.get_right_side())
+        for (auto x : right_side)
         {
-            right_states += aut_ass.at(x)->num_of_states();
+            right_states += this->aut_ass.at(x)->num_of_states();
         }
-        for (auto x : predicate.get_left_side())
+        for (auto x : left_side)
         {
-            left_states += aut_ass.at(x)->num_of_states();
+            left_states += this->aut_ass.at(x)->num_of_states();
         }
 
         Score split_score = num_of_splits_on_left * num_of_splits_on_right;
@@ -156,125 +159,79 @@ namespace smt::noodler {
         return score;
     }
 
-    bool SolvingState::predicate_has_ingoing_connections(Predicate &predicate) {
-        for (auto c : this->predicates_to_process) {
-            if (c == predicate) { continue; }
-            if (SolvingState::is_dependent(c.get_left_set(), predicate.get_right_set())) {
-                return true;
+    Predicate SolvingState::get_predicate_to_process() {
+        // First, we check the worklist
+        if (!this->predicates_to_process.empty()) {
+            Predicate p = this->predicates_to_process.front();
+            this->predicates_to_process.pop_front();
+            return p;
+        }
+
+        // Then we get an inclusion from the splitting graph
+        FormulaGraphNode best_node{Predicate()};
+        Score best_score = ~((Score)0);
+
+        bool ran_out_of_initial_nodes = true;
+
+        for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
+            // Check if node is initial
+            auto edges_to_node = this->simplified_splitting_graph.get_edges_to(node);
+            if (!edges_to_node.empty()) { continue; }
+
+            ran_out_of_initial_nodes = false;
+
+            Score node_score = calculate_node_score(node);
+
+            if (node_score < best_score) {
+                best_node = node;
+                best_score = node_score;
             }
         }
-        return false;
-    }
 
-    Predicate SolvingState::get_predicate_to_process() {
-        Predicate best_predicate;
-        Score best_score = ~((Score)0);
-        bool best_is_initial = false;
-        bool best_is_from_ssg = false;
-        // Indicates whether best_predicate is reversed. Used when removing it
-        // from the simplified splitting graph, because the node comparison
-        // works weirdly (node with a=b, reversed=true != node with b=a, reversed=false)
-        // TODO: fix FormulaGraphNode comparison?
-        bool best_reversed = false;
-        Predicate best_real_predicate;
-
-        // First, we try to pick predicates from simplified_splitting_graph
-        if (!this->ssg_empty) {
-            bool ran_out_of_initial_nodes = true;
-            for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
+        if (ran_out_of_initial_nodes) {
+            // We ran out of initial nodes in simplified_splitting_graph,
+            // so we push the rest of them into the worklist
+            for (auto node : this->simplified_splitting_graph.get_nodes()) {
                 Predicate node_pred = node.get_real_predicate();
 
-                // Node is not initial
-                auto edges_to_node = this->simplified_splitting_graph.get_edges_to(node);
-                if (!edges_to_node.empty()) { continue; }
-
-                ran_out_of_initial_nodes = false;
-
-                Score node_score = calculate_predicate_score(node_pred);
-
-                if (node_score < best_score) {
-                    best_predicate = node.get_predicate();
-                    best_real_predicate = node_pred;
-                    best_score = node_score;
-                    best_is_initial = true;
-                    best_is_from_ssg = true;
-                    best_reversed = node.is_reversed();
+                if (node_pred.is_equation()) {
+                    this->inclusions.insert(node_pred);
+                } else { // transducer
+                    SASSERT(node_pred.is_transducer());
+                    util::throw_error("We cannot handle non-chain free constraints with transducers");
                 }
+                this->predicates_to_process.push_back(node_pred);
             }
 
-            if (ran_out_of_initial_nodes) {
-                // We ran out of initial nodes in simplified_splitting_graph,
-                // so we push the rest of them into the worklist
-                for (auto node : this->simplified_splitting_graph.get_nodes()) {
-                    Predicate node_pred = node.get_real_predicate();
+            this->simplified_splitting_graph = {};
 
-                    if (node_pred.is_equation()) {
-                        this->inclusions.insert(node_pred);
-                    } else { // transducer
-                        SASSERT(node_pred.is_transducer());
-                        util::throw_error("We cannot handle non-chain free constraints with transducers");
-                    }
-                    this->predicates_to_process.push_back(node_pred);
-                }
-
-                this->simplified_splitting_graph = {};
-                this->ssg_empty = true;
-            }
+            // Small hack, pops the first inclusion in the worklist
+            return get_predicate_to_process();
         }
 
-        // Then we try to pick inclusions from the worklist
-        for (unsigned cand_idx = 0; cand_idx < this->predicates_to_process.size(); cand_idx++) {
-            Predicate candidate = this->predicates_to_process[cand_idx];
+        Predicate best_real_predicate = best_node.get_real_predicate();
 
-            bool cand_initial = !predicate_has_ingoing_connections(candidate);
-            if (best_is_initial && !cand_initial) {
-                // This predicate may be better, but it is not initial and the
-                // currently best one is, so we skip this one
-                continue;
-            }
+        // Removes predicate from simplified_splitting_graph
+        FormulaGraphNode reversed_node{ best_node.get_reversed() };
+        simplified_splitting_graph.remove_node(best_node);
+        simplified_splitting_graph.remove_node(reversed_node);
 
-            Score cand_score = calculate_predicate_score(candidate);
-            if (cand_score < best_score) {
-                best_predicate = candidate;
-                best_real_predicate = candidate;
-                best_score = cand_score;
-                best_is_initial = cand_initial;
-                best_is_from_ssg = false;
-            }
+        // The predicate is new, so we add it to all sets
+        if (best_real_predicate.is_equation()) {
+            this->inclusions.insert(best_real_predicate);
+        } else { // transducer
+            SASSERT(best_real_predicate.is_transducer());
+            this->transducers.insert(best_real_predicate);
         }
-
-        if (best_is_from_ssg) {
-            // Removes predicate from simplified_splitting_graph
-            FormulaGraphNode node{ best_predicate, best_reversed };
-            FormulaGraphNode reversed_node{ node.get_reversed() };
-            simplified_splitting_graph.remove_node(node);
-            simplified_splitting_graph.remove_node(reversed_node);
-
-            // The predicate is new, so we add it to all sets
-            if (best_real_predicate.is_equation()) {
-                this->inclusions.insert(best_real_predicate);
-            } else { // transducer
-                SASSERT(best_real_predicate.is_transducer());
-                this->transducers.insert(best_real_predicate);
-            }
-            this->predicates_not_on_cycle.insert(best_real_predicate);
-        } else {
-            // Removes predicate from worklist
-            auto best_it = find(predicates_to_process.begin(), predicates_to_process.end(), best_predicate);
-            predicates_to_process.erase(best_it);
-        }
+        this->predicates_not_on_cycle.insert(best_real_predicate);
 
         return best_real_predicate;
     }
 
     bool SolvingState::has_predicates_to_process() {
-        if (ssg_empty && this->predicates_to_process.empty()) { return false; }
-
-        if (!this->predicates_to_process.empty()) { return true; }
-
-        // If ssg_empty is false, we have to check, because ssg could be
-        // empty, but we haven't updated the variable yet
-        return this->simplified_splitting_graph.get_nodes().size() > 0;
+        bool worklist_empty = this->predicates_to_process.empty();
+        bool ssg_empty = this->simplified_splitting_graph.get_nodes().empty();
+        return !(worklist_empty && ssg_empty);
     }
 
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {

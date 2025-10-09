@@ -354,9 +354,7 @@ namespace smt::noodler {
 
         using Score = unsigned long;
         /// @brief Returns score indicating how suitable the predicate is to process
-        Score calculate_predicate_score(Predicate &predicate);
-        /// @brief True if @p predicate has some edges going into it from currently unprocessed inclusions
-        bool predicate_has_ingoing_connections(Predicate &predicate);
+        Score calculate_node_score(FormulaGraphNode node);
         /// @brief Returns a predicate to process which is found to be the most suitable and removes it from the worklist
         Predicate get_predicate_to_process();
         /// @brief True if there are still predicates that need to be processed

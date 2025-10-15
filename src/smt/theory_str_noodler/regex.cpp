@@ -1084,7 +1084,7 @@ namespace smt::noodler::regex {
                     SASSERT(backward_iterator != backward_iterator_end);
                     mata::nft::Nft result = std::holds_alternative<zstring>(find) ?
                                                 mata::applications::strings::replace::replace_reluctant_literal(util::get_mata_word_zstring(std::get<zstring>(find)), util::get_mata_word_zstring(replace), mata_alph)
-                                              : mata::applications::strings::replace::replace_reluctant_regex(std::get<mata::nfa::Nfa>(find), util::get_mata_word_zstring(replace), mata_alph);
+                                              : mata::applications::strings::replace::replace_reluctant_regex(mata::nfa::determinize(std::get<mata::nfa::Nfa>(find)), util::get_mata_word_zstring(replace), mata_alph);
                     ++backward_iterator;
                     return mata::nft::reduce(mata::nft::remove_epsilon(result).trim()).trim();
                 }

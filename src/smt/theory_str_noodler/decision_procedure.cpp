@@ -122,41 +122,44 @@ namespace smt::noodler {
         }
     }
 
+    unsigned noodle_estimator_3000(unsigned *ptr1, unsigned *ptr1_end, unsigned *ptr2, unsigned *ptr2_end) {
+        unsigned c = 0;
+        if (ptr1 + 1 != ptr1_end) {
+            c += *ptr2 * noodle_estimator_3000(ptr1 + 1, ptr1_end, ptr2, ptr2_end);
+        }
+        if (ptr2 + 1 != ptr2_end) {
+            c += *ptr1 * noodle_estimator_3000(ptr1, ptr1_end, ptr2 + 1, ptr2_end);
+        }
+        if (c == 0) { c = 1; }
+
+        return c;
+    }
+
     SolvingState::Score SolvingState::calculate_node_score(FormulaGraphNode node) {
         std::vector<BasicTerm> left_side = node.get_real_left_side();
         std::vector<BasicTerm> right_side = node.get_real_right_side();
 
-        Score num_of_splits_on_left = left_side.size();
-        Score num_of_splits_on_right = 0;
-        bool last_was_length = true;
-        for (const BasicTerm& right_var : right_side) {
-            if (this->length_sensitive_vars.contains(right_var)) {
-                ++num_of_splits_on_right;
-                last_was_length = true;
+        vector<unsigned> left_states;
+        vector<unsigned> right_states;
+
+        for (auto var : left_side) {
+            left_states.push_back(this->aut_ass.at(var)->num_of_states());
+        }
+
+        unsigned subcount = 0;
+        for (auto var : right_side) {
+            if (this->length_sensitive_vars.contains(var)) {
+                if (subcount != 0) right_states.push_back(subcount);
+                subcount = 0;
+                right_states.push_back(this->aut_ass.at(var)->num_of_states());
             } else {
-                if (last_was_length) {
-                    ++num_of_splits_on_right;
-                }
-                last_was_length = false;
+                subcount += this->aut_ass.at(var)->num_of_states();
             }
         }
-
-        // Sums the amount of states on each side
-        Score right_states = 0;
-        Score left_states = 0;
-        for (auto x : right_side)
-        {
-            right_states += this->aut_ass.at(x)->num_of_states();
+        if (subcount != 0) {
+            right_states.push_back(subcount);
         }
-        for (auto x : left_side)
-        {
-            left_states += this->aut_ass.at(x)->num_of_states();
-        }
-
-        Score split_score = num_of_splits_on_left * num_of_splits_on_right;
-        Score state_score = right_states * left_states;
-        Score score = state_score * split_score;
-        return score;
+        return noodle_estimator_3000(left_states.begin(), left_states.end(), right_states.begin(), right_states.end());
     }
 
     Predicate SolvingState::get_predicate_to_process() {

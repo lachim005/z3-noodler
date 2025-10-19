@@ -6,6 +6,7 @@
 #include <ranges>
 
 #include <mata/applications/strings.hh>
+#include <vector>
 #include "smt/theory_str_noodler/formula.h"
 #include "smt/theory_str_noodler/inclusion_graph.h"
 #include "util.h"
@@ -122,25 +123,13 @@ namespace smt::noodler {
         }
     }
 
-    unsigned noodle_estimator_3000(unsigned *ptr1, unsigned *ptr1_end, unsigned *ptr2, unsigned *ptr2_end) {
-        unsigned c = 0;
-        if (ptr1 + 1 != ptr1_end) {
-            c += *ptr2 * noodle_estimator_3000(ptr1 + 1, ptr1_end, ptr2, ptr2_end);
-        }
-        if (ptr2 + 1 != ptr2_end) {
-            c += *ptr1 * noodle_estimator_3000(ptr1, ptr1_end, ptr2 + 1, ptr2_end);
-        }
-        if (c == 0) { c = 1; }
-
-        return c;
-    }
-
     SolvingState::Score SolvingState::calculate_node_score(FormulaGraphNode node) {
         std::vector<BasicTerm> left_side = node.get_real_left_side();
         std::vector<BasicTerm> right_side = node.get_real_right_side();
 
-        vector<unsigned> left_states;
-        vector<unsigned> right_states;
+        // Calculates state count for each split on each side
+        std::vector<unsigned> left_states;
+        std::vector<unsigned> right_states;
 
         for (auto var : left_side) {
             left_states.push_back(this->aut_ass.at(var)->num_of_states());
@@ -159,7 +148,37 @@ namespace smt::noodler {
         if (subcount != 0) {
             right_states.push_back(subcount);
         }
-        return noodle_estimator_3000(left_states.begin(), left_states.end(), right_states.begin(), right_states.end());
+
+        // Estimates noodle count
+        int right_splits = right_states.size();
+        int left_splits = left_states.size();
+
+        Score *buffer = new Score[right_splits];
+        buffer[right_splits - 1] = 1;
+
+        if (right_splits > 1) {
+            for (int i = right_splits - 2; i >= 0; i--) {
+                buffer[i] = buffer[i + 1] * left_states[left_splits - 1];
+            }
+        }
+
+        if (left_splits > 1) {
+            for (int i = left_splits - 2; i >= 0; i--) {
+                for (int j = right_splits - 1; j >= 0; j--) {
+                    Score score = 0;
+                    score += buffer[j] * right_states[j];
+                    if (j + 1 != right_splits) {
+                        score += buffer[j + 1] * left_states[i];
+                    }
+                    buffer[j] = score;
+                }
+            }
+        }
+
+        Score score = buffer[0];
+        delete[] buffer;
+
+        return score;
     }
 
     Predicate SolvingState::get_predicate_to_process() {

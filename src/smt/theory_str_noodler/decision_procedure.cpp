@@ -127,6 +127,8 @@ namespace smt::noodler {
         std::vector<BasicTerm> left_side = node.get_real_left_side();
         std::vector<BasicTerm> right_side = node.get_real_right_side();
 
+        if (left_side.empty() || right_side.empty()) { return 1; }
+
         // Calculates state count for each split on each side
         std::vector<unsigned> left_states;
         std::vector<unsigned> right_states;

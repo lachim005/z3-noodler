@@ -32,6 +32,8 @@ Authors:
 #include "math/automata/automaton.h"
 #include "math/automata/symbolic_automata_def.h"
 
+#include "smt/theory_str_noodler/regex.h"
+
 
 expr_ref sym_expr::accept(expr* e) {
     ast_manager& m = m_t.get_manager();
@@ -2275,12 +2277,39 @@ void seq_rewriter::replace_all_subvectors(expr_ref_vector const& a, expr_ref_vec
         result.push_back(a[i++]);
 }
 
-br_status seq_rewriter::mk_seq_replace_re_all(expr* a, expr* b, expr* c, expr_ref& result) {
+br_status seq_rewriter::replace_re_version(expr* a, expr* b, expr* c, expr_ref& result, bool is_all_version) {
+    zstring s1, s2;
+    if (str().is_string(a, s1) && str().is_string(c, s2) && u().is_re(b)) {
+        std::set<mata::Symbol> symbols;
+        smt::noodler::regex::extract_symbols(a, u(), symbols);
+        smt::noodler::regex::extract_symbols(b, u(), symbols);
+        smt::noodler::regex::Alphabet alph(symbols);
+        mata::EnumAlphabet mata_alph{};
+        for(const mata::Symbol& symb : symbols) {
+            mata_alph.add_new_symbol(symb);
+        }
+        mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(b), u(), m(), alph); // this should throw error/unknown if b is a regex variable (so we can assume it is regex constant)
+        mata::nft::Nft transducer = mata::applications::strings::replace::replace_reluctant_regex(
+                                            mata::nfa::determinize(find_nfa),
+                                            smt::noodler::util::get_mata_word_zstring(s2),
+                                            &mata_alph,
+                                            is_all_version ?
+                                                mata::applications::strings::replace::ReplaceMode::All :
+                                                mata::applications::strings::replace::ReplaceMode::Single);
+
+        result = str().mk_string(alph.get_string_from_mata_word(transducer.apply(smt::noodler::util::get_mata_word_zstring(s1)).to_nfa_move().get_word().value()));
+        return BR_DONE;
+    }
+
     return BR_FAILED;
 }
 
+br_status seq_rewriter::mk_seq_replace_re_all(expr* a, expr* b, expr* c, expr_ref& result) {
+    return replace_re_version(a, b, c, result, true);
+}
+
 br_status seq_rewriter::mk_seq_replace_re(expr* a, expr* b, expr* c, expr_ref& result) {
-    return BR_FAILED;
+    return replace_re_version(a, b, c, result, false);
 }
 
 br_status seq_rewriter::mk_seq_prefix(expr* a, expr* b, expr_ref& result) {

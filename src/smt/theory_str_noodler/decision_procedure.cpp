@@ -132,20 +132,33 @@ namespace smt::noodler {
         // Calculates state count for each split on each side
         std::vector<unsigned> left_states;
         std::vector<unsigned> right_states;
+        std::vector<unsigned> left_transition_coefficients;
+        std::vector<unsigned> right_transition_coefficients;
 
+        std::shared_ptr<mata::nfa::Nfa> prev_aut = nullptr;
         for (auto var : left_side) {
-            left_states.push_back(this->aut_ass.at(var)->num_of_states());
+            auto aut = this->aut_ass.at(var);
+            left_states.push_back(aut->num_of_states());
+            if (prev_aut != nullptr) {
+                left_transition_coefficients.push_back(aut->initial.size() * prev_aut->final.size());
+            }
+            prev_aut = aut;
         }
 
         unsigned subcount = 0;
+        prev_aut = nullptr;
         for (auto var : right_side) {
+            auto aut = this->aut_ass.at(var);
             if (this->length_sensitive_vars.contains(var)) {
+                if (prev_aut != nullptr) {
+                    right_transition_coefficients.push_back(aut->initial.size() * prev_aut->final.size());
+                }
                 if (subcount != 0) right_states.push_back(subcount);
-                subcount = 0;
-                right_states.push_back(this->aut_ass.at(var)->num_of_states());
+                subcount = aut->num_of_states();
             } else {
-                subcount += this->aut_ass.at(var)->num_of_states();
+                subcount += aut->num_of_states();
             }
+            prev_aut = aut;
         }
         if (subcount != 0) {
             right_states.push_back(subcount);
@@ -160,7 +173,7 @@ namespace smt::noodler {
 
         if (right_splits > 1) {
             for (int i = right_splits - 2; i >= 0; i--) {
-                buffer[i] = buffer[i + 1] * left_states[left_splits - 1];
+                buffer[i] = buffer[i + 1] * left_states[left_splits - 1] * right_transition_coefficients[i];
             }
         }
 
@@ -168,9 +181,9 @@ namespace smt::noodler {
             for (int i = left_splits - 2; i >= 0; i--) {
                 for (int j = right_splits - 1; j >= 0; j--) {
                     Score score = 0;
-                    score += buffer[j] * right_states[j];
+                    score += buffer[j] * right_states[j] * left_transition_coefficients[i];
                     if (j + 1 != right_splits) {
-                        score += buffer[j + 1] * left_states[i];
+                        score += buffer[j + 1] * left_states[i] * right_transition_coefficients[j];
                     }
                     buffer[j] = score;
                 }

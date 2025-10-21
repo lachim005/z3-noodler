@@ -190,6 +190,9 @@ class seq_rewriter {
     //replace b in a by c into result
     void replace_all_subvectors(expr_ref_vector const& as, expr_ref_vector const& bs, expr* c, expr_ref_vector& result);
 
+    // function handling both replace_re (is_all_version == false) and replace_re_all (is_all_version == true)
+    br_status replace_re_version(expr* a, expr* b, expr* c, expr_ref& result, bool is_all_version);
+
     // Calculate derivative, memoized and enforcing a normal form
     expr_ref is_nullable_rec(expr* r);
     expr_ref mk_derivative_rec(expr* ele, expr* r);

@@ -45,6 +45,13 @@ namespace smt::noodler {
             return FC_DONE;
         }
 
+        // create equalities among inter-theory shared variables
+        // if any new equality is added, we return FC_CONTINUE to re-run the solver
+        unsigned num_eqs = mk_interface_eqs();
+        if(num_eqs > 0) {
+            return FC_CONTINUE;
+        }
+
         dec_proc = nullptr;
         relevant_vars.clear();
         sat_length_formula = expr_ref(m);
@@ -1143,5 +1150,73 @@ namespace smt::noodler {
         };
 
         return convert_len_node_to_z3_formula(context, node);
+    }
+
+    void theory_str_noodler::collect_shared_vars(sbuffer<theory_var> & result) const {
+        ptr_buffer<enode> to_unmark;
+        unsigned num_vars = get_num_vars();
+        for (unsigned i = 0; i < num_vars; i++) {
+            enode * n = get_enode(i);
+            // we take only string variables
+            if (!ctx.is_relevant(n) || m_util_s.str.mk_string_sort() != n->get_sort()) {
+                continue;
+            }
+            enode * r = n->get_root();
+            // mark to avoid duplicities
+            if (r->is_marked()) {
+                continue;
+            }
+            // is variable shared among theories?
+            if (ctx.is_shared(r)) {
+                STRACE(str, tout << "new shared var: #" << r->get_owner_id() << " " << mk_pp(r->get_expr(), m) << "\n";);
+                theory_var r_th_var = r->get_th_var(get_id());
+                SASSERT(r_th_var != null_theory_var);
+                result.push_back(r_th_var);
+            }
+            r->set_mark();
+            to_unmark.push_back(r);            
+        }
+        unmark_enodes(to_unmark.size(), to_unmark.data());
+    }
+
+    unsigned theory_str_noodler::mk_interface_eqs() {
+        sbuffer<theory_var> roots;
+        collect_shared_vars(roots);
+        // count the number of new equalities added
+        // for result > 0 we immediately return FC_CONTINUE in final_check
+        unsigned result = 0;
+        sbuffer<theory_var>::iterator it1  = roots.begin();
+        sbuffer<theory_var>::iterator end1 = roots.end();
+        for (; it1 != end1; ++it1) {
+            STRACE(str, tout << "mk_interface_eqs: processing: v" << *it1 << "\n";);
+            theory_var  v1 = *it1;
+            enode *     n1 = get_enode(v1);
+            sbuffer<theory_var>::iterator it2 = it1;
+            ++it2;
+            for (; it2 != end1; ++it2) {
+                theory_var v2 = *it2;
+                enode * n2 = get_enode(v2);
+                sort * s2 = n2->get_expr()->get_sort();
+                app * eq = ctx.mk_eq_atom(n1->get_expr(), n2->get_expr());
+
+                // disequation of inter-theory variables are always relevant
+                if(ctx.is_diseq(n1, n2)) {
+                    ctx.mark_as_relevant(m.mk_not(eq));
+                    continue;
+                }
+
+                // it is not equality neither disequality in the context
+                if (!ctx.is_diseq(n1, n2) && !ctx.is_eq(n1, n2)) {
+                    if (!ctx.b_internalized(eq) || !ctx.is_relevant(eq)) {
+                        result++;
+                        ctx.internalize(eq, false);
+                        ctx.mark_as_relevant(eq);
+                        // add axiom for the equality
+                        add_axiom(eq);
+                    }
+                }
+            }
+        }
+        return result;
     }
 }

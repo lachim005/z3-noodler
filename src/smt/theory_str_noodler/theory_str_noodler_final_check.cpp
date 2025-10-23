@@ -1157,6 +1157,9 @@ namespace smt::noodler {
         unsigned num_vars = get_num_vars();
         for (unsigned i = 0; i < num_vars; i++) {
             enode * n = get_enode(i);
+            if(n->is_shared() == l_false) {
+                continue;
+            }
             // we take only string variables
             if (!ctx.is_relevant(n) || m_util_s.str.mk_string_sort() != n->get_sort()) {
                 continue;

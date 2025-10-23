@@ -128,6 +128,8 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // True if the parent solving state produced more noodles than just this one
+        bool has_siblings = false;
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,

@@ -572,6 +572,7 @@ namespace smt::noodler {
                                                                     false,
                                                                     {{"reduce", "forward"}});
 
+        bool more_than_one_noodle = noodles.size() > 1;
         for (const auto &noodle : noodles) {
             util::check_limit(m);
             STRACE(str, tout << "Processing noodle" << (is_trace_enabled(TraceTag::str_nfa) ? " with automata:" : "") << std::endl;);
@@ -645,6 +646,7 @@ namespace smt::noodler {
 
             // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
             // and if there is no cycle, we do not need to do BFS, the algorithm should end
+            new_element.has_siblings = more_than_one_noodle;
             push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
         }
 

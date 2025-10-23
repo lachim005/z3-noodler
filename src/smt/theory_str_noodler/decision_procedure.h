@@ -23,6 +23,12 @@ namespace smt::noodler {
         UNDERAPPROX
     };
 
+    enum struct SolutionState {
+        NONE,
+        SAT,
+        CHECK_LIA,
+    };
+
     /**
      * @brief Abstract decision procedure. Defines interface for decision
      * procedures to be used within z3.
@@ -130,6 +136,7 @@ namespace smt::noodler {
 
         // True if the parent solving state produced more noodles than just this one
         bool has_siblings = false;
+        bool checked_lia = false;
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
@@ -489,7 +496,9 @@ namespace smt::noodler {
 
         /// State of a found satisfiable solution set when one is computed using
         ///  compute_next_solution() or after preprocess()
+    public:
         SolvingState solution;
+    protected:
 
         // initial length vars, formula, automata assignment and substitution map, can be updated by preprocessing, used for initializing the decision procedure
         std::unordered_set<BasicTerm> init_length_sensitive_vars;
@@ -570,6 +579,12 @@ namespace smt::noodler {
             STRACE(str_noodle_dot, tout << element_to_process.DOT_name << " -> " << element_to_process.DOT_name << " [penwidth=0,dir=none,label=" << num_of_popped_elements << "];\n";);
             ++num_of_popped_elements;
             return element_to_process;
+        }
+        SolvingState& peek_at_worklist() {
+            if (!possible_solutions.empty()) {
+                return possible_solutions.back();
+            }
+            return worklist.front();
         }
 
         /**
@@ -792,6 +807,8 @@ namespace smt::noodler {
 
     public:
 
+        SolutionState solution_state = SolutionState::NONE;
+        lbool lia_check_result = l_false;
         /**
          * Initialize a new decision procedure that can solve word equations
          * (equalities of concatenations of string variables) with regular constraints

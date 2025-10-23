@@ -392,9 +392,32 @@ namespace smt::noodler {
         STRACE(str, tout << "------------------------"
                            << "Getting another solution"
                            << "------------------------" << std::endl;);
+        // We wanted to check lia before, so now we are being called with the result
+        if (solution_state == SolutionState::CHECK_LIA) {
+            STRACE(str_noodle_dot,
+                    auto &top = peek_at_worklist();
+                    tout << top.DOT_name << " [style=filled,fillcolor=\"" << ((lia_check_result == l_true) ? "springGreen" : "salmon") << "\"];\n";
+            );
+            if (lia_check_result == l_false) {
+                // LIA check was unsat, so we dont have to check the current state
+                pop_from_worklist();
+            }
+        }
 
+        solution_state = SolutionState::NONE;
         while (!is_worklist_empty()) {
             util::check_limit(m);
+            auto &top = peek_at_worklist();
+
+            if (top.has_siblings && !top.checked_lia && !top.predicates_to_process.empty()) {
+                // We check length constrains before we start processing this noodle
+                solution = top;
+                top.checked_lia = true;
+                solution_state = SolutionState::CHECK_LIA;
+                lia_check_result = l_false;
+                return l_true;
+            }
+
             SolvingState element_to_process = pop_from_worklist();
 
             if (element_to_process.predicates_to_process.empty()) {
@@ -402,6 +425,7 @@ namespace smt::noodler {
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
                 solution = std::move(element_to_process);
+                solution_state = SolutionState::SAT;
                 STRACE(str,
                     tout << "Found solution:" << std::endl;
                     for (const auto &var_substitution : solution.substitution_map) {
@@ -647,6 +671,7 @@ namespace smt::noodler {
             // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
             // and if there is no cycle, we do not need to do BFS, the algorithm should end
             new_element.has_siblings = more_than_one_noodle;
+            new_element.checked_lia = false;
             push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
         }
 

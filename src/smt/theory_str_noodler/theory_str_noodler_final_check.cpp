@@ -306,46 +306,33 @@ namespace smt::noodler {
 
                 if (running_lia_check) {
                     (dynamic_cast<DecisionProcedure&>(*dec_proc)).lia_check_result = is_lengths_sat;
+                    continue;
                 }
 
                 if (is_lengths_sat == l_true) {
                     STRACE(str, tout << "len sat " << mk_pp(lengths, m) << std::endl;);
-                    if (!running_lia_check)
-                        sat_handling(lengths);
 
-                    if (!running_lia_check)
-                        if(precision == LenNodePrecision::OVERAPPROX) {
-                            ctx.get_fparams().is_overapprox = true;
-                        }
+                    sat_handling(lengths);
 
-                    if (running_lia_check) {
-                        continue;
+                    if(precision == LenNodePrecision::OVERAPPROX) {
+                        ctx.get_fparams().is_overapprox = true;
                     }
                     this->statistics.at("stabilization").num_finish++;
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE(str, tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
                     STRACE(str_noodle_dot, tout << (dynamic_cast<DecisionProcedure&>(*dec_proc).solution.DOT_name) << " [fontcolor=\"blue\",color=\"blue\"];" << std::endl;);
-                    // if (!running_lia_check)
-                        block_len = m.mk_or(block_len, lengths);
 
-                    if (!running_lia_check)
-                        if(precision == LenNodePrecision::UNDERAPPROX) {
-                            ctx.get_fparams().is_underapprox = true;
-                        }
-                    if (running_lia_check) {
-                        continue;
+                    block_len = m.mk_or(block_len, lengths);
+
+                    if(precision == LenNodePrecision::UNDERAPPROX) {
+                        ctx.get_fparams().is_underapprox = true;
                     }
-
                 } else {
                     // The solver returned `l_undef`. As not-contains predicates are being reduced to quantified LIA, we are using a solver with quantified instantiation
                     // that is incomplete and it might return `l_undef` (unknown) on some branches. We want to continue exploring other branches, hoping that some other
                     // might get solved. Hence we set is_underapprox = true - we don't really know whether this branch has contained any solutions.
                     ctx.get_fparams().is_underapprox = true;
-
-                    if (running_lia_check) {
-                        continue;
-                    }
                 }
             } else if (result == l_false) {
                 // we did not find a solution (with satisfiable length constraints)

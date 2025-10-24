@@ -1166,7 +1166,8 @@ namespace smt::noodler {
             if (r->is_marked()) {
                 continue;
             }
-            if (!ctx.is_relevant(r) || m_util_s.str.mk_string_sort() != r->get_sort()) {
+
+            if (!ctx.is_relevant(r) || !((r->get_expr()->get_kind() == ast_kind::AST_APP || r->get_expr()->get_kind() == ast_kind::AST_VAR )) || m_util_s.str.mk_string_sort() != r->get_sort()) {
                 continue;
             }
             // is variable shared among theories?

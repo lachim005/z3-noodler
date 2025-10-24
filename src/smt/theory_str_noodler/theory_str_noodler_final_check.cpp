@@ -1157,16 +1157,16 @@ namespace smt::noodler {
         unsigned num_vars = get_num_vars();
         for (unsigned i = 0; i < num_vars; i++) {
             enode * n = get_enode(i);
-            if(n->is_shared() == l_false) {
-                continue;
-            }
-            // we take only string variables
-            if (!ctx.is_relevant(n) || m_util_s.str.mk_string_sort() != n->get_sort()) {
+            // it suffices to consider only root shared nodes (thats basically what ctx.is_shared does)
+            if(n->is_shared() == l_false || !n->is_root()) {
                 continue;
             }
             enode * r = n->get_root();
             // mark to avoid duplicities
             if (r->is_marked()) {
+                continue;
+            }
+            if (!ctx.is_relevant(r) || m_util_s.str.mk_string_sort() != r->get_sort()) {
                 continue;
             }
             // is variable shared among theories?

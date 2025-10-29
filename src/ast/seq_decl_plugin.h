@@ -83,6 +83,8 @@ enum seq_op_kind {
     OP_STRING_CONST,
     OP_STRING_ITOS,
     OP_STRING_STOI,
+    OP_STRING_RTOS,
+    OP_STRING_STOR,
     OP_STRING_UBVTOS,
     OP_STRING_SBVTOS,
     OP_STRING_LT,
@@ -364,6 +366,8 @@ public:
         bool is_suffix(expr const* n)   const { return is_app_of(n, m_fid, OP_SEQ_SUFFIX); }
         bool is_itos(expr const* n)     const { return is_app_of(n, m_fid, OP_STRING_ITOS); }
         bool is_stoi(expr const* n)     const { return is_app_of(n, m_fid, OP_STRING_STOI); }
+        bool is_rtos(expr const* n)		const { return is_app_of(n, m_fid, OP_STRING_RTOS); }
+        bool is_stor(expr const* n)		const { return is_app_of(n, m_fid, OP_STRING_STOR); }
         bool is_ubv2s(expr const* n)    const { return is_app_of(n, m_fid, OP_STRING_UBVTOS); }
         bool is_sbv2s(expr const* n)    const { return is_app_of(n, m_fid, OP_STRING_SBVTOS); }
         bool is_in_re(expr const* n)    const { return is_app_of(n, m_fid, OP_SEQ_IN_RE); }
@@ -415,6 +419,8 @@ public:
         MATCH_BINARY(is_le);
         MATCH_UNARY(is_itos);
         MATCH_UNARY(is_stoi);
+        MATCH_UNARY(is_rtos);
+        MATCH_UNARY(is_stor);
         MATCH_UNARY(is_ubv2s);
         MATCH_UNARY(is_sbv2s);
         MATCH_UNARY(is_is_digit);

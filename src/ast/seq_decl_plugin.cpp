@@ -195,6 +195,7 @@ void seq_decl_plugin::init() {
     sort* reT  = m.mk_sort(m_family_id, RE_SORT, 1, &paramS);
     sort* boolT = m.mk_bool_sort();
     sort* intT  = arith_util(m).mk_int();
+    sort* realT = arith_util(m).mk_real();
     sort* predA = autil.mk_array_sort(A, boolT);
     sort* seqAseqAseqA[3] = { seqA, seqA, seqA };
     sort* seqAreAseqA[3] = { seqA, reA, seqA };
@@ -258,6 +259,8 @@ void seq_decl_plugin::init() {
     m_sigs[_OP_STRING_FROM_CHAR] = alloc(psig, m, "char", 1, 0, nullptr, strT);
     m_sigs[OP_STRING_ITOS]       = alloc(psig, m, "str.from_int", 0, 1, &intT, strT);
     m_sigs[OP_STRING_STOI]       = alloc(psig, m, "str.to_int", 0, 1, &strT, intT);
+    m_sigs[OP_STRING_RTOS]		 = alloc(psig, m, "str.from_real", 0, 1, &realT, strT);
+    m_sigs[OP_STRING_STOR]		 = alloc(psig, m, "str.to_real", 0, 1, &strT, realT);
     m_sigs[OP_STRING_LT]         = alloc(psig, m, "str.<", 0, 2, str2T, boolT);
     m_sigs[OP_STRING_LE]         = alloc(psig, m, "str.<=", 0, 2, str2T, boolT);
     m_sigs[OP_STRING_IS_DIGIT]   = alloc(psig, m, "str.is_digit", 0, 1, &strT, boolT);
@@ -424,6 +427,8 @@ func_decl* seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, p
     case OP_SEQ_UNIT:
     case OP_STRING_ITOS:
     case OP_STRING_STOI:
+	case OP_STRING_RTOS:
+	case OP_STRING_STOR:
     case OP_STRING_LT:
     case OP_STRING_LE:
     case OP_STRING_IS_DIGIT:

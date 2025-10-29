@@ -427,6 +427,8 @@ namespace smt::noodler {
         } else if (
             m_util_s.str.is_stoi(n) || // str.to_int
             m_util_s.str.is_itos(n) || // str.from_int
+            m_util_s.str.is_stor(n) || // str.to_real
+            m_util_s.str.is_rtos(n) || // str.from_real
             m_util_s.str.is_to_code(n) || // str.to_code
             m_util_s.str.is_from_code(n) // str.from_code
         ) {
@@ -2224,6 +2226,9 @@ namespace smt::noodler {
         } else if (m_util_s.str.is_itos(conversion, arg)) {
             type = ConversionType::FROM_INT;
             name_of_type = "from_int";
+        } else if (m_util_s.str.is_stor(conversion) || m_util_s.str.is_rtos(conversion)) {
+            util::throw_error("str.to_real and str.from_real are not supported");
+            return;
         } else {
             UNREACHABLE();
             return;

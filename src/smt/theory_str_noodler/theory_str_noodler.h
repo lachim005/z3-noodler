@@ -589,6 +589,10 @@ namespace smt::noodler {
         void sat_handling(expr_ref length_formula);
 
         /***************** FINAL_CHECK_EH HELPING FUNCTIONS END *******************/
+
+        void collect_shared_vars(sbuffer<theory_var> & result) const;
+
+        unsigned mk_interface_eqs();
     };
 }
 

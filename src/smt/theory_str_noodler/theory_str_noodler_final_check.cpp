@@ -2,6 +2,7 @@
 #include "formula.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "memb_heuristics_procedures.h"
+#include "util/debug.h"
 #include "util/trace.h"
 
 namespace smt::noodler {
@@ -293,6 +294,7 @@ namespace smt::noodler {
             bool running_lia_check = (dynamic_cast<DecisionProcedure&>(*dec_proc)).solution_state == SolutionState::CHECK_LIA;
             if (result == l_true) {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
+                SASSERT(!running_lia_check || precision == LenNodePrecision::PRECISE);
 
                 lengths = len_node_to_z3_formula(noodler_lengths);
 
@@ -306,10 +308,12 @@ namespace smt::noodler {
 
                 if (running_lia_check) {
                     (dynamic_cast<DecisionProcedure&>(*dec_proc)).lia_check_result = is_lengths_sat;
-                    continue;
                 }
 
                 if (is_lengths_sat == l_true) {
+                    if (running_lia_check) {
+                        continue;
+                    }
                     STRACE(str, tout << "len sat " << mk_pp(lengths, m) << std::endl;);
 
                     sat_handling(lengths);
@@ -325,10 +329,16 @@ namespace smt::noodler {
 
                     block_len = m.mk_or(block_len, lengths);
 
+                    if (running_lia_check) {
+                        continue;
+                    }
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;
                     }
                 } else {
+                    if (running_lia_check) {
+                        continue;
+                    }
                     // The solver returned `l_undef`. As not-contains predicates are being reduced to quantified LIA, we are using a solver with quantified instantiation
                     // that is incomplete and it might return `l_undef` (unknown) on some branches. We want to continue exploring other branches, hoping that some other
                     // might get solved. Hence we set is_underapprox = true - we don't really know whether this branch has contained any solutions.

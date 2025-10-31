@@ -410,7 +410,7 @@ namespace smt::noodler {
             auto &top = peek_at_worklist();
 
             if (top.has_siblings && !top.checked_lia && !top.predicates_to_process.empty()) {
-                if (top.transducers.empty() && conversions.empty()) {
+                if (top.transducers.empty() && conversions.empty() && disequations.get_predicates().empty() && not_contains.get_predicates().empty()) {
                     // We check length constrains before we start processing this noodle
                     solution = top;
                     top.checked_lia = true;

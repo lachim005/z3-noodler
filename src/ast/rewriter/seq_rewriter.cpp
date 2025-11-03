@@ -741,6 +741,14 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         SASSERT(num_args == 1);
         st = mk_str_stoi(args[0], result);
         break;
+    case OP_STRING_RTOS: 
+        SASSERT(num_args == 2);
+        st = mk_str_rtos(args[0], args[1], result);
+        break;
+    case OP_STRING_STOR: 
+        SASSERT(num_args == 1);
+        st = mk_str_stor(args[0], result);
+        break;
     case OP_STRING_UBVTOS:
         SASSERT(num_args == 1);
         st = mk_str_ubv2s(args[0], result);
@@ -2773,6 +2781,66 @@ br_status seq_rewriter::mk_str_stoi(expr* a, expr_ref& result) {
     //     return BR_REWRITE_FULL;
     // }
 
+    return BR_FAILED;
+}
+
+br_status seq_rewriter::mk_str_rtos(expr* a, expr* b, expr_ref& result) {
+    rational r, w;
+    if (m_autil.is_numeral(a, r) && r.is_neg()) {
+        result = str().mk_string(zstring());
+        return BR_DONE;
+    }
+    if (m_autil.is_numeral(b, w) && w.is_neg()) {
+        result = str().mk_string(zstring());
+        return BR_DONE;
+    }
+    if (m_autil.is_numeral(a, r) && m_autil.is_numeral(b, w)) {
+        SASSERT(w.is_int());
+        if (!r.is_neg() && !w.is_neg()) {
+            result = str().mk_string(zstring(r.to_string_decimal(w)));
+        } else {
+            result = str().mk_string(zstring());
+        }
+        return BR_DONE;
+    }
+
+    return BR_FAILED;
+}
+
+br_status seq_rewriter::mk_str_stor(expr* a, expr_ref& result) {
+    zstring s;
+    if (str().is_string(a, s)) {
+        std::string s1 = s.encode();
+        if (s1.length() == 0) {
+            result = minus_one_real();
+            return BR_DONE;
+        }
+        bool found_dot = false;
+        for (unsigned i = 0; i < s1.length(); ++i) {
+            if (!('0' <= s1[i] && s1[i] <= '9')) {
+                if (s1[i] == '.' && !found_dot) {
+                    found_dot = true;
+                } else {
+                    result = minus_one();
+                    return BR_DONE;
+                }
+            }
+        }
+        if (found_dot && s1.length() == 1) {
+            // string containg only ".", not a valid number
+            result = minus_one();
+            return BR_DONE;
+        }
+        rational r(s1.c_str());
+        result = m_autil.mk_numeral(r, false);
+        return BR_DONE;
+    }
+    
+    expr* c = nullptr, *t = nullptr, *e = nullptr;
+    if (m().is_ite(a, c, t, e)) {
+        result = m().mk_ite(c, str().mk_stoi(t), str().mk_stoi(e));
+        return BR_REWRITE_FULL;
+    }
     return BR_FAILED;
 }
 

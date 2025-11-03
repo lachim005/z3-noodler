@@ -266,6 +266,8 @@ class seq_rewriter {
     br_status mk_str_units(func_decl* f, expr_ref& result);
     br_status mk_str_itos(expr* a, expr_ref& result);
     br_status mk_str_stoi(expr* a, expr_ref& result);
+    br_status mk_str_rtos(expr* a, expr* b, expr_ref& result);
+    br_status mk_str_stor(expr* a, expr_ref& result);
     br_status mk_str_ubv2s(expr* a, expr_ref& result);
     br_status mk_str_sbv2s(expr* a, expr_ref& result);
     br_status mk_str_in_regexp(expr* a, expr* b, expr_ref& result);
@@ -314,6 +316,7 @@ class seq_rewriter {
     expr_ref zero() { return expr_ref(m_autil.mk_int(0), m()); }
     expr_ref one() { return expr_ref(m_autil.mk_int(1), m()); }
     expr_ref minus_one() { return expr_ref(m_autil.mk_int(-1), m()); }
+    expr_ref minus_one_real() { return expr_ref(m_autil.mk_real(-1), m()); }
     expr_ref mk_sub(expr* a, rational const& n);
     expr_ref mk_sub(expr* a, unsigned n) { return mk_sub(a, rational(n)); }
 

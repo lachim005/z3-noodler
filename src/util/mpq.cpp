@@ -16,6 +16,7 @@ Author:
 Revision History:
 
 --*/
+#include <sstream>
 #include "util/mpq.h"
 #include "util/warning.h"
 #include "util/z3_exception.h"
@@ -120,6 +121,37 @@ std::string mpq_manager<SYNCH>::to_string(mpq const & a) const {
     if (is_int(a))
         return to_string(a.m_num);
     return to_string(a.m_num) + "/" + to_string(a.m_den);
+}
+
+template<bool SYNCH>
+std::string mpq_manager<SYNCH>::to_string_decimal(mpq const & a, mpz const & prec) {
+    std::stringstream res;
+    mpz n1, d1, v1;
+    get_numerator(a, n1);
+    get_denominator(a, d1);
+    if (is_neg(a)) {
+        res << "-";
+        neg(n1);
+    }
+    mpz ten(10);
+    div(n1, d1, v1);
+    display(res, v1);
+    rem(n1, d1, n1);
+    if (!is_zero(n1)) { // number is not an integer
+        res << ".";
+        for (mpz i = 0; !eq(i, prec); add(i, 1, i)) {
+            mul(n1, ten, n1);
+            div(n1, d1, v1);
+            SASSERT(lt(v1, ten));
+            display(res, v1);
+            rem(n1, d1, n1);
+            if (is_zero(n1)) { // number is precise
+                break;
+            }
+        }
+    }
+    del(ten); del(n1); del(d1); del(v1);
+    return res.str();
 }
 
 template<bool SYNCH>

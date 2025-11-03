@@ -2821,14 +2821,14 @@ br_status seq_rewriter::mk_str_stor(expr* a, expr_ref& result) {
                 if (s1[i] == '.' && !found_dot) {
                     found_dot = true;
                 } else {
-                    result = minus_one();
+                    result = minus_one_real();
                     return BR_DONE;
                 }
             }
         }
         if (found_dot && s1.length() == 1) {
             // string containg only ".", not a valid number
-            result = minus_one();
+            result = minus_one_real();
             return BR_DONE;
         }
         rational r(s1.c_str());
@@ -2838,7 +2838,7 @@ br_status seq_rewriter::mk_str_stor(expr* a, expr_ref& result) {
     
     expr* c = nullptr, *t = nullptr, *e = nullptr;
     if (m().is_ite(a, c, t, e)) {
-        result = m().mk_ite(c, str().mk_stoi(t), str().mk_stoi(e));
+        result = m().mk_ite(c, str().mk_stor(t), str().mk_stor(e));
         return BR_REWRITE_FULL;
     }
     return BR_FAILED;

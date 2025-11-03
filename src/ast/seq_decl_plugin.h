@@ -322,6 +322,8 @@ public:
         app* mk_char_bit(expr* e, unsigned i);
         app* mk_itos(expr* i) const { return m.mk_app(m_fid, OP_STRING_ITOS, 1, &i); }
         app* mk_stoi(expr* s) const { return m.mk_app(m_fid, OP_STRING_STOI, 1, &s); }
+        app* mk_rtos(expr* r, expr* i) const { expr* es[2] = { r, i }; return m.mk_app(m_fid, OP_STRING_RTOS, 2, es); }
+        app* mk_stor(expr* s) const { return m.mk_app(m_fid, OP_STRING_STOR, 1, &s); }
         app* mk_ubv2s(expr* b) const { return m.mk_app(m_fid, OP_STRING_UBVTOS, 1, &b); }
         app* mk_sbv2s(expr* b) const { return m.mk_app(m_fid, OP_STRING_SBVTOS, 1, &b); }
         app* mk_is_empty(expr* s) const;
@@ -419,7 +421,7 @@ public:
         MATCH_BINARY(is_le);
         MATCH_UNARY(is_itos);
         MATCH_UNARY(is_stoi);
-        MATCH_UNARY(is_rtos);
+        MATCH_BINARY(is_rtos);
         MATCH_UNARY(is_stor);
         MATCH_UNARY(is_ubv2s);
         MATCH_UNARY(is_sbv2s);

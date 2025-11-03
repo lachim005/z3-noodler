@@ -212,6 +212,7 @@ void seq_decl_plugin::init() {
     sort* str2TintT[3] = { strT, strT, intT };
     sort* seqAintT[2] = { seqA, intT };
     sort* seq3A[3] = { seqA, seqA, seqA };
+    sort* realTintT[2] = { realT, intT };
 
     m_sigs.resize(LAST_SEQ_OP);
     // TBD: have (par ..) construct and load parameterized signature from premable.
@@ -259,7 +260,7 @@ void seq_decl_plugin::init() {
     m_sigs[_OP_STRING_FROM_CHAR] = alloc(psig, m, "char", 1, 0, nullptr, strT);
     m_sigs[OP_STRING_ITOS]       = alloc(psig, m, "str.from_int", 0, 1, &intT, strT);
     m_sigs[OP_STRING_STOI]       = alloc(psig, m, "str.to_int", 0, 1, &strT, intT);
-    m_sigs[OP_STRING_RTOS]		 = alloc(psig, m, "str.from_real", 0, 1, &realT, strT);
+    m_sigs[OP_STRING_RTOS]		 = alloc(psig, m, "str.from_real", 0, 2, realTintT, strT);
     m_sigs[OP_STRING_STOR]		 = alloc(psig, m, "str.to_real", 0, 1, &strT, realT);
     m_sigs[OP_STRING_LT]         = alloc(psig, m, "str.<", 0, 2, str2T, boolT);
     m_sigs[OP_STRING_LE]         = alloc(psig, m, "str.<=", 0, 2, str2T, boolT);

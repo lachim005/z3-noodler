@@ -878,7 +878,7 @@ namespace smt::noodler {
         // collect all variables that substitute some string_var of some conversion (we do it here
         // because we need to know which variables are used in conversions for parikh image of variables
         // in transducers)
-        std::tie(code_subst_vars, int_subst_vars) = get_vars_substituted_in_conversions();
+        std::tie(code_subst_vars, int_subst_vars, real_subst_vars) = get_vars_substituted_in_conversions();
 
         // start with formula for disequations
         std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
@@ -1000,9 +1000,9 @@ namespace smt::noodler {
                     code_subst_vars_handled_by_parikh.insert(var);
                     levels_of_code_subst_vars.insert(i);
                 }
-                if (int_subst_vars.contains(var)) {
+                if (int_subst_vars.contains(var) || real_subst_vars.contains(var)) {
                     // TODO add support (pretty hard, we need to remember the order of selected transitions by parikh)
-                    util::throw_error("Integer conversions with transducers are not supported yet");
+                    util::throw_error("Integer/real conversions with transducers are not supported yet");
                 }
             }
 
@@ -1141,8 +1141,8 @@ namespace smt::noodler {
         return result;
     }
 
-    std::pair<std::set<BasicTerm>,std::set<BasicTerm>> DecisionProcedure::get_vars_substituted_in_conversions() {
-        std::set<BasicTerm> code_subst_vars, int_subst_vars;
+    std::tuple<std::set<BasicTerm>,std::set<BasicTerm>,std::set<BasicTerm>> DecisionProcedure::get_vars_substituted_in_conversions() {
+        std::set<BasicTerm> code_subst_vars, int_subst_vars, real_subs_vars;
         for (const TermConversion& conv : conversions) {
             switch (conv.type)
             {
@@ -1162,11 +1162,19 @@ namespace smt::noodler {
                     }
                     break;
                 }
+                case ConversionType::TO_REAL:
+                case ConversionType::FROM_REAL:
+                {
+                    for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
+                        real_subst_vars.insert(var);
+                    }
+                    break;
+                }
                 default:
                     UNREACHABLE();
             }
         }
-        return {code_subst_vars, int_subst_vars};
+        return {code_subst_vars, int_subst_vars, real_subs_vars};
     }
 
     LenNode DecisionProcedure::get_formula_for_code_subst_vars(const std::set<BasicTerm>& code_subst_vars) {
@@ -1650,6 +1658,8 @@ namespace smt::noodler {
             res_precision = int_conv_formula_with_precision.second;
         }
 
+        // TODO add get_formula_for_real_subst_vars here
+
         for (const TermConversion& conv : conversions) {
             STRACE(str_conversion,
                 tout << " processing " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
@@ -1667,6 +1677,13 @@ namespace smt::noodler {
                 case ConversionType::FROM_INT:
                 {
                     result.succ.push_back(get_formula_for_int_conversion(conv, int_subst_vars_to_possible_valid_lengths));
+                    break;
+                }
+                case ConversionType::TO_REAL:
+                case ConversionType::FROM_REAL:
+                {
+                    // TODO
+                    util::throw_error("cannot handle string-real conversions");
                     break;
                 }
                 default:

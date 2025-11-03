@@ -952,6 +952,8 @@ namespace smt::noodler {
         FROM_CODE,
         TO_INT,
         FROM_INT,
+        TO_REAL,
+        FROM_REAL
     };
 
     // Term conversion: to_int/from_int/to_code/from_code
@@ -974,6 +976,10 @@ namespace smt::noodler {
             return "to_int";
         case ConversionType::FROM_INT:
             return "from_int";
+        case ConversionType::TO_REAL:
+            return "to_real";
+        case ConversionType::FROM_REAL:
+            return "from_real";
 
         default:
             UNREACHABLE();

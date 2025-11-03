@@ -514,6 +514,7 @@ namespace smt::noodler {
         // see get_vars_substituted_in_conversions() for what these sets mean (used in get_length() and in model generation)
         std::set<BasicTerm> code_subst_vars;
         std::set<BasicTerm> int_subst_vars;
+        std::set<BasicTerm> real_subst_vars;
 
         std::set<BasicTerm> code_subst_vars_handled_by_parikh;
 
@@ -628,14 +629,14 @@ namespace smt::noodler {
         }
 
         /**
-         * Gets the pair of variable sets (code_subst_vars, int_subst_vars) where code_subst_vars
+         * Gets the variable sets (code_subst_vars, int_subst_vars, real_subst_vars) where code_subst_vars
          * contains all vars s_i, such that there exists "c = to_code(s)" or "s = from_code(c)"
          * in conversions where s is substituted by s_1 ... s_i ... s_n in the solution.
          * If s is not substituted (it maps to automaton), then it is added to code_subst_vars instead.
-         * The set int_subst_vars is defined similarly, but for "i = to_int(s)" or "s = from_int(i)"
-         * conversions.
+         * The set int_subst_vars and real_subst_vars is defined similarly, but for "i = to_int(s)"/"s = from_int(i)"
+         * and "r = to_real(s)"/"s = from_real(r)" conversions respectively.
          */
-        std::pair<std::set<BasicTerm>,std::set<BasicTerm>> get_vars_substituted_in_conversions();
+        std::tuple<std::set<BasicTerm>,std::set<BasicTerm>,std::set<BasicTerm>> get_vars_substituted_in_conversions();
 
         /**
          * @brief Get the formula for to_code/from_code substituting variables

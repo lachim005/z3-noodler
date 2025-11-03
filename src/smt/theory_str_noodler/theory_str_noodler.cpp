@@ -2213,37 +2213,34 @@ namespace smt::noodler {
         expr *arg = nullptr;
 
         ConversionType type;
-        std::string name_of_type;
         if (m_util_s.str.is_to_code(conversion, arg)) {
             type = ConversionType::TO_CODE;
-            name_of_type = "to_code";
         } else if (m_util_s.str.is_from_code(conversion, arg)) {
             type = ConversionType::FROM_CODE;
-            name_of_type = "from_code";
         } else if (m_util_s.str.is_stoi(conversion, arg)) {
             type = ConversionType::TO_INT;
-            name_of_type = "to_int";
         } else if (m_util_s.str.is_itos(conversion, arg)) {
             type = ConversionType::FROM_INT;
-            name_of_type = "from_int";
-        } else if (m_util_s.str.is_stor(conversion) || m_util_s.str.is_rtos(conversion)) {
-            util::throw_error("str.to_real and str.from_real are not supported");
-            return;
+        } else if (m_util_s.str.is_stor(conversion, arg)) {
+            type = ConversionType::TO_REAL;
+        } else if (m_util_s.str.is_rtos(conversion, arg)) {
+            type = ConversionType::FROM_REAL;
         } else {
             UNREACHABLE();
             return;
         }
-        bool tranforming_from = (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT);
+        bool tranforming_from = (type == ConversionType::FROM_CODE || type == ConversionType::FROM_INT || type == ConversionType::FROM_REAL);
+        std::string name_of_type = get_conversion_name(type);
 
         // get the var for the argument
         BasicTerm var_for_arg(BasicTermType::Variable);
         if (tranforming_from) {
-            // we create new fresh noodler var for the integer argument which we save into var_name so that
+            // we create new fresh noodler var for the integer/real argument which we save into var_name so that
             // len formula we will create in decision procedure will replace the correct var with the correct expression
             var_for_arg = util::mk_noodler_var_fresh(name_of_type + "_argument");
             var_name.insert({var_for_arg, expr_ref(arg, m)});
         } else {
-            // for to_code and to_int, the argument has string type, we have to find the variable for it
+            // the argument has string type, we have to find the variable for it
             expr_ref z3_var_for_arg(m);
             if (m_util_s.str.is_string(arg)) {
                 // it seems that Z3 rewriter handles the case where we tranform from string literal, so this should be unreachable
@@ -2268,7 +2265,7 @@ namespace smt::noodler {
                 this->predicate_replace.insert(arg, z3_var_for_arg);
             }
             var_for_arg = util::get_variable_basic_term(z3_var_for_arg);
-            var_name.insert({var_for_arg, z3_var_for_arg}); // I have no idea why I am doing this, but it is probably important
+            var_name.insert({var_for_arg, z3_var_for_arg});
             // we need exact solution for the argument, so that we can compute
             // the arithmetic formula for the result in final_check_eh
             len_vars.insert(z3_var_for_arg);
@@ -2280,9 +2277,9 @@ namespace smt::noodler {
             expr_ref z3_var_for_conversion = mk_str_var_fresh(name_of_type + "_result");
             add_axiom({mk_literal(m.mk_eq(z3_var_for_conversion, conversion))});
             this->predicate_replace.insert(conversion, z3_var_for_conversion);
-            len_vars.insert(z3_var_for_conversion); // dunno if this is needed
+            len_vars.insert(z3_var_for_conversion); // we need exact solution for the result, to compute the arithmetic formula
             var_for_conversion = util::get_variable_basic_term(z3_var_for_conversion);
-            var_name.insert({var_for_conversion, z3_var_for_conversion}); // I have no idea why I am doing this, but it is probably important
+            var_name.insert({var_for_conversion, z3_var_for_conversion});
 
             // The range of from_* functions is bounded, we have to bound it also for the decision procedure
             if (type == ConversionType::FROM_CODE) {
@@ -2318,8 +2315,13 @@ namespace smt::noodler {
                     mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(m_params.m_underapprox_length))))
                 });
             }
+
+            if (type == ConversionType::FROM_REAL) {
+                // TODO
+                util::throw_error("We cannot handle to_real yet");
+            }
         } else {
-            // we create new fresh noodler var for the integer result which we save into var_name so that
+            // we create new fresh noodler var for the integer/real result which we save into var_name so that
             // len formula we will create in decision procedure will replace the correct var with the correct expression
             var_for_conversion = util::mk_noodler_var_fresh(name_of_type + "_result");
             var_name.insert({var_for_conversion, expr_ref(conversion, m)});
@@ -2335,12 +2337,11 @@ namespace smt::noodler {
                 // the result of str.to_int cannot be any negative number other than -1
                 add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_int(-1), conversion))});
 
-
                 expr *e1 = nullptr, *e2 = nullptr, *e3 = nullptr;
                 rational r1;
                 if (m_util_s.str.is_at(arg)) {
                     // argument is str.at(...) => result must be less than 10
-                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_int(10)))});
+                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_int(9)))});
                 } else if (m_util_s.str.is_extract(arg, e1, e2, e3) && m_util_a.is_numeral(e3, r1)) {
                     // argument is str.substr(?, ?, numeral) => result must be less than 10^numeral
                     rational ten_to_r1(1);
@@ -2348,6 +2349,25 @@ namespace smt::noodler {
                         ten_to_r1 = ten_to_r1 * 10;
                     }
                     add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_int(ten_to_r1)))});
+                }
+            }
+
+            if (type == ConversionType::TO_REAL) {
+                // the result of str.to_real cannot be any negative number other than -1
+                add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), conversion)), mk_literal(m.mk_eq(m_util_a.mk_real(-1), conversion))});
+
+                expr *e1 = nullptr, *e2 = nullptr, *e3 = nullptr;
+                rational r1;
+                if (m_util_s.str.is_at(arg)) {
+                    // argument is str.at(...) => result must be less than 10
+                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_real(9)))});
+                } else if (m_util_s.str.is_extract(arg, e1, e2, e3) && m_util_a.is_numeral(e3, r1)) {
+                    // argument is str.substr(?, ?, numeral) => result must be less than 10^numeral
+                    rational ten_to_r1(1);
+                    for (rational i(0); i < r1; ++i) {
+                        ten_to_r1 = ten_to_r1 * 10;
+                    }
+                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_real(ten_to_r1)))});
                 }
             }
         }

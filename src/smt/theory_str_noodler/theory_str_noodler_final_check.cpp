@@ -288,6 +288,7 @@ namespace smt::noodler {
         this->statistics.at("stabilization").num_start++;
 
         expr_ref block_len(m.mk_false(), m);
+        bool added_overapprox_to_block_len = false;
         while (true) {
             util::check_limit(m);
             result = dec_proc->compute_next_solution();
@@ -330,6 +331,7 @@ namespace smt::noodler {
                     block_len = m.mk_or(block_len, lengths);
 
                     if (running_lia_check) {
+                        added_overapprox_to_block_len = true;
                         continue;
                     }
                     if(precision == LenNodePrecision::UNDERAPPROX) {
@@ -359,7 +361,7 @@ namespace smt::noodler {
                 } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
-                    block_curr_len(block_len);
+                    block_curr_len(block_len, !added_overapprox_to_block_len);
                 }
                 this->statistics.at("stabilization").num_finish++;
                 return FC_CONTINUE;

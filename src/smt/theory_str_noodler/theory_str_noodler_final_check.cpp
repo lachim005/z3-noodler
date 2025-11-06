@@ -2,6 +2,8 @@
 #include "formula.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
 #include "memb_heuristics_procedures.h"
+#include "util/debug.h"
+#include "util/trace.h"
 
 namespace smt::noodler {
 
@@ -286,11 +288,14 @@ namespace smt::noodler {
         this->statistics.at("stabilization").num_start++;
 
         expr_ref block_len(m.mk_false(), m);
+        bool added_overapprox_to_block_len = false;
         while (true) {
             util::check_limit(m);
             result = dec_proc->compute_next_solution();
+            bool running_lia_check = (dynamic_cast<DecisionProcedure&>(*dec_proc)).solution_state == SolutionState::CHECK_LIA;
             if (result == l_true) {
                 auto [noodler_lengths, precision] = dec_proc->get_lengths();
+                SASSERT(!running_lia_check || precision == LenNodePrecision::PRECISE);
 
                 lengths = len_node_to_z3_formula(noodler_lengths);
 
@@ -302,24 +307,40 @@ namespace smt::noodler {
 
                 lbool is_lengths_sat = check_len_sat(lengths);
 
+                if (running_lia_check) {
+                    (dynamic_cast<DecisionProcedure&>(*dec_proc)).lia_check_result = is_lengths_sat;
+                }
+
                 if (is_lengths_sat == l_true) {
+                    if (running_lia_check) {
+                        continue;
+                    }
                     STRACE(str, tout << "len sat " << mk_pp(lengths, m) << std::endl;);
+
                     sat_handling(lengths);
 
                     if(precision == LenNodePrecision::OVERAPPROX) {
                         ctx.get_fparams().is_overapprox = true;
                     }
-
                     this->statistics.at("stabilization").num_finish++;
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE(str, tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
+                    STRACE(str_noodle_dot, tout << (dynamic_cast<DecisionProcedure&>(*dec_proc).solution.DOT_name) << " [fontcolor=\"blue\",color=\"blue\"];" << std::endl;);
+
                     block_len = m.mk_or(block_len, lengths);
 
+                    if (running_lia_check) {
+                        added_overapprox_to_block_len = true;
+                        continue;
+                    }
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;
                     }
                 } else {
+                    if (running_lia_check) {
+                        continue;
+                    }
                     // The solver returned `l_undef`. As not-contains predicates are being reduced to quantified LIA, we are using a solver with quantified instantiation
                     // that is incomplete and it might return `l_undef` (unknown) on some branches. We want to continue exploring other branches, hoping that some other
                     // might get solved. Hence we set is_underapprox = true - we don't really know whether this branch has contained any solutions.
@@ -340,7 +361,7 @@ namespace smt::noodler {
                 } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
-                    block_curr_len(block_len);
+                    block_curr_len(block_len, !added_overapprox_to_block_len);
                 }
                 this->statistics.at("stabilization").num_finish++;
                 return FC_CONTINUE;
@@ -736,7 +757,12 @@ namespace smt::noodler {
 
         while(dec_proc->compute_next_solution() == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
-            if(check_len_sat(lengths) == l_true) {
+            lbool is_lengths_sat = check_len_sat(lengths);
+            if ((dynamic_cast<DecisionProcedure&>(*dec_proc)).solution_state == SolutionState::CHECK_LIA) {
+                (dynamic_cast<DecisionProcedure&>(*dec_proc)).lia_check_result = is_lengths_sat;
+                continue;
+            }
+            if(is_lengths_sat == l_true) {
                 sat_handling(lengths);
                 this->statistics.at("underapprox").num_finish++;
                 return l_true;

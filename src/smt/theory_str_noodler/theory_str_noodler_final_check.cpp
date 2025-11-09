@@ -1215,8 +1215,11 @@ namespace smt::noodler {
                         result++;
                         ctx.internalize(eq, false);
                         ctx.mark_as_relevant(eq);
-                        // add axiom for the equality
-                        add_axiom(eq);
+                        // Previously we added the equality as a theory axiom here (add_axiom(eq)).
+                        // This forced all interface pairs to become equal immediately, preventing the SAT core
+                        // from exploring assignments where they differ. Instead we only internalize and mark it
+                        // relevant so the core solver may choose (dis)equalities later, and other theory reasoning
+                        // can derive necessary consequences.
                     }
                 }
             }

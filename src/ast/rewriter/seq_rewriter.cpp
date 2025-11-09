@@ -4667,9 +4667,9 @@ br_status seq_rewriter::mk_str_in_regexp(expr* a, expr* b, expr_ref& result) {
     }
     expr* b1 = nullptr;
     expr* eps = nullptr;
-    if (re().is_opt(b, b1) ||
+    if (false && (re().is_opt(b, b1) ||
         (re().is_union(b, b1, eps) && re().is_epsilon(eps)) ||
-        (re().is_union(b, eps, b1) && re().is_epsilon(eps)))
+        (re().is_union(b, eps, b1) && re().is_epsilon(eps)))) // FIXME: NOODLER adding length variables from regexes is not beneficial for noodler
     {
         result = m().mk_ite(m().mk_eq(str().mk_length(a), zero()),
             m().mk_true(),

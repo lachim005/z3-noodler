@@ -2356,6 +2356,7 @@ namespace smt::noodler {
             // we create new fresh noodler var for the integer/real result which we save into var_name so that
             // len formula we will create in decision procedure will replace the correct var with the correct expression
             var_for_conversion = util::mk_noodler_var_fresh(name_of_type + "_result");
+            if (type == ConversionType::TO_REAL) { var_for_conversion = BasicTerm(BasicTermType::RealVariable, var_for_conversion.get_name()); }
             var_name.insert({var_for_conversion, expr_ref(conversion, m)});
 
             // To help LIA solver, we give some bounds on the results of to_* functions
@@ -2385,9 +2386,6 @@ namespace smt::noodler {
             }
 
             if (type == ConversionType::TO_REAL) {
-                // the result should be real var, not int var
-                var_for_conversion = BasicTerm(BasicTermType::RealVariable, var_for_conversion.get_name());
-
                 // the result of str.to_real cannot be any negative number other than -1
                 add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), conversion)), mk_literal(m.mk_eq(m_util_a.mk_real(-1), conversion))});
 

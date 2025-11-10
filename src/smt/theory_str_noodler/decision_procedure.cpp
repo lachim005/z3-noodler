@@ -1235,9 +1235,9 @@ namespace smt::noodler {
         return result;
     }
 
-    LenNode DecisionProcedure::encode_interval_words(const BasicTerm& var, const std::vector<interval_word>& interval_words) {
+    LenNode DecisionProcedure::encode_interval_words(const BasicTerm& var, const std::vector<IntervalWord>& interval_words) {
         LenNode result(LenFormulaType::OR);
-        for (const auto& interval_word : interval_words) {
+        for (const IntervalWord& interval_word : interval_words) {
             // How this works on an example:
             //      interval_word = [4-5][0-9][2-5][0-9][0-9]
             // We need to encode, as succintcly as possible, that var is any number from the interval word.

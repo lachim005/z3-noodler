@@ -17,7 +17,7 @@
 
 namespace smt::noodler {
 
-    using interval_word = std::vector<std::pair<mata::Symbol,mata::Symbol>>;
+    using IntervalWord = std::vector<std::pair<mata::Symbol,mata::Symbol>>;
 
     /**
      * hints for using AutAssignment:
@@ -152,7 +152,7 @@ namespace smt::noodler {
          * 
          * @param aut - minimized automaton that accepts finite language
          */
-        static std::vector<interval_word> get_interval_words(const mata::nfa::Nfa& aut);
+        static std::vector<IntervalWord> get_interval_words(const mata::nfa::Nfa& aut);
 
         /**
          * @brief Checks if @p aut encodes literal, i.e., it accepts only one word that does not contain dummy symbol.
@@ -160,7 +160,7 @@ namespace smt::noodler {
          * Works only if @p aut was trimmed and reduced by simulation (or determinized and minimized).
          * The found literal is saved in @p found_literal.
          */
-       static bool aut_encodes_literal(const mata::nfa::Nfa& aut, zstring& found_literal);
+        static bool aut_encodes_literal(const mata::nfa::Nfa& aut, zstring& found_literal);
 
         mata::nfa::Nfa get_automaton_concat(const std::vector<BasicTerm>& concat) const {
             mata::nfa::Nfa ret = mata::nfa::builder::create_empty_string_nfa();
@@ -337,7 +337,7 @@ namespace smt::noodler {
             return ret;
         }
 
-        std::string print() {
+        std::string print() const {
             std::stringstream res;
             for (const auto &key_val : *this) {
                 res << "Automaton for " << key_val.first.get_name() << ":" << std::endl << *key_val.second;
@@ -378,7 +378,7 @@ namespace smt::noodler {
          * @param aut Automaton to be complemented
          * @return mata::nfa::Nfa 
          */
-        mata::nfa::Nfa complement_aut(mata::nfa::Nfa& aut) {
+        mata::nfa::Nfa complement_aut(const mata::nfa::Nfa& aut) const {
             mata::OnTheFlyAlphabet mata_alphabet{};
             for (const auto& symbol : get_alphabet()) {
                 mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);

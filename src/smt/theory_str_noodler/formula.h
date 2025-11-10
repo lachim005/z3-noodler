@@ -55,15 +55,18 @@ namespace smt::noodler {
     }
 
     enum struct BasicTermType {
-        Variable,
-        Literal,
-        Length,
+        Variable, // string and int vars (for string vars we pretend it is its length in LenNode)
+        RealVariable, // real variables (important for LenNode)
+        Literal, // string literal
+        Length, // numeral literal
     };
 
     [[nodiscard]] static std::string to_string(BasicTermType term_type) {
         switch (term_type) {
             case BasicTermType::Variable:
                 return "Variable";
+            case BasicTermType::RealVariable:
+                return "RealVariable";
             case BasicTermType::Literal:
                 return "Literal";
             case BasicTermType::Length:
@@ -79,7 +82,8 @@ namespace smt::noodler {
         BasicTerm(BasicTermType type, zstring name): type(type), name(std::move(name)) {}
 
         [[nodiscard]] BasicTermType get_type() const { return type; }
-        [[nodiscard]] bool is_variable() const { return type == BasicTermType::Variable; }
+        [[nodiscard]] bool is_variable() const { return (type == BasicTermType::Variable || type == BasicTermType::RealVariable); }
+        [[nodiscard]] bool is_real_variable() const { return type == BasicTermType::RealVariable; }
         [[nodiscard]] bool is_literal() const { return type == BasicTermType::Literal; }
         [[nodiscard]] bool is(BasicTermType term_type) const { return type == term_type; }
 

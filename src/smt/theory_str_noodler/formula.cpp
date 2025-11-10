@@ -163,12 +163,16 @@ namespace smt::noodler {
     }
 
     void write_len_formula_as_smt2(const LenNode& formula, std::ostream& out_stream) {
-        out_stream << "(set-logic LIA)" << std::endl;
+        out_stream << "(set-logic LIRA)" << std::endl;
 
         std::set<BasicTerm> free_vars = collect_free_vars(formula);
 
         for (const BasicTerm& free_var : free_vars) {
-            out_stream << "(declare-fun " << free_var << "() Int)" << std::endl;
+            if (free_var.is_real_variable()) {
+                out_stream << "(declare-fun " << free_var << "() Real)" << std::endl;
+            } else {
+                out_stream << "(declare-fun " << free_var << "() Int)" << std::endl;
+            }
         }
         out_stream << "(assert " << std::endl;
         out_stream << formula;
@@ -346,6 +350,7 @@ namespace smt::noodler {
                 return ("\"" + name.encode() + "\"");
             }
             case BasicTermType::Variable:
+            case BasicTermType::RealVariable:
                 return name.encode();
             case BasicTermType::Length:
                 return name.encode() + " (" + noodler::to_string(type) + ")";
@@ -407,7 +412,7 @@ namespace smt::noodler {
                 return expr_ref(ctx.seq_utilities.str.mk_length(expr), ctx.manager);
             }
 
-            // we assume here that all other variables are int, so they map into the predicate they represent
+            // we assume here that all other variables are int/real, so they map into the predicate they represent
             return expr;
         }
 
@@ -423,7 +428,12 @@ namespace smt::noodler {
         }
 
         // Not quantified - needs to be skolem, because it seems they are not printed for models
-        app* var = ctx.manager.mk_skolem_const(symbol(var_name.c_str()), ctx.arith_utilities.mk_int());
+        app* var;
+        if (node.atom_val.is_real_variable()) {
+            var = ctx.manager.mk_skolem_const(symbol(var_name.c_str()), ctx.arith_utilities.mk_real());
+        } else {
+            var = ctx.manager.mk_skolem_const(symbol(var_name.c_str()), ctx.arith_utilities.mk_int());
+        }
         return expr_ref(var, ctx.manager);
     }
 

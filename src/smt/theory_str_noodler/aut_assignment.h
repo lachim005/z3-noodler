@@ -136,6 +136,34 @@ namespace smt::noodler {
             return only_digits_of_length;
         }
 
+        /// Returns automaton that accept words from [0-9]*.[0-9]* where . is the decimal separator
+        static mata::nfa::Nfa decimal_automaton() {
+            mata::nfa::Nfa res(2, {0}, {1});
+            for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
+                res.delta.add(0, digit, 0);
+                res.delta.add(1, digit, 1);
+            }
+            res.delta.add(0, AutAssignment::REAL_NUMBER_DELIMITER, 1);
+            return res;
+        }
+
+        /// Returns automaton that accept words from [0-9]{length_of_whole_part}.[0-9]{length_of_decimal_part} where . is the decimal separator
+        static mata::nfa::Nfa decimal_automaton_of_lengths(unsigned length_of_whole_part, unsigned length_of_decimal_part) {
+            mata::nfa::Nfa res(length_of_whole_part+length_of_decimal_part+2, {0}, {length_of_whole_part+length_of_decimal_part+1});
+            for (unsigned i = 0; i < length_of_whole_part; ++i) {
+                for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
+                    res.delta.add(i, digit, i+1);
+                }
+            }
+            res.delta.add(length_of_whole_part, AutAssignment::REAL_NUMBER_DELIMITER, length_of_whole_part+1);
+            for (unsigned i = length_of_whole_part+1; i < length_of_whole_part+length_of_decimal_part+1; ++i) {
+                for (mata::Symbol digit = AutAssignment::DIGIT_SYMBOL_START; digit <= AutAssignment::DIGIT_SYMBOL_END; ++digit) {
+                    res.delta.add(i, digit, i+1);
+                }
+            }
+            return res;
+        }
+
         /**
          * @brief Get the vector of "interval" words accepted by @p aut
          * 

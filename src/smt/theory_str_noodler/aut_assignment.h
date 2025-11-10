@@ -93,10 +93,12 @@ namespace smt::noodler {
             return nfa;
         }
 
-        // represents code point of digit 0
-        static const mata::Symbol DIGIT_SYMBOL_START = 48;
-        // represents code point of digit 9
-        static const mata::Symbol DIGIT_SYMBOL_END = 57;
+        // represents the code point of digit 0
+        static constexpr mata::Symbol DIGIT_SYMBOL_START = 48;
+        // represents the code point of digit 9
+        static constexpr mata::Symbol DIGIT_SYMBOL_END = 57;
+        // represents the code point of .
+        static constexpr mata::Symbol REAL_NUMBER_DELIMITER = 46;
 
         /**
          * @brief Returns automaton that accept non-empty words containing only symbols encoding digits (symbols from 48 to 57)

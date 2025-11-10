@@ -629,6 +629,27 @@ namespace smt::noodler {
         }
 
         /**
+         * Returns the variable for @p var encoding the decimal separator position in @p var
+         */
+        BasicTerm dot_position_of(const BasicTerm& var) {
+            return BasicTerm(BasicTermType::Variable, var.get_name() + "!dot_position");
+        }
+
+        /**
+         * Returns the variable for @p var encoding the whole part before the decimal separator in @p var
+         */
+        BasicTerm whole_part_of(const BasicTerm& var) {
+            return BasicTerm(BasicTermType::Variable, var.get_name() + "!whole_part");
+        }
+
+        /**
+         * Returns the variable for @p var encoding the decimal part after the decimal separator in @p var
+         */
+        BasicTerm decimal_part_of(const BasicTerm& var) {
+            return BasicTerm(BasicTermType::Variable, var.get_name() + "!decimal_part");
+        }
+
+        /**
          * Gets the variable sets (code_subst_vars, int_subst_vars, real_subst_vars) where code_subst_vars
          * contains all vars s_i, such that there exists "c = to_code(s)" or "s = from_code(c)"
          * in conversions where s is substituted by s_1 ... s_i ... s_n in the solution.
@@ -636,7 +657,7 @@ namespace smt::noodler {
          * The set int_subst_vars and real_subst_vars is defined similarly, but for "i = to_int(s)"/"s = from_int(i)"
          * and "r = to_real(s)"/"s = from_real(r)" conversions respectively.
          */
-        std::tuple<std::set<BasicTerm>,std::set<BasicTerm>,std::set<BasicTerm>> get_vars_substituted_in_conversions();
+        void get_vars_substituted_in_conversions();
 
         /**
          * @brief Get the formula for to_code/from_code substituting variables
@@ -644,7 +665,7 @@ namespace smt::noodler {
          * It basically succinctly encodes `code_version_of(s) = to_code(w_s)` for each s in @p code_subst_vars and w_c \in solution.aut_ass.at(s) while
          * keeping the correspondence between |s| and |w_s|
          */
-        LenNode get_formula_for_code_subst_vars(const std::set<BasicTerm>& code_subst_vars);
+        LenNode get_formula_for_code_subst_vars();
 
         /**
          * @brief Get the formula encoding that arithmetic variable @p var is any of the numbers encoded by some interval word from @p interval_words
@@ -652,6 +673,7 @@ namespace smt::noodler {
         LenNode encode_interval_words(const BasicTerm& var, const std::vector<IntervalWord>& interval_words);
 
         /**
+         * TODO fix comment to newest version!!!!!!
          * @brief Get the formula for to_int/from_int substituting variables
          * 
          * It basically succinctly encodes `int_version_of(s) = to_int(w_s)` for each s in @p int_subst_vars and w_s \in solution.aut_ass.at(s) while
@@ -665,7 +687,10 @@ namespace smt::noodler {
          * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
          * @return The formula + precision of the formula (can be precise or underapproximation)
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_subst_vars(const std::set<BasicTerm>& int_subst_vars, const std::set<BasicTerm>& code_subst_vars, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_real_subst_vars(std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, std::map<BasicTerm,std::vector<std::pair<unsigned,unsigned>>>& real_subst_vars_to_possible_valid_lengths_and_dot_positions);
+
+        // TODO!!!!
+        LenNode get_formula_for_number_conversion(BasicTerm result, const std::vector<BasicTerm>& subst_vars, std::vector<unsigned> lengths_of_subst_vars, std::optional<std::pair<size_t,unsigned>> dot_position);
 
         /**
          * @brief Get the formula encoding to_code/from_code conversion
@@ -673,11 +698,12 @@ namespace smt::noodler {
         LenNode get_formula_for_code_conversion(const TermConversion& conv);
 
         /**
+         * TODO fix comment!!!!!
          * @brief Get the formula encoding to_int/from_int conversion
          * 
          * @param int_subst_vars_to_possible_valid_lengths maps each var from int_subst_vars into a vector of lengths of all possible numbers for var (also 0 if there is empty string)
          */
-        LenNode get_formula_for_int_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths);
+        LenNode get_formula_for_int_real_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const std::map<BasicTerm,std::vector<std::pair<unsigned,unsigned>>>& real_subst_vars_to_possible_valid_lengths_and_dot_positions);
 
         /**
          * Formula containing all not_contains predicate (nothing else)

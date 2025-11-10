@@ -126,9 +126,7 @@ namespace smt::noodler {
         scoped_vector<expr_pair> m_lang_diseq_todo; // pair contains left and right side of the language disequality
         scoped_vector<expr_pair> m_not_contains_todo; // first element should not contain the second one
         scoped_vector<expr_pair_flag> m_membership_todo; // contains the variable and reg. lang. + flag telling us if it is negated (false -> negated)
-        // contains pair of variables (e,s), where we have one of e = str.to_code(s), e = str.from_code(s),
-        // e = str.to_int(s), or e = str.from_int(s), based on the conversion type
-        scoped_vector<TermConversion> m_conversion_todo;
+        scoped_vector<TermConversion> m_conversion_todo; // code-point, string-integer and string-real conversions
 
         // during final_check_eh, we call remove_irrelevant_constr which chooses from previous sets of
         // todo constraints and check if they are relevant for current SAT assignment => if they are
@@ -281,6 +279,16 @@ namespace smt::noodler {
                 return expr_ref(m.mk_var(it->second, m_util_a.mk_int()), m);
             }
             app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
+            return expr_ref(var, m);
+        }
+
+        /**
+         * @brief Get Z3 real var with exact given @p name
+         *
+         * @param name Name of the var
+         */
+        expr_ref mk_real_var(const std::string& name) {
+            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_real()); // need to be skolem, because it seems they are not printed for models
             return expr_ref(var, m);
         }
 

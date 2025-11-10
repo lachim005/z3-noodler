@@ -389,7 +389,12 @@ namespace smt::noodler {
 
     expr_ref constr_z3_expr_for_leaf(LenFormulaContext& ctx, const LenNode& node) {
         if (node.atom_val.get_type() == BasicTermType::Length) {
-            return expr_ref(ctx.arith_utilities.mk_int(rational(node.atom_val.get_name().encode().c_str())), ctx.manager);
+            rational number(node.atom_val.get_name().encode().c_str());
+            if (number.is_int()) {
+                return expr_ref(ctx.arith_utilities.mk_int(number), ctx.manager);
+            } else {
+                return expr_ref(ctx.arith_utilities.mk_real(number), ctx.manager);
+            }
         }
 
         if (node.atom_val.get_type() == BasicTermType::Literal) {

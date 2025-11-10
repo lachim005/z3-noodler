@@ -2241,9 +2241,14 @@ namespace smt::noodler {
         // get the var for the argument
         BasicTerm var_for_arg(BasicTermType::Variable);
         if (tranforming_from) {
-            // we create new fresh noodler var for the integer/real argument which we save into var_name so that
-            // len formula we will create in decision procedure will replace the correct var with the correct expression
+            // we create new fresh noodler var for the integer/real argument 
             var_for_arg = util::mk_noodler_var_fresh(name_of_type + "_argument");
+            if (type != ConversionType::FROM_REAL) {
+                // we make the var real for noodler
+                var_for_arg = BasicTerm(BasicTermType::RealVariable, var_for_arg.get_name());
+            }
+            // to give equality for var_for_arg with arg, we save into var_name so that len formula we will create in decision procedure will replace the correct var with the correct expression
+            // NOTE we cannnot put axiom var_for_arg == arg, this is ignored by Z3
             var_name.insert({var_for_arg, expr_ref(arg, m)});
         } else {
             // the argument has string type, we have to find the variable for it
@@ -2322,14 +2327,15 @@ namespace smt::noodler {
             }
 
             if (type == ConversionType::FROM_REAL) {
-                // the result of str.from_real can only be either a decimal representation of a number without leading zeros (in the whole part) and without trailing zeros (in the decimal part, which can be missing), or empty string (if argument is negative)
                 app* digits_without_trailing_zeros = m_util_s.re.mk_concat(
                     m_util_s.re.mk_star(m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9"))),
                     m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))
                 );
-                app* all_nums_with_decimal_part = m_util_s.re.mk_concat(all_nums, m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(".")), digits_without_trailing_zeros));
+                app* digits_without_trailing_zeros_restricted_by_width = m_util_s.re.mk_inter(digits_without_trailing_zeros, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(width_for_rtos)));
+                app* all_nums_with_decimal_part_restricted_by_width = m_util_s.re.mk_concat(all_nums, m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(".")), digits_without_trailing_zeros_restricted_by_width));
 
-                add_axiom({mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_union(m_util_s.re.mk_union(all_nums, all_nums_with_decimal_part), epsilon)))});
+                // the result of str.from_real can only be either a decimal representation of a number without leading zeros (in the whole part) and without trailing zeros (in the decimal part, which can be missing and must be restricted by width), or empty string (if argument is negative)
+                add_axiom({mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_union(m_util_s.re.mk_union(all_nums, all_nums_with_decimal_part_restricted_by_width), epsilon)))});
 
                 // |from_real(x)| = 0 <-> x < 0
                 add_axiom({ mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), ~mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });
@@ -2379,6 +2385,9 @@ namespace smt::noodler {
             }
 
             if (type == ConversionType::TO_REAL) {
+                // the result should be real var, not int var
+                var_for_conversion = BasicTerm(BasicTermType::RealVariable, var_for_conversion.get_name());
+
                 // the result of str.to_real cannot be any negative number other than -1
                 add_axiom({mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), conversion)), mk_literal(m.mk_eq(m_util_a.mk_real(-1), conversion))});
 
@@ -2400,7 +2409,11 @@ namespace smt::noodler {
 
         // Add to todo
         if (tranforming_from) {
-            m_conversion_todo.push_back({type, var_for_conversion, var_for_arg});
+            if (type == ConversionType::FROM_REAL) {
+                m_conversion_todo.push_back({type, var_for_conversion, var_for_arg, width_for_rtos});
+            } else {
+                m_conversion_todo.push_back({type, var_for_conversion, var_for_arg});
+            }
         } else {
             m_conversion_todo.push_back({type, var_for_arg, var_for_conversion});
         }

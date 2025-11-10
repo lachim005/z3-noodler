@@ -1143,6 +1143,9 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::get_vars_substituted_in_conversions() {
+        code_subst_vars.clear();
+        int_subst_vars.clear();
+        real_subst_vars.clear();
         for (const TermConversion& conv : conversions) {
             switch (conv.type)
             {

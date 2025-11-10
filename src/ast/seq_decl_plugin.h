@@ -521,6 +521,7 @@ public:
         sort* to_seq(sort* re);
 
         app* mk_to_re(expr* s) { return m.mk_app(m_fid, OP_SEQ_TO_RE, 1, &s); }
+        app* mk_to_re(const zstring &s) { return mk_to_re(u.str.mk_string(s)); }
         app* mk_in_re(expr* s, expr* r) { return m.mk_app(m_fid, OP_SEQ_IN_RE, s, r); }
         app* mk_range(expr* s1, expr* s2) { return m.mk_app(m_fid, OP_RE_RANGE, s1, s2); }
         app* mk_concat(expr* r1, expr* r2) { return m.mk_app(m_fid, OP_RE_CONCAT, r1, r2); }

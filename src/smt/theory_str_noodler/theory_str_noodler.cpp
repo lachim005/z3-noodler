@@ -2210,6 +2210,7 @@ namespace smt::noodler {
      * of the term and puts them in m_conversion_todo.
      */
     void theory_str_noodler::handle_conversion(expr *conversion) {
+        STRACE(str, tout  << "handle conversion " << mk_pp(conversion, m) << std::endl;);
         expr *arg = nullptr;
         rational width_for_rtos;
 
@@ -2341,8 +2342,8 @@ namespace smt::noodler {
                 }
 
                 // |from_real(x)| = 0 <-> x < 0
-                add_axiom({ mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), ~mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });
-                add_axiom({ ~mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });
+                add_axiom({ mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });
+                add_axiom({ ~mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), ~mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });
 
                 // As the result of from_real belongs to infinite language, it is very likely that we will have to underapproximate in the decision procedure.
                 // The underapproximation maximum length of words used from this infinite language is given by m_params.m_underapprox_length, we therefore add

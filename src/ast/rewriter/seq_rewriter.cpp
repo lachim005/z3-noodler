@@ -2797,7 +2797,29 @@ br_status seq_rewriter::mk_str_rtos(expr* a, expr* b, expr_ref& result) {
     if (m_autil.is_numeral(a, r) && m_autil.is_numeral(b, w)) {
         SASSERT(w.is_int());
         if (!r.is_neg() && !w.is_neg()) {
-            result = str().mk_string(zstring(r.to_string_decimal(w)));
+            zstring str_repr(r.to_string_decimal(w));
+            if (w > 0) {
+                // pad zeros to w
+                if (!w.is_unsigned()) {
+                    throw default_exception("width is too large in str.from_real");
+                }
+                unsigned cur_pos = 0;
+                unsigned num_of_decimal_places = 0;
+                for (auto c : str_repr) {
+                    if (c == '.') {
+                        num_of_decimal_places = (str_repr.length()-cur_pos)-1;
+                        break;
+                    }
+                    ++cur_pos;
+                }
+                if (cur_pos == str_repr.length()) {
+                    str_repr = str_repr + zstring(".");
+                }
+                for (; num_of_decimal_places < w.get_unsigned(); ++num_of_decimal_places) {
+                    str_repr = str_repr + zstring("0");
+                }
+            }
+            result = str().mk_string(str_repr);
         } else {
             result = str().mk_string(zstring());
         }

@@ -1890,8 +1890,8 @@ namespace smt::noodler {
                 for (unsigned i = 0; i < conv.width.get_unsigned(); ++i) { power_of_ten /= 10; }
                 result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
                     formula_for_cut_value,
-                    LenNode(LenFormulaType::LEQ, {cut_value, i}),
-                    LenNode(LenFormulaType::LT, {i, LenNode(LenFormulaType::PLUS, {cut_value, power_of_ten} )})
+                    LenNode(LenFormulaType::LEQ, {0, LenNode(LenFormulaType::MINUS, {i, cut_value})}), // we put 0 <= i - cut_value and not i <= cut_value, z3 has problem with it
+                    LenNode(LenFormulaType::LT, {LenNode(LenFormulaType::MINUS, {i, cut_value}), power_of_ten}) // we put i - cut_value < 10^-width and not i < cut_value+10^-width, z3 has problem with it
                 });
             } else {
                 result.succ.push_back(get_formula_for_number_conversion(i, subst_vars, one_case.first, one_case.second));

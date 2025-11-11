@@ -1474,11 +1474,22 @@ namespace smt::noodler {
             }
 
             if (is_real_subst_var) {
+                real_subst_vars_to_possible_valid_lengths_and_dot_positions[int_real_subst_var] = {};
+                // We add the following formula to the result even though it is not needed (if dot position is -1 we do not touch the parts).
+                // However, it is important to define these variables somehwere (the parts), for model generation (Z3 would not know they exist).
+                // dot_position_of(int_real_subst_var) == -1 => (whole_part_of(int_real_subst_var) == -1 && whole_part_of(int_real_subst_var) == -1)
+                result.succ.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
+                    LenNode(LenFormulaType::NEQ, { dot_position_of(int_real_subst_var), -1 }),
+                    LenNode(LenFormulaType::AND, {
+                        LenNode(LenFormulaType::EQ, { whole_part_of(int_real_subst_var), -1 }),
+                        LenNode(LenFormulaType::EQ, { decimal_part_of(int_real_subst_var), -1 }),
+                    })
+                });
+
                 // part containing only digits (i.e. valid int number)
                 mata::nfa::Nfa aut_valid_real_part = mata::nfa::reduce(mata::nfa::intersection(*aut, real_numbers).trim());
                 STRACE(str_conversion_int, tout << "valid-real NFA:" << std::endl << aut_valid_real_part << std::endl;);
     
-                real_subst_vars_to_possible_valid_lengths_and_dot_positions[int_real_subst_var] = {};
 
                 if (!aut_valid_real_part.is_lang_empty()) {
                     mata::utils::SparseSet<mata::nfa::State> delimiter_source_states;
@@ -1898,7 +1909,7 @@ namespace smt::noodler {
             }
         }
 
-        STRACE(str_conversion_int, tout << "int conversion: " << result << std::endl;);
+        STRACE(str_conversion_int, tout << "int/real conversion: " << result << std::endl;);
         return result;
     }
 

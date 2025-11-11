@@ -2327,15 +2327,18 @@ namespace smt::noodler {
             }
 
             if (type == ConversionType::FROM_REAL) {
-                app* digits_without_trailing_zeros = m_util_s.re.mk_concat(
-                    m_util_s.re.mk_star(m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9"))),
-                    m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))
-                );
-                app* digits_without_trailing_zeros_restricted_by_width = m_util_s.re.mk_inter(digits_without_trailing_zeros, m_util_s.re.mk_loop(m_util_s.re.mk_full_char(nullptr), m_util_a.mk_int(0), m_util_a.mk_int(width_for_rtos)));
-                app* all_nums_with_decimal_part_restricted_by_width = m_util_s.re.mk_concat(all_nums, m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(".")), digits_without_trailing_zeros_restricted_by_width));
-
-                // the result of str.from_real can only be either a decimal representation of a number without leading zeros (in the whole part) and without trailing zeros (in the decimal part, which can be missing and must be restricted by width), or empty string (if argument is negative)
-                add_axiom({mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_union(m_util_s.re.mk_union(all_nums, all_nums_with_decimal_part_restricted_by_width), epsilon)))});
+                if (width_for_rtos > 0) {
+                    app* digits_without_trailing_zeros_restricted_by_width = m_util_s.re.mk_concat(
+                        m_util_s.re.mk_loop(m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")), m_util_a.mk_int(0), m_util_a.mk_int(width_for_rtos-1)),
+                        m_util_s.re.mk_range(m_util_s.str.mk_string("1"), m_util_s.str.mk_string("9"))
+                    );
+                    app* all_nums_with_decimal_part_restricted_by_width = m_util_s.re.mk_concat(all_nums, m_util_s.re.mk_concat(m_util_s.re.mk_to_re(m_util_s.str.mk_string(".")), digits_without_trailing_zeros_restricted_by_width));
+                    // the result of str.from_real can only be either a decimal representation of a number without leading zeros (in the whole part) and without trailing zeros (in the decimal part, which can be missing and must be restricted by width), or empty string (if argument is negative)
+                    add_axiom({mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_union(m_util_s.re.mk_union(all_nums, all_nums_with_decimal_part_restricted_by_width), epsilon)))});
+                } else {
+                    // the decimal part must be empty, so the result of str.from_real must be a whole number (or empty string)
+                    add_axiom({mk_literal(m_util_s.re.mk_in_re(z3_var_for_conversion, m_util_s.re.mk_union(all_nums, epsilon)))});
+                }
 
                 // |from_real(x)| = 0 <-> x < 0
                 add_axiom({ mk_literal(m.mk_eq( m_util_s.str.mk_length(conversion), m_util_a.mk_int(0))), ~mk_literal(m_util_a.mk_le(m_util_a.mk_real(0), arg)) });

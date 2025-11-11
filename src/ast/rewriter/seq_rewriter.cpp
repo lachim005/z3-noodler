@@ -2801,7 +2801,7 @@ br_status seq_rewriter::mk_str_rtos(expr* a, expr* b, expr_ref& result) {
             if (w > 0) {
                 // pad zeros to w
                 if (!w.is_unsigned()) {
-                    throw default_exception("width is too large in str.from_real");
+                    throw default_exception("we cannot handle width that large in str.from_real");
                 }
                 unsigned cur_pos = 0;
                 unsigned num_of_decimal_places = 0;

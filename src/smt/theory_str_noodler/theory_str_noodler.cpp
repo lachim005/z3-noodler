@@ -2243,8 +2243,8 @@ namespace smt::noodler {
         if (tranforming_from) {
             // we create new fresh noodler var for the integer/real argument 
             var_for_arg = util::mk_noodler_var_fresh(name_of_type + "_argument");
-            if (type != ConversionType::FROM_REAL) {
-                // we make the var real for noodler
+            if (type == ConversionType::FROM_REAL) {
+                // we make the var real for noodler (actually not needed, we add it to var_name anyway, so it will be replaced)
                 var_for_arg = BasicTerm(BasicTermType::RealVariable, var_for_arg.get_name());
             }
             // to give equality for var_for_arg with arg, we save into var_name so that len formula we will create in decision procedure will replace the correct var with the correct expression
@@ -2359,7 +2359,7 @@ namespace smt::noodler {
             // we create new fresh noodler var for the integer/real result which we save into var_name so that
             // len formula we will create in decision procedure will replace the correct var with the correct expression
             var_for_conversion = util::mk_noodler_var_fresh(name_of_type + "_result");
-            if (type == ConversionType::TO_REAL) { var_for_conversion = BasicTerm(BasicTermType::RealVariable, var_for_conversion.get_name()); }
+            if (type == ConversionType::TO_REAL) { var_for_conversion = BasicTerm(BasicTermType::RealVariable, var_for_conversion.get_name()); } // probably not needed, we put it in var_name anyway, so its type does not matter
             var_name.insert({var_for_conversion, expr_ref(conversion, m)});
 
             // To help LIA solver, we give some bounds on the results of to_* functions

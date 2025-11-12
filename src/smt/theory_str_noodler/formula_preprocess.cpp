@@ -1725,7 +1725,7 @@ namespace smt::noodler {
      * 
      * @param conversions 
      */
-    void FormulaPreprocessor::conversions_validity(std::vector<TermConversion>& conversions) {
+    void FormulaPreprocessor::conversions_validity(const std::vector<TermConversion>& conversions) {
         STRACE(str_prep, tout << "Preprocessing step - conversions_validity\n";);
         mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
         mata::nfa::Nfa only_digits_aut = AutAssignment::digit_automaton();

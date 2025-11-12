@@ -85,6 +85,17 @@ namespace smt::noodler::util {
         return m_util_s.is_string(expression->get_sort()) && is_variable(expression);
     }
 
+
+    void add_vars_to_map(app *const ex, ast_manager& m, const seq_util& m_util_s, std::map<BasicTerm, expr_ref>& var_name) {
+        obj_hashtable<expr> vars;
+        util::get_str_variables(ex, m_util_s, m, vars);
+        for(expr * const v : vars) {
+
+            BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
+            var_name.insert({vterm, expr_ref(v, m)});
+        }
+    }
+
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
                        std::map<BasicTerm, expr_ref>& var_name, std::vector<BasicTerm>& terms) {
 

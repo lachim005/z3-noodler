@@ -215,6 +215,25 @@ namespace smt::noodler::util {
      * @return std::optional<std::vector<mata::Word>> The accepting words or std::nullopt if none exist.
      */
     std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::vector<unsigned>& lengths, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
+
+    /**
+     * @brief Insert string variables occurring in the given (concat) expression into the provided map.
+     *
+     * Traverses the application @p ex and, for every
+     * encountered string variable, inserts an entry into @p var_name. The key is the corresponding
+     * BasicTerm created from the variable, and the value is the original Z3 expression reference.
+     *
+     * Notes:
+     * - The map is updated in-place; existing entries are preserved.
+     * - Only string variables are considered; non-string terms (ints, regexes, composites) are ignored.
+     * - This helper complements collect_terms(), which also accepts @p var_name for consistent mapping.
+     *
+     * @param ex       Application to inspect (may be a concatenation or a standalone term).
+     * @param m        AST manager used to manage lifetimes of expr_ref values.
+     * @param m_util_s Sequence utilities used to recognize string constructs.
+     * @param[out] var_name Mapping from BasicTerm to the original variable expr; populated/updated by this call.
+     */
+    void add_vars_to_map(app *const ex, ast_manager& m, const seq_util& m_util_s, std::map<BasicTerm, expr_ref>& var_name);
 }
 
 #endif

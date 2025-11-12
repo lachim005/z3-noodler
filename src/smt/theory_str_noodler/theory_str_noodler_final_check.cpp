@@ -512,6 +512,9 @@ namespace smt::noodler {
             // ignore trivial equations obtained from axiomatization of 
             // transducer constraints, e.g., tmp = replace_all(...)
             if(is_tmp_transducer_eq(ctx.mk_eq_atom(we.first, we.second))) {
+                // add variables to var_name map (the fresh variables are not converted to str.len in length formula otherwise)
+                util::add_vars_to_map(to_app(we.first), this->m, this->m_util_s, this->var_name);
+                util::add_vars_to_map(to_app(we.second), this->m, this->m_util_s, this->var_name);
                 continue;
             }
             Predicate inst = this->conv_eq_pred(ctx.mk_eq_atom(we.first, we.second));

@@ -82,6 +82,7 @@ Examples:
  - `(str.to_real "8494.")` evaluates to `8494.0`
  - `(str.to_real ".")` evaluates to `-1.0`
  - `(str.to_real "4564a")` evaluates to `-1.0`
+ - `(str.to_real "4564e3")` evaluates to `-1.0`
 
 `(str.from_real Real Int String)`  
 Transforms a positive real number `r` to a string `s` with a corresponding number of decimal places `n`. If either `n` or `r` is negative, it evaluates to the empty string.  

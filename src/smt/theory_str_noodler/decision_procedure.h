@@ -217,13 +217,6 @@ namespace smt::noodler {
         LenNode get_formula_for_len_vars();
 
         /**
-         * @brief Gets the formula encoding to_code/from_code/to_int/from_int conversions
-         * 
-         * Assumes that code_subst_vars and int_subst_vars are computed already.
-         */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_conversions();
-
-        /**
          * @brief Initialize disquation for TagAut-based handling. Assumed to be called during 
          * the decision procedure initialization.
          */

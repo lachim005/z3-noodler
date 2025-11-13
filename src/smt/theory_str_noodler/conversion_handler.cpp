@@ -425,7 +425,7 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real
 
 LenNode ConversionHandler::get_formula_for_code_conversion(const TermConversion& conv) {
     const BasicTerm& s = conv.string_var;
-    const BasicTerm& c = conv.int_var;
+    const BasicTerm& c = conv.number_var;
 
     // First handle the invalid inputs
     LenNode invalid_case(LenFormulaType::AND);
@@ -588,7 +588,7 @@ LenNode ConversionHandler::get_formula_for_number_conversion(BasicTerm result, c
 
 LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConversion& conv) {
     const BasicTerm& s = conv.string_var;
-    const BasicTerm& i = conv.int_var;
+    const BasicTerm& i = conv.number_var;
 
     LenNode result(LenFormulaType::OR);
 
@@ -793,7 +793,7 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_encoding_con
 
     for (const TermConversion& conv : conversions) {
         STRACE(str_conversion,
-            tout << " processing " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.int_var << std::endl;
+            tout << " processing " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.number_var << std::endl;
         );
 
         switch (conv.type)

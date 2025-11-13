@@ -961,12 +961,12 @@ namespace smt::noodler {
     struct TermConversion {
         ConversionType type;
         BasicTerm string_var;
-        BasicTerm int_var;
+        BasicTerm number_var;
 
         rational width = rational(0); // maximum number of decimal places for FROM_REAL operation
 
-        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm int_var) : type(type), string_var(std::move(string_var)), int_var(std::move(int_var)) {}
-        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm int_var, rational width) : type(type), string_var(std::move(string_var)), int_var(std::move(int_var)), width(width) { SASSERT(type == ConversionType::FROM_REAL); }
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm number_var) : type(type), string_var(std::move(string_var)), number_var(std::move(number_var)) {}
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm number_var, rational width) : type(type), string_var(std::move(string_var)), number_var(std::move(number_var)), width(width) { SASSERT(type == ConversionType::FROM_REAL); }
 
         bool is_code_conversion() const { return (type == ConversionType::TO_CODE || type == ConversionType::FROM_CODE); }
         bool is_int_conversion() const { return (type == ConversionType::TO_INT || type == ConversionType::FROM_INT); }

@@ -75,7 +75,7 @@ namespace smt::noodler {
             }
             tout << " conversions(" << this->m_conversion_todo.size() << "):" << std::endl;
             for (const auto &conv: this->m_conversion_todo) {
-                tout << "    " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
+                tout << "    " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.number_var << std::endl;
             }
         );
 
@@ -189,7 +189,7 @@ namespace smt::noodler {
         STRACE(str,
             tout << "Relevant formula:\n" << instance.to_string();
             for (const auto& conv : conversions) {
-                tout << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
+                tout << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.number_var << std::endl;
             }
             tout << "Length variables:";
             for (const auto &len_var : init_length_sensitive_vars) {

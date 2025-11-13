@@ -2382,7 +2382,7 @@ namespace smt::noodler {
                     for (rational i(0); i < r1; ++i) {
                         ten_to_r1 = ten_to_r1 * 10;
                     }
-                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_int(ten_to_r1)))});
+                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_int(ten_to_r1-1)))});
                 }
             }
 
@@ -2401,7 +2401,7 @@ namespace smt::noodler {
                     for (rational i(0); i < r1; ++i) {
                         ten_to_r1 = ten_to_r1 * 10;
                     }
-                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_real(ten_to_r1)))});
+                    add_axiom({mk_literal(m_util_a.mk_le(conversion, m_util_a.mk_real(ten_to_r1-1)))});
                 }
             }
         }

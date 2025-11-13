@@ -30,6 +30,18 @@ namespace smt::noodler {
         // automaton representing all non-valid (real/integer) numbers
         mata::nfa::Nfa non_number;
 
+        unsigned max_length_of_word_in_aut(const mata::nfa::Nfa aut, LenNodePrecision& precision) {
+            if (aut.is_acyclic()) {
+                // there is a finite number of words in aut => the longest possible word is aut.num_of_states()-1
+                return aut.num_of_states()-1;
+            } else {
+                // there is infinite number of such words => we need to underapproximate
+                STRACE(str_conversion, tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut << std::endl;);
+                precision = LenNodePrecision::UNDERAPPROX;
+                return underapprox_length;
+            }
+        };
+
         /**
          * @brief Get the formula for to_code/from_code substituting variables
          * 

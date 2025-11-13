@@ -176,9 +176,9 @@ namespace smt::noodler {
          *      {4, 12, 2}
          *          ...
          * 
-         * Assumes that @p aut is minimized and accepts a non-empty finite language
+         * Assumes that @p aut is minimized and accepts a non-empty finite language where each word has the same length
          * 
-         * @param aut - minimized automaton that accepts finite language
+         * @param aut - minimized automaton that accepts finite language where each word has the same length
          */
         static std::vector<IntervalWord> get_interval_words(const mata::nfa::Nfa& aut);
 

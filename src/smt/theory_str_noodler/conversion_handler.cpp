@@ -121,8 +121,7 @@ LenNode ConversionHandler::encode_interval_words(const BasicTerm& var, const std
         // by going backwards in the interval_word, first by computing the main interval [..200-..599] which
         // ends after hitting first digit interval that does not contain all digits (in the exmaple it is [2-5])
         // and after that point, we add all the possible cases for all digits in the following digit intervals.
-        std::vector<std::pair<rational,rational>> interval_cases = { {rational(0),rational(0)} }; // start with interval [0-0], with the assumption that interval word is not empty
-        assert(interval_word.size() > 0);
+        std::vector<std::pair<rational,rational>> interval_cases = { {rational(0),rational(0)} }; // start with interval [0-0]
         rational place_value(1); // which point in the interval_word we are now (ones, tens, hundreds, etc.)
         bool need_to_split = false; // have we hit the digit interval that does not contain all digits yet?
         for (auto interval_it = interval_word.crbegin(); interval_it != interval_word.crend(); ++interval_it) { // going backwards in interval_word
@@ -241,43 +240,12 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real
         // Now, for each length l of some word containing only digits, we create the formula
         //      (|int_real_subst_var| = l && int_version_of(int_real_subst_var) is number represented by some word containing only digits of length l)
         // and add l to int_subst_vars_to_possible_valid_lengths[int_real_subst_var].
-        // For l=0 we need to do something else with the second conjunct, and for l=1, we also need to add something about code_version_of(int_subt_var).
-
-        // Handle l=0 as a special case.
-        if (aut_valid_int_part.is_in_lang({})) {
-            // Even though it is invalid and it seems that we should set int_version_of(int_real_subst_var) = -1, we cannot do that
-            // as int_real_subst_var is substituting some string_var in int conversion, and the other variables in the substitution
-            // might not be empty, so together they could form a valid string representing integer.
-            // To simplify things further, we put int_version_of(int_real_subst_var) to be 0.
-            // We therefore get the formula:
-            //      |int_real_subst_var| = 0 && int_version_of(int_real_subst_var) = 0
-            formula_for_int_real_subst_var.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
-                LenNode(LenFormulaType::EQ, { int_real_subst_var, 0 }),
-                LenNode(LenFormulaType::EQ, { int_version_of(int_real_subst_var), 0 })
-            });
-            if (is_real_subst_var) {
-                // TODO explain
-                formula_for_int_real_subst_var.succ.back().succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ dot_position_of(int_real_subst_var), -1 }); // dot_position(int_real_subst_var) = -1
-            }
-            // Also add the information that int_real_subst_var can have length 0
-            int_subst_vars_to_possible_valid_lengths[int_real_subst_var].push_back(0);
-        }
 
         // maximum length of l
-        unsigned max_length_of_words;
+        unsigned max_length_of_words = max_length_of_word_in_aut(aut_valid_int_part, res_precision);
 
-        if (aut_valid_int_part.is_acyclic()) {
-            // there is a finite number of words containing only digits => the longest possible word is aut_valid_int_part.num_of_states()-1
-            max_length_of_words = aut_valid_int_part.num_of_states()-1;
-        } else {
-            // there is infinite number of such words => we need to underapproximate
-            STRACE(str_conversion, tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_valid_int_part << std::endl;);
-            max_length_of_words = underapprox_length;
-            res_precision = LenNodePrecision::UNDERAPPROX;
-        }
-
-        // for lengths l=1 to max_length_of_words
-        for (unsigned l = 1; l <= max_length_of_words; ++l) {
+        // for lengths l=0 to max_length_of_words
+        for (unsigned l = 0; l <= max_length_of_words; ++l) {
             // get automaton representing all accepted words containing only digits of length l
             mata::nfa::Nfa aut_valid_of_length = mata::nfa::minimize(mata::nfa::intersection(aut_valid_int_part, AutAssignment::digit_automaton_of_length(l)).trim());
 
@@ -349,30 +317,14 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real
             aut_delimiter_part.final = delimiter_source_states;
             aut_delimiter_part.trim();
             STRACE(str_conversion_int, tout << "whole part of valid-real NFA:" << std::endl << aut_delimiter_part << std::endl;);
-            if (aut_delimiter_part.is_acyclic()) {
-                // there is a finite number of words => the longest possible word is aut_delimiter_part.num_of_states()-1
-                max_length_of_whole_part = aut_delimiter_part.num_of_states()-1;
-            } else {
-                // there is infinite number of such words => we need to underapproximate
-                STRACE(str_conversion, tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_delimiter_part << std::endl;);
-                max_length_of_whole_part = underapprox_length;
-                res_precision = LenNodePrecision::UNDERAPPROX;
-            }
+            max_length_of_whole_part = max_length_of_word_in_aut(aut_delimiter_part, res_precision);
 
             // part of aut accepting languages from '.' (the decimal part of the numbers)
             aut_delimiter_part = aut_valid_real_part;
             aut_delimiter_part.initial = delimiter_target_states;
             aut_delimiter_part.trim();
             STRACE(str_conversion_int, tout << "decimal part of valid-real NFA:" << std::endl << aut_delimiter_part << std::endl;);
-            if (aut_delimiter_part.is_acyclic()) {
-                // there is a finite number of words => the longest possible word is aut_delimiter_part.num_of_states()-1
-                max_length_of_decimal_part = aut_delimiter_part.num_of_states()-1;
-            } else {
-                // there is infinite number of such words => we need to underapproximate
-                STRACE(str_conversion, tout << "infinite NFA for which we need to do underapproximation:" << std::endl << aut_delimiter_part << std::endl;);
-                max_length_of_decimal_part = underapprox_length;
-                res_precision = LenNodePrecision::UNDERAPPROX;
-            }
+            max_length_of_decimal_part = max_length_of_word_in_aut(aut_delimiter_part, res_precision);
 
             for (unsigned whole_length = 0; whole_length <= max_length_of_whole_part; ++whole_length) {
                 for (unsigned decimal_length = 0; decimal_length <= max_length_of_decimal_part; ++decimal_length) {
@@ -399,53 +351,24 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real
                     formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ dot_position_of(int_real_subst_var), whole_length }); // dot_position_of(int_real_subst_var) is the position of decimal separator
                     formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ int_version_of(int_real_subst_var), -1 }); // int_version_of(int_real_subst_var) = -1, because we have '.', so we cannot have integer number
 
-                    if (whole_length == 0 && decimal_length == 0) { // both whole and decimal parts are empty (i.e. there is only the word ".")
-                        // whole_part_of(int_real_subst_var) = 0 && decimal_part_of(int_real_subst_var) = 0
-                        formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ whole_part_of(int_real_subst_var), 0 });
-                        formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ decimal_part_of(int_real_subst_var), 0 });
+                    // TODO explain
+                    LenNode formula_for_interval_words(LenFormulaType::OR);
+                    for (const IntervalWord& interval_word : AutAssignment::get_interval_words(aut_valid_of_length)) {
+                        // each interval word of aut_valid_of_length should be split on the delimiter, i.e. the position of delimiter in interval_word will have the interval ['.', '.']
+                        SASSERT((interval_word[whole_length] == std::pair{ AutAssignment::REAL_NUMBER_DELIMITER, AutAssignment::REAL_NUMBER_DELIMITER }));
+                        IntervalWord whole_part_interval_word(interval_word.begin(), interval_word.begin()+whole_length);
+                        IntervalWord decimal_part_interval_word(interval_word.begin()+whole_length+1, interval_word.end());
+                        formula_for_interval_words.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
+                            encode_interval_words(whole_part_of(int_real_subst_var), { whole_part_interval_word }),
+                            encode_interval_words(decimal_part_of(int_real_subst_var), { decimal_part_interval_word })
+                        });
+                    }
+                    formula_for_cur_lengths.succ.push_back(formula_for_interval_words);
 
-                        if (code_subst_vars.contains(int_real_subst_var)) {
-                            // int_real_subst_var is used in some to_code/from_code AND because we have both whole and decimal parts empty, we are handling the case where we have the only word ".
-                            // => we need to put code_version_of(int_real_subst_var) == code point of '.'
-                            formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(int_real_subst_var), AutAssignment::REAL_NUMBER_DELIMITER });
-                        }
-                    } else if (whole_length == 0) { // only whole part is empty
-                        formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ whole_part_of(int_real_subst_var), 0 }); // whole_part_of(int_real_subst_var) = 0
-                        // Because aut_valid_of_length is minimized, it should have one initial state that is also accepting (representing the empty whole part) with one transition, over the symbol '.'
-                        // If we take the automaton starting from the target state of this transition, it will represent the decimal part, and we can just put the condition that decimal_part_of(int_real_subst_var)
-                        // is numeral represented by one of the interval words of this automaton.
-                        SASSERT(aut_valid_of_length.initial.size() == 1);
-                        SASSERT(aut_valid_of_length.delta[*aut_valid_of_length.initial.begin()].size() == 1);
-                        SASSERT(aut_valid_of_length.delta[*aut_valid_of_length.initial.begin()].begin()->symbol == AutAssignment::REAL_NUMBER_DELIMITER);
-                        SASSERT(aut_valid_of_length.delta[*aut_valid_of_length.initial.begin()].begin()->targets.size() == 1);
-                        aut_valid_of_length.initial = { *(aut_valid_of_length.delta[*aut_valid_of_length.initial.begin()].begin()->targets.begin()) };
-                        aut_valid_of_length.trim();
-                        formula_for_cur_lengths.succ.push_back(encode_interval_words(decimal_part_of(int_real_subst_var), AutAssignment::get_interval_words(aut_valid_of_length)));
-                    } else if (decimal_length == 0) { // only decimal part is empty
-                        formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ decimal_part_of(int_real_subst_var), 0 }); // decimal_part_of(int_real_subst_var) = 0
-                        // Similarly as in previous case, we will have one final state to which there leads only one transition, over the symbol '.'
-                        // We will now take the automaton whose final state will be the source state of such a transition, getting the automaton representing the whole part, and we put the condition
-                        // that whole_part_of(int_real_subst_var) is numeral represented by one of the interval words of this automaton.
-                        SASSERT(aut_valid_of_length.final.size() == 1);
-                        SASSERT(aut_valid_of_length.delta.get_transitions_to(*aut_valid_of_length.final.begin()).size() == 1);
-                        SASSERT(aut_valid_of_length.delta.get_transitions_to(*aut_valid_of_length.final.begin()).begin()->symbol == AutAssignment::REAL_NUMBER_DELIMITER);
-                        aut_valid_of_length.final = { aut_valid_of_length.delta.get_transitions_to(*aut_valid_of_length.final.begin()).begin()->source };
-                        aut_valid_of_length.trim();
-                        formula_for_cur_lengths.succ.push_back(encode_interval_words(whole_part_of(int_real_subst_var), AutAssignment::get_interval_words(aut_valid_of_length)));
-                    } else { // both parts are not empty
-                        // TODO explain
-                        LenNode formula_for_interval_words(LenFormulaType::OR);
-                        for (const IntervalWord& interval_word : AutAssignment::get_interval_words(aut_valid_of_length)) {
-                            // each interval word of aut_valid_of_length should be split on the delimiter, i.e. the position of delimiter in interval_word will have the interval ['.', '.']
-                            SASSERT((interval_word[whole_length] == std::pair{ AutAssignment::REAL_NUMBER_DELIMITER, AutAssignment::REAL_NUMBER_DELIMITER }));
-                            IntervalWord whole_part_interval_word(interval_word.begin(), interval_word.begin()+whole_length);
-                            IntervalWord decimal_part_interval_word(interval_word.begin()+whole_length+1, interval_word.end());
-                            formula_for_interval_words.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
-                                encode_interval_words(whole_part_of(int_real_subst_var), { whole_part_interval_word }),
-                                encode_interval_words(decimal_part_of(int_real_subst_var), { decimal_part_interval_word })
-                            });
-                        }
-                        formula_for_cur_lengths.succ.push_back(formula_for_interval_words);
+                    if (code_subst_vars.contains(int_real_subst_var) && length_of_number == 1) {
+                        // int_real_subst_var is used in some to_code/from_code AND because we have both whole and decimal parts empty, we are handling the case where we have the only word "."
+                        // => we need to put code_version_of(int_real_subst_var) == code point of '.'
+                        formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ code_version_of(int_real_subst_var), AutAssignment::REAL_NUMBER_DELIMITER });
                     }
 
                     formula_for_int_real_subst_var.succ.push_back(formula_for_cur_lengths);

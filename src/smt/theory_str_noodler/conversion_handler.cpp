@@ -589,15 +589,18 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
     if (conv.type == ConversionType::TO_INT) {
         // for TO_INT empty string or anything that contains non-digit
         LenNode empty_or_one_subst_contains_non_digit(LenFormulaType::OR, {LenNode(LenFormulaType::EQ, {s, 0})}); // start with empty string: |s| = 0
+
         for (const BasicTerm& subst_var : subst_vars) {
             // subst_var contain non-digit if one of s_i == -1 (see get_formula_for_int_subst_vars)
             empty_or_one_subst_contains_non_digit.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{int_version_of(subst_var), -1});
         }
+
         result.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
             empty_or_one_subst_contains_non_digit,
             LenNode(LenFormulaType::EQ, {i, -1}) // for non-valid s, to_int(s) == -1
         });
     } else if (conv.type == ConversionType::TO_REAL) {
+        // for TO_REAL empty string, string ".", or anything that contains character that is not a digit and neither '.', or string with two '.'
         LenNode invalid_cases(LenFormulaType::OR);
         invalid_cases.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{s, 0}); // |s| = 0
 
@@ -650,38 +653,49 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
 
     bool is_real_conversion = conv.is_real_conversion();
 
-    // length_cases will contain all combinations of lengths l_1,...,l_n, such that l_i represents length of possible word containing only digits of s_i
-    // with one of the lengths possibly representing the case where s_i is decimal number with the dot position (the second part of the outer pair keeps the index i + the dot position in s_i)
+    // This vector will contain the pairs
+    //      < <l_1,l_2,...,l_n>, D >
+    // Where each l_i is one possible length of some word of s_i representing integer AND if D=<j,d> is defined, then l_j instead is
+    // the length of some word w of s_j representing real number with decimal separator on position d in w.
     std::vector<std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>>> length_cases_with_dot_position = {std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>>{{}, std::nullopt}};
     for (size_t i = 0; i < subst_vars.size(); ++i) {
+        // length_cases_with_dot_position contains the pairs < <l_1,l_2,..,l_{i-1}>, D>, we are adding l_i to the vector (or possibly new D)
         const BasicTerm& subst_var = subst_vars[i];
         std::vector<std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>>> new_cases;
+
+        // first we add each l_i, the length of some word of s_i representing integer
         const std::vector<unsigned>& possible_lengths = int_subst_vars_to_possible_valid_lengths.at(subst_var);
         for (const std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>>& old_case : length_cases_with_dot_position) {
             for (unsigned possible_length : possible_lengths) {
                 std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>> new_case = old_case;
-                new_case.first.push_back(possible_length);
+                new_case.first.push_back(possible_length); // add l_i to vector
                 new_cases.push_back(new_case);
             }
         }
+
+        // and if we have a real conversion...
         if (is_real_conversion) {
+            // ... we add l_i, the length of some word of s_i representing real number
             const std::vector<std::pair<unsigned,unsigned>>& possible_dot_positions = real_subst_vars_to_possible_valid_lengths_and_dot_positions.at(subst_var);
             for (const std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>>& old_case : length_cases_with_dot_position) {
-                if (!old_case.second.has_value()) {
-                    for (const std::pair<unsigned, unsigned>& possible_dot_position : possible_dot_positions) {
+                if (!old_case.second.has_value()) { // but only if there is not already some s_j, j<i, that represents real number
+                    for (const auto& [possible_length, dot_position] : possible_dot_positions) {
                         std::pair<std::vector<unsigned>,std::optional<std::pair<size_t,unsigned>>> new_case = old_case;
-                        new_case.first.push_back(possible_dot_position.first);
-                        new_case.second = std::pair<size_t,unsigned>{ i, possible_dot_position.second };
+                        new_case.first.push_back(possible_length); // add l_i to vector
+                        new_case.second = std::pair<size_t,unsigned>{ i, dot_position }; // add D=<i, dot_position>
                         new_cases.push_back(new_case);
                     }
                 }
             }
         }
+
         length_cases_with_dot_position = new_cases;
     }
 
     for (const auto& one_case : length_cases_with_dot_position) {
-        if (conv.type == ConversionType::FROM_REAL) {
+        if (conv.type != ConversionType::FROM_REAL) {
+            result.succ.push_back(get_formula_for_number_conversion(i, subst_vars, one_case.first, one_case.second));
+        } else {
             // For from_real, we need to handle it specially, because we have width, the decimal part of the result will be cut.
             // We create helping var that will have the cut value:
             BasicTerm cut_value(BasicTermType::RealVariable, i.get_name() + "!cut_value");
@@ -696,8 +710,6 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
                 LenNode(LenFormulaType::LEQ, {0, LenNode(LenFormulaType::MINUS, {i, cut_value})}), // we put 0 <= i - cut_value and not i <= cut_value, z3 has problem with it
                 LenNode(LenFormulaType::LT, {LenNode(LenFormulaType::MINUS, {i, cut_value}), power_of_ten}) // we put i - cut_value < 10^-width and not i < cut_value+10^-width, z3 has problem with it
             });
-        } else {
-            result.succ.push_back(get_formula_for_number_conversion(i, subst_vars, one_case.first, one_case.second));
         }
     }
 
@@ -706,10 +718,10 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
 }
 
 /**
- * Creates a LIA formula that encodes to_code/from_code/to_int/from_int/to_real/from_real functions.
+ * Creates a LI(R)A formula that encodes to_code/from_code/to_int/from_int/to_real/from_real functions.
  * Assumes that
  *      - solution is flattened,
- *      - will be used in conjunction with the result of solution.get_lengths,
+ *      - will be used in conjunction with the result of solution.get_lengths(),
  *      - the resulting string variable of from_code/from_int/from_real is restricted to only valid results of from_code/from_int/from_real (should be done in theory_str_noodler::handle_conversion),
  *      - if to_int/from_int/to_real/from_real will be processed, code points of all digits (symbols 48,..,57) should be in the alphabet (should be done in theory_str_noodler::final_check_eh).
  *      - if to_real/from_real will be processed, the decimal separator '.' is in the alphabet (should be done in theory_str_noodler::final_check_eh).
@@ -723,7 +735,7 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
  *      s = from_real(r)
  * With s a string variable, c/i an integer variable, r a real variable.
  * The string variable s can be substituted in the (flattened) solution:
- *      s = s_1 ... s_n (note that we should have |s| = |s_1| + ... + |s_n| from solution.get_lengths)
+ *      s = s_1 ... s_n (note that we should have |s| = |s_1| + ... + |s_n| from solution.get_lengths())
  * We therefore collect all vars s_i and put them into three sets:
  *      code_subst_vars - all vars that substitute some s in to_code/from_code
  *      int_subst_vars - all vars that substitute some s in to_int/from_int
@@ -731,14 +743,14 @@ LenNode ConversionHandler::get_formula_for_int_real_conversion(const TermConvers
  *
  * We will then use functions get_formula_for_code_subst_vars and get_formula_for_real_int_subst_vars to encode
  *      - for each s \in code_subst_vars a formula compactly saying that
- *          - code_version_of(s) is equal to some to_code(w_s) for any w_s \in solution.aut_ass.at(w_s) with the condition that |s| == |w_s|
+ *          - code_version_of(s) is equal to some to_code(w_s) for any w_s \in solution.aut_ass.at(s) with the condition that |s| == |w_s|
  *      - for each s \in int_subst_vars a formula compactly saying that
- *          - int_version_of(s) is equal to some to_int(w_s) for any w_s \in solution.aut_ass.at(w_s) with the condition that |s| == |w_s| AND if s also belongs to code_subst_vars, there is a correspondence between int_version_of(s) and code_version_of(s)
+ *          - int_version_of(s) is equal to some to_int(w_s) for any w_s \in solution.aut_ass.at(s) with the condition that |s| == |w_s| AND if s also belongs to code_subst_vars, there is a correspondence between int_version_of(s) and code_version_of(s)
  *      - for each s \in real_subst_vars
- *          - the same int_version_of(s) as in previous + dot_position_of(s), whole_part_of(s), and decimal_part_of(s) encoding the parts of decimal numbers w_s \in solution.aut_ass.at(w_s) with the correspondence with code_version and lengths
+ *          - the same int_version_of(s) as in previous + dot_position_of(s), whole_part_of(s), and decimal_part_of(s) encoding the parts of decimal numbers w_s \in solution.aut_ass.at(s) with the correspondence with code_version and lengths
  *
  * After that, we use get_formula_for_code_conversion to handle code conversions - both to_code and from_code are handled similarly for valid strings (i.e. strings of length 1), invalid cases must be handled differently.
- * Similarly, we use get_formula_for_int_conversion to handle int_conversions.
+ * Similarly, we use get_formula_for_int_real_conversion to handle int/real conversions.
  */
 std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_encoding_conversions(const std::set<BasicTerm> subst_vars_not_needed_to_be_handled) {
     STRACE(str_conversion,

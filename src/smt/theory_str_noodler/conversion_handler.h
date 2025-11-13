@@ -24,7 +24,7 @@ namespace smt::noodler {
         /**
          * @brief Get the formula for to_code/from_code substituting variable @p code_subst_var
          * 
-         * It basically succinctly encodes that code_version_of(code_subst_var) is equal to one of to_code(w) for some w \in solution.aut_ass.at(s) while
+         * It basically succinctly encodes that code_version_of(code_subst_var) is equal to one of to_code(w) for some w \in solution.aut_ass.at(code_subst_var) while
          * keeping the correspondence between |code_subst_var| and |w|.
          */
         LenNode get_formula_for_code_subst_var(const BasicTerm& code_subst_var);
@@ -97,22 +97,6 @@ namespace smt::noodler {
         LenNode encode_interval_words(const BasicTerm& var, const std::vector<IntervalWord>& interval_words);
 
         /**
-         * TODO fix comment to newest version!!!!!!
-         * @brief Get the formula for to_int/from_int substituting variables
-         * 
-         * It basically succinctly encodes `int_version_of(s) = to_int(w_s)` for each s in @p int_subst_vars and w_s \in solution.aut_ass.at(s) while
-         * keeping the correspondence between |s|, |w_s|, and code_version_of(s).
-         * Note that for w_s = "", we do not put int_version_of(s) = -1 but we instead force that it is NOT -1 (so that get_formula_for_int_conversion
-         * can handle this case correctly).
-         * 
-         * @param int_subst_vars to_int/from_int substituting variables for which we create formulae
-         * @param code_subst_vars to_code/from_code substituting variables (needed only if int_subst_vars and code_subst_vars are not disjoint)
-         * @param[out] int_subst_vars_to_possible_valid_lengths will map each var from int_subst_vars into a vector of lengths of all possible numbers for var (also 0 if there is empty string)
-         * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
-         * @return The formula + precision of the formula (can be precise or underapproximation)
-         */
-
-        /**
          * @brief Get the formula for int or real substituting variable @p int_real_subst_var
          * 
          * In the case for int substituting variable, it succinctly encodes that int_version_of(int_real_subst_var) is one of to_int(w) for some w \in solution.aut_ass.at(int_real_subst_var)
@@ -150,7 +134,12 @@ namespace smt::noodler {
         /// Gets a solution for which we want to compute the LIA formula (can be called multiple times to get formula for different solutions)
         void initialize_solution(SolvingState solution);
 
-        /// Gets a LIA formula encoding the conversions based on a given solution from initialize_solution
+        /**
+         * @brief Gets a LI(R)A formula encoding the conversions based on a given solution from initialize_solution
+         * 
+         * @param subst_vars_not_needed_to_be_handled substituting vars for which we do not need to create encoding subformulas because they are handled differently (for example by parikh image)
+         * @return std::pair<LenNode, LenNodePrecision> resulting formula with its precision (can be underapproximating)
+         */
         std::pair<LenNode, LenNodePrecision> get_formula_encoding_conversions(const std::set<BasicTerm> subst_vars_not_needed_to_be_handled);
 
         /// The set of vars s_i, such that there exists "c = to_code(s)" or "s = from_code(c)" in conversions, where s is substituted by s_1 ... s_i ... s_n in the solution.
@@ -184,9 +173,7 @@ namespace smt::noodler {
          * 
          * WARNING: It is assumed that after initialize_solution is called, this function will never be called
          */
-        void add_conversion(TermConversion conversion) {
-            conversions.push_back(conversion);
-        }
+        void add_conversion(TermConversion conversion) { conversions.push_back(conversion); }
 
         /// Are there any conversions this ConversionHandler is handling?
         bool are_there_any_conversions() const { return !conversions.empty(); }
@@ -195,27 +182,21 @@ namespace smt::noodler {
         BasicTerm code_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); }
 
         /// Returns the int var version of @p var used to encode int-string conversions
-        BasicTerm int_version_of(const BasicTerm& var) {
-            return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_int");
-        }
+        BasicTerm int_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_int"); }
 
         /// Returns the variable for @p var encoding the decimal separator position in @p var
-        BasicTerm dot_position_of(const BasicTerm& var) {
-            return BasicTerm(BasicTermType::Variable, var.get_name() + "!dot_position");
-        }
+        BasicTerm dot_position_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!dot_position"); }
 
         /// Returns the variable for @p var encoding the whole part before the decimal separator in @p var
-        BasicTerm whole_part_of(const BasicTerm& var) {
-            return BasicTerm(BasicTermType::Variable, var.get_name() + "!whole_part");
-        }
+        BasicTerm whole_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!whole_part"); }
 
         /// Returns the variable for @p var encoding the decimal part after the decimal separator in @p var
-        BasicTerm decimal_part_of(const BasicTerm& var) {
-            return BasicTerm(BasicTermType::Variable, var.get_name() + "!decimal_part");
-        }
+        BasicTerm decimal_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!decimal_part"); }
 
         /// Get all variables needed to generate model for conversions
         std::vector<BasicTerm> get_arith_vars_needed_for_model();
+
+        /// TODO: add function to handle model generation for substituting vars
     };
 };
 

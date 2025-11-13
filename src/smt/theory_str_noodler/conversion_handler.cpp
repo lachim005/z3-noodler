@@ -51,6 +51,8 @@ void ConversionHandler::initialize_solution(SolvingState solution) {
 }
 
 LenNode ConversionHandler::get_formula_for_code_subst_var(const BasicTerm& code_subst_var) {
+    SASSERT(is_var_code_subst_var(code_subst_var));
+
     // for the code substituting variable c, create the formula
     //   (|c| != 1 && code_version_of(c) == -1) || (|c| == 1 && code_version_of(c) is code point of one of the chars in the language of automaton for c)
 
@@ -186,7 +188,7 @@ LenNode ConversionHandler::encode_interval_words(const BasicTerm& var, const std
 }
 
 LenNode ConversionHandler::get_formula_for_invalid_case(const BasicTerm& int_real_subst_var) {
-    SASSERT(int_subst_vars.contains(int_real_subst_var) || real_subst_vars.contains(int_real_subst_var));
+    SASSERT(is_var_int_subst_var(int_real_subst_var) || is_var_real_subst_var(int_real_subst_var));
 
     // part representing invalid cases (for int vars it contains some non-digit, for real vars it is not any number)
     mata::nfa::Nfa aut_non_valid_part = mata::nfa::reduce(mata::nfa::intersection(*solution.aut_ass.at(int_real_subst_var), (is_var_real_subst_var(int_real_subst_var) ? non_number : contain_non_digit)).trim());
@@ -223,7 +225,7 @@ LenNode ConversionHandler::get_formula_for_invalid_case(const BasicTerm& int_rea
 
 
 LenNode ConversionHandler::get_formula_for_valid_int_case(const BasicTerm& int_real_subst_var, LenNodePrecision& precision) {
-    SASSERT(int_subst_vars.contains(int_real_subst_var) || real_subst_vars.contains(int_real_subst_var));
+    SASSERT(is_var_int_subst_var(int_real_subst_var) || is_var_real_subst_var(int_real_subst_var));
     
     // part containing only digits (i.e. valid int number)
     mata::nfa::Nfa aut_valid_int_part = mata::nfa::reduce(mata::nfa::intersection(*solution.aut_ass.at(int_real_subst_var), only_digits).trim());
@@ -233,9 +235,11 @@ LenNode ConversionHandler::get_formula_for_valid_int_case(const BasicTerm& int_r
         return LenNode(LenFormulaType::FALSE);
     }
 
-    // Now, for each length l of some word containing only digits, we create the formula
-    //      (|int_real_subst_var| = l && int_version_of(int_real_subst_var) is number represented by some word containing only digits of length l)
+    // For each length l of some word containing only digits, we create the formula
+    //      |int_real_subst_var| = l && int_version_of(int_real_subst_var) is number represented by some word containing only digits of length l (&& dot_position_of(int_real_subst_var = -1))
     // and add l to int_subst_vars_to_possible_valid_lengths[int_real_subst_var].
+    // The part in parentheses is done only if int_real_subst_var is real.
+    // Note that for l=0, we set int_version_of(int_real_subst_var) = 0.
     LenNode result(LenFormulaType::OR);
 
     // maximum length of l
@@ -271,7 +275,7 @@ LenNode ConversionHandler::get_formula_for_valid_int_case(const BasicTerm& int_r
         }
 
         if (is_var_real_subst_var(int_real_subst_var)) {
-            // TODO explain
+            // if int_real_subst_var represents integer, then there is no decimal separator => dot_position_of(int_real_subst_var) = -1
             formula_for_length_l.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ dot_position_of(int_real_subst_var), -1 });
         }
 
@@ -282,9 +286,9 @@ LenNode ConversionHandler::get_formula_for_valid_int_case(const BasicTerm& int_r
 }
 
 LenNode ConversionHandler::get_formula_for_valid_real_case(const BasicTerm& int_real_subst_var, LenNodePrecision& precision) {
-    SASSERT(int_subst_vars.contains(int_real_subst_var) || real_subst_vars.contains(int_real_subst_var));
+    SASSERT(is_var_real_subst_var(int_real_subst_var));
 
-    // part containing only digits (i.e. valid int number)
+    // part containing words representing real numbers, i.e. [0-9]*.[0-9]*
     mata::nfa::Nfa aut_valid_real_part = mata::nfa::reduce(mata::nfa::intersection(*solution.aut_ass.at(int_real_subst_var), real_numbers).trim());
     STRACE(str_conversion_int, tout << "valid-real NFA for " << int_real_subst_var << ":" << std::endl << aut_valid_real_part << std::endl;);
 
@@ -292,8 +296,16 @@ LenNode ConversionHandler::get_formula_for_valid_real_case(const BasicTerm& int_
         return LenNode(LenFormulaType::FALSE);
     }
 
+    // For each pair <l_w, l_d> of lengths of some word representing real number, where l_w is the length of the whole part (before the eparator) and l_d is the length of 
+    // the decimal part (after the separator) we create the formula
+    //      |int_real_subst_var| = l_w+1+l_d && dot_position_of(int_real_subst_var = l_w && int_version_of(int_real_subst_var) = -1 
+    //                && whole_part_of(int_real_subst_var) is the number representing the whole part
+    //                && decimal_part_of(int_real_subst_var) is the number representing the decimal part
+    // We also add <l_w+1+l_d, l_w> to real_subst_vars_to_possible_valid_lengths_and_dot_positions[int_real_subst_var].
+    // Note that for l_w = 0, we set whole_part_of(int_real_subst_var) = 0 (similarly for l_d = 0).
     LenNode result(LenFormulaType::OR);
 
+    // for each transition s-.->t we keep s in delimiter_source_states and t in delimiter_target_states
     mata::utils::SparseSet<mata::nfa::State> delimiter_source_states;
     mata::utils::SparseSet<mata::nfa::State> delimiter_target_states;
     for (const mata::nfa::Transition& transition : aut_valid_real_part.delta.transitions()) {
@@ -321,7 +333,7 @@ LenNode ConversionHandler::get_formula_for_valid_real_case(const BasicTerm& int_
 
     for (unsigned whole_length = 0; whole_length <= max_length_of_whole_part; ++whole_length) {
         for (unsigned decimal_length = 0; decimal_length <= max_length_of_decimal_part; ++decimal_length) {
-            // get automaton representing all accepted words containing only digits of length l
+            // get automaton representing all accepted words whose whole part has length whole_length and decimal part has length decimal_length
             mata::nfa::Nfa aut_valid_of_length = mata::nfa::minimize(mata::nfa::intersection(aut_valid_real_part, AutAssignment::decimal_automaton_of_lengths(whole_length, decimal_length)).trim());
 
             if (aut_valid_of_length.is_lang_empty()) {
@@ -344,13 +356,12 @@ LenNode ConversionHandler::get_formula_for_valid_real_case(const BasicTerm& int_
             formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ dot_position_of(int_real_subst_var), whole_length }); // dot_position_of(int_real_subst_var) is the position of decimal separator
             formula_for_cur_lengths.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{ int_version_of(int_real_subst_var), -1 }); // int_version_of(int_real_subst_var) = -1, because we have '.', so we cannot have integer number
 
-            // TODO explain
             LenNode formula_for_interval_words(LenFormulaType::OR);
             for (const IntervalWord& interval_word : AutAssignment::get_interval_words(aut_valid_of_length)) {
                 // each interval word of aut_valid_of_length should be split on the delimiter, i.e. the position of delimiter in interval_word will have the interval ['.', '.']
                 SASSERT((interval_word[whole_length] == std::pair{ AutAssignment::REAL_NUMBER_DELIMITER, AutAssignment::REAL_NUMBER_DELIMITER }));
-                IntervalWord whole_part_interval_word(interval_word.begin(), interval_word.begin()+whole_length);
-                IntervalWord decimal_part_interval_word(interval_word.begin()+whole_length+1, interval_word.end());
+                IntervalWord whole_part_interval_word(interval_word.begin(), interval_word.begin()+whole_length); // the interval word before the separator
+                IntervalWord decimal_part_interval_word(interval_word.begin()+whole_length+1, interval_word.end()); // the interval word after the separator
                 formula_for_interval_words.succ.emplace_back(LenFormulaType::AND, std::vector<LenNode>{
                     encode_interval_words(whole_part_of(int_real_subst_var), { whole_part_interval_word }),
                     encode_interval_words(decimal_part_of(int_real_subst_var), { decimal_part_interval_word })
@@ -372,15 +383,13 @@ LenNode ConversionHandler::get_formula_for_valid_real_case(const BasicTerm& int_
 }
 
 std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real_subst_var(const BasicTerm& int_real_subst_var) {
+    SASSERT(is_var_int_subst_var(int_real_subst_var) || is_var_real_subst_var(int_real_subst_var));
+    STRACE(str_conversion_int, tout << "NFA for " << int_real_subst_var << ":" << std::endl << *solution.aut_ass.at(int_real_subst_var) << std::endl;);
+
     LenNode result(LenFormulaType::AND);
     LenNodePrecision res_precision = LenNodePrecision::PRECISE;
 
-    // formula_for_int_real_subst_var should encode int_version_of(int_real_subst_var) = to_int(int_real_subst_var) for all words in solution.aut_ass.at(int_subst_var) while
-    // keeping the correspondence between |int_real_subst_var|, int_version_of(int_real_subst_var) and possibly also code_version_of(int_real_subst_var)
-    // and for real vars, it should also give correspondence to whole_part_of(int_real_subst_var), decimal_part_of(int_real_subst_var), and dot_position(int_real_subst_var)
     LenNode formula_for_int_real_subst_var(LenFormulaType::OR);
-
-    STRACE(str_conversion_int, tout << "NFA for " << int_real_subst_var << ":" << std::endl << *solution.aut_ass.at(int_real_subst_var) << std::endl;);
 
     // Add the case that do not represent numbers
     formula_for_int_real_subst_var.succ.push_back(get_formula_for_invalid_case(int_real_subst_var));
@@ -392,25 +401,26 @@ std::pair<LenNode, LenNodePrecision> ConversionHandler::get_formula_for_int_real
     // Add the case encoding real numbers
     if (is_var_real_subst_var(int_real_subst_var)) {
         real_subst_vars_to_possible_valid_lengths_and_dot_positions[int_real_subst_var] = {};
-        // We add the formula
+        formula_for_int_real_subst_var.succ.push_back(get_formula_for_valid_real_case(int_real_subst_var, res_precision));
+
+        // We also add the formula
         //     dot_position_of(int_real_subst_var) == -1 => (whole_part_of(int_real_subst_var) == -1 && whole_part_of(int_real_subst_var) == -1)
         // The formula is actually not needed (if dot position is -1 we do not touch the whole/decimal parts). However, it is important to define
-        // the variables for the parts somewhere, for model generation (Z3 would not know they exist).
-        result.succ.emplace_back(LenFormulaType::OR, std::vector<LenNode>{
-            LenNode(LenFormulaType::NEQ, { dot_position_of(int_real_subst_var), -1 }),
-            LenNode(LenFormulaType::AND, {
-                LenNode(LenFormulaType::EQ, { whole_part_of(int_real_subst_var), -1 }),
-                LenNode(LenFormulaType::EQ, { decimal_part_of(int_real_subst_var), -1 }),
+        // the variables for the parts somewhere, for model generation, otherwise Z3 would not know they exist.
+        formula_for_int_real_subst_var = LenNode(LenFormulaType::AND, {
+            formula_for_int_real_subst_var,
+            LenNode(LenFormulaType::OR, {
+                LenNode(LenFormulaType::NEQ, { dot_position_of(int_real_subst_var), -1 }),
+                LenNode(LenFormulaType::AND, {
+                    LenNode(LenFormulaType::EQ, { whole_part_of(int_real_subst_var), -1 }),
+                    LenNode(LenFormulaType::EQ, { decimal_part_of(int_real_subst_var), -1 }),
+                })
             })
         });
-
-        formula_for_int_real_subst_var.succ.push_back(get_formula_for_valid_real_case(int_real_subst_var, res_precision));
     }
-    
-    result.succ.push_back(formula_for_int_real_subst_var);
 
-    STRACE(str_conversion_int, tout << "int_real_subst_var formula for " << int_real_subst_var << ": " << result << std::endl;);
-    return {result, res_precision};
+    STRACE(str_conversion_int, tout << "int_real_subst_var formula for " << int_real_subst_var << ": " << formula_for_int_real_subst_var << std::endl;);
+    return {formula_for_int_real_subst_var, res_precision};
 }
 
 LenNode ConversionHandler::get_formula_for_code_conversion(const TermConversion& conv) {
@@ -455,7 +465,7 @@ LenNode ConversionHandler::get_formula_for_code_conversion(const TermConversion&
 }
 
 LenNode ConversionHandler::get_formula_for_number_conversion(BasicTerm result, const std::vector<BasicTerm>& subst_vars, std::vector<unsigned> lengths_of_subst_vars, std::optional<std::pair<size_t,unsigned>> index_of_subst_var_with_dot_and_dot_position) {
-    assert(subst_vars.size() == lengths_of_subst_vars.size());
+    SASSERT(subst_vars.size() == lengths_of_subst_vars.size());
 
     // Example:
     //     subst_vars = s0,s1,s2,s3,s4    lengths_of_subst_vars = 2,1,6,0,1    index_of_subst_var_with_dot_and_dot_position=(2,2)

@@ -30,6 +30,9 @@ namespace smt::noodler {
         // automaton representing all non-valid (real/integer) numbers
         mata::nfa::Nfa non_number;
 
+        std::map<BasicTerm,std::vector<unsigned>> int_subst_vars_to_possible_valid_lengths;
+        std::map<BasicTerm,std::vector<std::pair<unsigned,unsigned>>> real_subst_vars_to_possible_valid_lengths_and_dot_positions;
+
         unsigned max_length_of_word_in_aut(const mata::nfa::Nfa aut, LenNodePrecision& precision) {
             if (aut.is_acyclic()) {
                 // there is a finite number of words in aut => the longest possible word is aut.num_of_states()-1
@@ -41,6 +44,10 @@ namespace smt::noodler {
                 return underapprox_length;
             }
         };
+
+        LenNode get_formula_for_invalid_case(const mata::nfa::Nfa& aut_non_valid_part, const BasicTerm& int_real_subst_var);
+        LenNode get_formula_for_valid_int_case(const mata::nfa::Nfa& aut_valid_int_part, const BasicTerm& int_real_subst_var, LenNodePrecision& precision);
+        LenNode get_formula_for_valid_real_case(const mata::nfa::Nfa& aut_valid_real_part, const BasicTerm& int_real_subst_var, LenNodePrecision& precision);
 
         /**
          * @brief Get the formula for to_code/from_code substituting variables
@@ -70,7 +77,7 @@ namespace smt::noodler {
          * @param underapproximating_length For the case that we need to underapproximate, this variable sets the length up to which we underapproximate
          * @return The formula + precision of the formula (can be precise or underapproximation)
          */
-        std::pair<LenNode, LenNodePrecision> get_formula_for_int_real_subst_var(const BasicTerm& int_real_subst_var, std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, std::map<BasicTerm,std::vector<std::pair<unsigned,unsigned>>>& real_subst_vars_to_possible_valid_lengths_and_dot_positions);
+        std::pair<LenNode, LenNodePrecision> get_formula_for_int_real_subst_var(const BasicTerm& int_real_subst_var);
 
         // TODO!!!!
         LenNode get_formula_for_number_conversion(BasicTerm result, const std::vector<BasicTerm>& subst_vars, std::vector<unsigned> lengths_of_subst_vars, std::optional<std::pair<size_t,unsigned>> dot_position);
@@ -86,7 +93,7 @@ namespace smt::noodler {
          * 
          * @param int_subst_vars_to_possible_valid_lengths maps each var from int_subst_vars into a vector of lengths of all possible numbers for var (also 0 if there is empty string)
          */
-        LenNode get_formula_for_int_real_conversion(const TermConversion& conv, const std::map<BasicTerm,std::vector<unsigned>>& int_subst_vars_to_possible_valid_lengths, const std::map<BasicTerm,std::vector<std::pair<unsigned,unsigned>>>& real_subst_vars_to_possible_valid_lengths_and_dot_positions);
+        LenNode get_formula_for_int_real_conversion(const TermConversion& conv);
 
     public:
         ConversionHandler(std::vector<TermConversion> conversions, unsigned underapprox_length) : conversions(conversions), underapprox_length(underapprox_length), only_digits(AutAssignment::digit_automaton_with_epsilon()), real_numbers(AutAssignment::decimal_automaton()) {

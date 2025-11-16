@@ -94,6 +94,8 @@ public:
     
     std::string to_string() const { return m().to_string(m_val); }
 
+    std::string to_string_decimal(rational const & prec) const { SASSERT(prec.is_int() && prec.is_nonneg()); return m().to_string_decimal(m_val, prec.m_val.numerator()); }
+
     void display(std::ostream & out) const { return m().display(out, m_val); }
     
     void display_decimal(std::ostream & out, unsigned prec, bool truncate = false) const { return m().display_decimal(out, m_val, prec, truncate); }

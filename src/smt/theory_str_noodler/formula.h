@@ -55,15 +55,18 @@ namespace smt::noodler {
     }
 
     enum struct BasicTermType {
-        Variable,
-        Literal,
-        Length,
+        Variable, // string and int vars (for string vars we pretend it is its length in LenNode)
+        RealVariable, // real variables (important for LenNode)
+        Literal, // string literal
+        Length, // numeral literal
     };
 
     [[nodiscard]] static std::string to_string(BasicTermType term_type) {
         switch (term_type) {
             case BasicTermType::Variable:
                 return "Variable";
+            case BasicTermType::RealVariable:
+                return "RealVariable";
             case BasicTermType::Literal:
                 return "Literal";
             case BasicTermType::Length:
@@ -79,7 +82,8 @@ namespace smt::noodler {
         BasicTerm(BasicTermType type, zstring name): type(type), name(std::move(name)) {}
 
         [[nodiscard]] BasicTermType get_type() const { return type; }
-        [[nodiscard]] bool is_variable() const { return type == BasicTermType::Variable; }
+        [[nodiscard]] bool is_variable() const { return (type == BasicTermType::Variable || type == BasicTermType::RealVariable); }
+        [[nodiscard]] bool is_real_variable() const { return type == BasicTermType::RealVariable; }
         [[nodiscard]] bool is_literal() const { return type == BasicTermType::Literal; }
         [[nodiscard]] bool is(BasicTermType term_type) const { return type == term_type; }
 
@@ -194,6 +198,7 @@ namespace smt::noodler {
 
         LenNode(rational k) : type(LenFormulaType::LEAF), atom_val(BasicTermType::Length, zstring(k)), succ() { };
         LenNode(int k) : LenNode(rational(k)) { };
+        LenNode(unsigned k) : LenNode(rational(k)) { };
         LenNode(BasicTerm val) : type(LenFormulaType::LEAF), atom_val(val), succ() { };
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };
@@ -210,12 +215,9 @@ namespace smt::noodler {
             return (os << "false");
         case LenFormulaType::LEAF: {
             zstring name = node.atom_val.get_name();
-            // Make sure that we print negative numbers in a valid SMT2 format
             if (node.atom_val.is(BasicTermType::Length)) {
-                if (name[0] == '-') {
-                    os << "(- " << name.encode().substr(1) << ")";
-                    return os;
-                }
+                rational(name.encode().c_str()).display_smt2(os);
+                return os;
             }
             return (os << node.atom_val.get_name());
         }
@@ -952,15 +954,24 @@ namespace smt::noodler {
         FROM_CODE,
         TO_INT,
         FROM_INT,
+        TO_REAL,
+        FROM_REAL
     };
 
-    // Term conversion: to_int/from_int/to_code/from_code
+    // Term conversion: to_int/from_int/to_code/from_code/to_real/from_real
     struct TermConversion {
         ConversionType type;
         BasicTerm string_var;
-        BasicTerm int_var;
+        BasicTerm number_var;
 
-        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm int_var) : type(type), string_var(std::move(string_var)), int_var(std::move(int_var)) {}
+        rational width = rational(0); // maximum number of decimal places for FROM_REAL operation
+
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm number_var) : type(type), string_var(std::move(string_var)), number_var(std::move(number_var)) {}
+        TermConversion(ConversionType type, BasicTerm string_var, BasicTerm number_var, rational width) : type(type), string_var(std::move(string_var)), number_var(std::move(number_var)), width(width) { SASSERT(type == ConversionType::FROM_REAL); }
+
+        bool is_code_conversion() const { return (type == ConversionType::TO_CODE || type == ConversionType::FROM_CODE); }
+        bool is_int_conversion() const { return (type == ConversionType::TO_INT || type == ConversionType::FROM_INT); }
+        bool is_real_conversion() const { return (type == ConversionType::TO_REAL || type == ConversionType::FROM_REAL); }
     };
 
     inline std::string get_conversion_name(ConversionType type) {
@@ -974,6 +985,10 @@ namespace smt::noodler {
             return "to_int";
         case ConversionType::FROM_INT:
             return "from_int";
+        case ConversionType::TO_REAL:
+            return "to_real";
+        case ConversionType::FROM_REAL:
+            return "from_real";
 
         default:
             UNREACHABLE();

@@ -214,6 +214,8 @@ public:
 
     std::string to_string(mpz const & a) const { return mpz_manager<SYNCH>::to_string(a); }
 
+    std::string to_string_decimal(mpq const & a, mpz const & prec);
+
     void display(std::ostream & out, mpz const & a) const { return mpz_manager<SYNCH>::display(out, a); }
 
     void display(std::ostream & out, mpq const & a) const;

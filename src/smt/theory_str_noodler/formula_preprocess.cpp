@@ -1725,7 +1725,7 @@ namespace smt::noodler {
      * 
      * @param conversions 
      */
-    void FormulaPreprocessor::conversions_validity(std::vector<TermConversion>& conversions) {
+    void FormulaPreprocessor::conversions_validity(const std::vector<TermConversion>& conversions) {
         STRACE(str_prep, tout << "Preprocessing step - conversions_validity\n";);
         mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
         mata::nfa::Nfa only_digits_aut = AutAssignment::digit_automaton();
@@ -1734,7 +1734,7 @@ namespace smt::noodler {
             if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,       *aut_ass.at(conv.string_var))).is_lang_empty()) ||
                 (conv.type == ConversionType::TO_INT  && mata::nfa::reduce(mata::nfa::intersection(only_digits_aut, *aut_ass.at(conv.string_var))).is_lang_empty()))
                 {
-                    len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.int_var, -1});
+                    len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.number_var, -1});
                 }
         }
         STRACE(str_prep, tout << print_info(is_trace_enabled(TraceTag::str_nfa)));

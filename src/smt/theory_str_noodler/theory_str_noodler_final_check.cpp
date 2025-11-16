@@ -82,7 +82,7 @@ namespace smt::noodler {
             }
             tout << " conversions(" << this->m_conversion_todo.size() << "):" << std::endl;
             for (const auto &conv: this->m_conversion_todo) {
-                tout << "    " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
+                tout << "    " << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.number_var << std::endl;
             }
         );
 
@@ -113,6 +113,10 @@ namespace smt::noodler {
         bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
+        bool contains_int_conversion = false;
+        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_INT || c.type == ConversionType::TO_INT) { contains_int_conversion = true; break; } }
+        bool contains_real_conversion = false;
+        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_REAL || c.type == ConversionType::TO_REAL) { contains_real_conversion = true; break; } }
         bool contains_eqs_and_diseqs_only = this->m_not_contains_todo_rel.empty() && this->m_conversion_todo.empty();
 
         // nothing is trivially SAT
@@ -164,12 +168,14 @@ namespace smt::noodler {
         // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
         std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
 
-        // For the case that it is possible we have to_int/from_int, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle to_int/from_int
-        if (!m_conversion_todo.empty()) {
-            for (mata::Symbol s = 48; s <= 57; ++s) {
+        // If we have to_int/from_int/to_real/from_real, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle the conversions
+        if (contains_int_conversion || contains_real_conversion) {
+            for (mata::Symbol s = AutAssignment::DIGIT_SYMBOL_START; s <= AutAssignment::DIGIT_SYMBOL_END; ++s) {
                 symbols_in_formula.insert(s);
             }
         }
+        // If we have to_real/from_real, we also add '.', so that decimal point is not represented by dummy symbol
+        if (contains_real_conversion) { symbols_in_formula.insert(AutAssignment::REAL_NUMBER_DELIMITER); }
 
         // Gather relevant word (dis)equations (and transducers that occur in them) to noodler formula
         Formula instance = get_formula_from_relevant(symbols_in_formula);
@@ -190,7 +196,7 @@ namespace smt::noodler {
         STRACE(str,
             tout << "Relevant formula:\n" << instance.to_string();
             for (const auto& conv : conversions) {
-                tout << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and int var " << conv.int_var << std::endl;
+                tout << get_conversion_name(conv.type) << " with string var " << conv.string_var << " and number var " << conv.number_var << std::endl;
             }
             tout << "Length variables:";
             for (const auto &len_var : init_length_sensitive_vars) {

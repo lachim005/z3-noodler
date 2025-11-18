@@ -409,6 +409,9 @@ namespace smt::noodler {
         /// @brief Returns the model_value_proc for string variable @p str_expr based on whether it is used in dec_proc or not
         model_value_proc* model_of_string_var(app* str_var);
 
+        /// @brief Handles (recursively) ITE in @p e in model generation
+        app* get_ite_value(expr* e) const;
+
         /******************* FINAL_CHECK_EH HELPING FUNCTIONS *********************/
 
         /**

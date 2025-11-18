@@ -140,10 +140,32 @@ namespace smt::noodler {
         }
     }
 
+    app* theory_str_noodler::get_ite_value(expr* e) const {
+        // The following code is the same as in theory_seq::get_ite_value()
+        expr* e1, *e2, *e3;
+        while (m.is_ite(e, e1, e2, e3)) {        
+            if (!ctx.e_internalized(e))
+                break;
+            enode* r = ctx.get_enode(e)->get_root();
+            if (ctx.get_enode(e2)->get_root() == r) {
+                e = e2;
+            }
+            else if (ctx.get_enode(e3)->get_root() == r) {
+                e = e3;
+            }
+            else {
+                break;
+            }
+        }
+        return to_app(e);
+    }
+
     model_value_proc* theory_str_noodler::mk_value(enode *const n, model_generator &mg) {
         // it seems here we only get string literals/vars, concats (whose arguments can be something more complex, but should be replacable by a var), from_int/from_code and regex literals/vars (vars probably not, only if we fix disequations with unrestricted regex vars)
         app *tgt = n->get_expr();
         STRACE(str, tout << "mk_value: getting model for " << mk_pp(tgt, m) << " sort is " << mk_pp(tgt->get_sort(), m) << "\n";);
+
+        tgt = get_ite_value(tgt);
 
         if (m_util_s.is_re(tgt)) {
             // if tgt is regular

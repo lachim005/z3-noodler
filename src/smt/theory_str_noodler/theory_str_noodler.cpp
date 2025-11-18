@@ -1615,6 +1615,7 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
+        STRACE(str, tout << "handle-prefix: " << mk_pp(e, m) << '\n';);
         if(axiomatized_persist_terms.contains(e))
             return;
 
@@ -1653,6 +1654,7 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
+        STRACE(str, tout << "handle-not-prefx: " << mk_pp(e, m) << '\n';);
         if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
@@ -1715,12 +1717,14 @@ namespace smt::noodler {
         expr_ref pmyqy(m_util_s.str.mk_concat(pmy, qy), m);
         string_theory_propagation(pmyqy);
 
+        // |x| <= |y|
         expr_ref len_x_gt_len_y(m);
         zstring s;
         if(m_util_s.str.is_string(x, s)) {
             len_x_gt_len_y = expr_ref{m_util_a.mk_ge(m_util_s.str.mk_length(y), m_util_a.mk_int(s.length())),m};
         } else {
-            len_x_gt_len_y = expr_ref{m_util_a.mk_ge(m_util_s.str.mk_length(y), m_util_s.str.mk_length(x)),m};
+            // we cannot put |x| <= |y| because lra solver gives up, we need to give it |y| - |x| >= 0 (there has to be a numeral on one side)
+            len_x_gt_len_y = expr_ref{m_util_a.mk_ge(m_util_a.mk_sub(m_util_s.str.mk_length(y), m_util_s.str.mk_length(x)), m_util_a.mk_int(0)),m};
         }
 
         literal x_eq_pmq = mk_eq(x,pmxqx,false);
@@ -1758,6 +1762,7 @@ namespace smt::noodler {
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
+        STRACE(str, tout << "handle-suffix: " << mk_pp(e, m) << '\n';);
         if(axiomatized_persist_terms.contains(e))
             return;
 
@@ -1785,6 +1790,7 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
+        STRACE(str, tout << "handle-not-suffix: " << mk_pp(e, m) << '\n';);
         if(axiomatized_persist_terms.contains(m.mk_not(e)))
             return;
 
@@ -2102,6 +2108,7 @@ namespace smt::noodler {
      * TODO: This probably makes is_digit always relevant.
      */
     void theory_str_noodler::handle_is_digit(expr *e) {
+        STRACE(str, tout << "handle-is-digit: " << mk_pp(e, m) << '\n';);
         if(axiomatized_persist_terms.contains(e))
             return;
         axiomatized_persist_terms.insert(e);

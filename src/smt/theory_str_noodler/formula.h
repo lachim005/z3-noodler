@@ -39,7 +39,7 @@ namespace smt::noodler {
         Transducer, 
     };
 
-    [[nodiscard]] static std::string to_string(PredicateType predicate_type) {
+    [[nodiscard, maybe_unused]] static inline std::string to_string(PredicateType predicate_type) {
         switch (predicate_type) {
             case PredicateType::Equation:
                 return "Equation";
@@ -61,7 +61,7 @@ namespace smt::noodler {
         Length, // numeral literal
     };
 
-    [[nodiscard]] static std::string to_string(BasicTermType term_type) {
+    [[nodiscard, maybe_unused]] static inline std::string to_string(BasicTermType term_type) {
         switch (term_type) {
             case BasicTermType::Variable:
                 return "Variable";
@@ -110,19 +110,19 @@ namespace smt::noodler {
         zstring name;
     }; // Class BasicTerm.
 
-    [[nodiscard]] static std::string to_string(const BasicTerm& basic_term) {
+    [[nodiscard, maybe_unused]] static inline std::string to_string(const BasicTerm& basic_term) {
         return basic_term.to_string();
     }
 
 
-    static std::ostream& operator<<(std::ostream& os, const BasicTerm& basic_term) {
+    [[maybe_unused]] static inline std::ostream& operator<<(std::ostream& os, const BasicTerm& basic_term) {
         os << basic_term.to_string();
         return os;
     }
 
-    static bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
-    static bool operator!=(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs == rhs); }
-    static bool operator<(const BasicTerm& lhs, const BasicTerm& rhs) {
+    static inline bool operator==(const BasicTerm& lhs, const BasicTerm& rhs) { return lhs.equals(rhs); }
+    static inline bool operator!=(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs == rhs); }
+    static inline bool operator<(const BasicTerm& lhs, const BasicTerm& rhs) {
         if (lhs.get_type() < rhs.get_type()) {
             return true;
         } else if (lhs.get_type() > rhs.get_type()) {
@@ -134,7 +134,7 @@ namespace smt::noodler {
         }
         return false;
     }
-    static bool operator>(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs < rhs); }
+    static inline bool operator>(const BasicTerm& lhs, const BasicTerm& rhs) { return !(lhs < rhs); }
 
     [[nodiscard]] static std::string to_string(const std::vector<BasicTerm>& vec, const std::string& delimiter = " ") {
         if(vec.empty()) return "";
@@ -145,7 +145,7 @@ namespace smt::noodler {
         return ret;
     }
 
-    static std::ostream& operator<<(std::ostream& os, const std::vector<BasicTerm>& vec) {
+    [[maybe_unused]] static inline std::ostream& operator<<(std::ostream& os, const std::vector<BasicTerm>& vec) {
         os << to_string(vec);
         return os;
     }
@@ -203,7 +203,7 @@ namespace smt::noodler {
         LenNode(LenFormulaType tp, std::vector<struct LenNode> s = {}) : type(tp), atom_val(BasicTerm(BasicTermType::Length)), succ(s) { };
     };
 
-    static std::ostream& operator<<(std::ostream& os, const LenNode& node) {
+    static inline std::ostream& operator<<(std::ostream& os, const LenNode& node) {
         auto children_iterator = node.succ.begin(); // Some nodes, e.g., quantifiers would like to consume successor nodes
         bool was_opening_parenthesis_emitted = true;
 
@@ -789,11 +789,11 @@ namespace smt::noodler {
         }
     }; // Class Predicate.
 
-    [[nodiscard]] static std::string to_string(const Predicate& predicate) {
+    [[nodiscard, maybe_unused]] static inline std::string to_string(const Predicate& predicate) {
         return predicate.to_string();
     }
 
-    static std::ostream& operator<<(std::ostream& os, const Predicate& predicate) {
+    [[maybe_unused]] static inline std::ostream& operator<<(std::ostream& os, const Predicate& predicate) {
         os << predicate.to_string();
         return os;
     }
@@ -941,12 +941,12 @@ namespace smt::noodler {
         }
     }; // Class Formula.
 
-    static bool operator==(const Formula& lhs, const Formula& rhs) { return lhs.get_predicates() == rhs.get_predicates(); }
-    static bool operator!=(const Formula& lhs, const Formula& rhs) { return !(lhs == rhs); }
-    static bool operator<(const Formula& lhs, const Formula& rhs) {
+    [[nodiscard]] static inline bool operator==(const Formula& lhs, const Formula& rhs) { return lhs.get_predicates() == rhs.get_predicates(); }
+    [[nodiscard, maybe_unused]] static inline bool operator!=(const Formula& lhs, const Formula& rhs) { return !(lhs == rhs); }
+    [[nodiscard]] static inline bool operator<(const Formula& lhs, const Formula& rhs) {
        return lhs.get_predicates() < rhs.get_predicates();
     }
-    static bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
+    [[nodiscard, maybe_unused]] static inline bool operator>(const Formula& lhs, const Formula& rhs) { return !(lhs < rhs); }
 
     // Conversions of strings to ints/code values and vice versa
     enum class ConversionType {

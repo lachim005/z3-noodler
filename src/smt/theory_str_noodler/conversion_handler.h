@@ -128,7 +128,7 @@ namespace smt::noodler {
         LenNode get_formula_for_int_real_conversion(const TermConversion& conv);
 
     public:
-        ConversionHandler(std::vector<TermConversion> conversions, unsigned underapprox_length) : conversions(conversions), underapprox_length(underapprox_length), only_digits(AutAssignment::digit_automaton_with_epsilon()), real_numbers(AutAssignment::decimal_automaton()) {
+        ConversionHandler(std::vector<TermConversion> conversions, unsigned underapprox_length) : conversions(conversions), only_digits(AutAssignment::digit_automaton_with_epsilon()), real_numbers(AutAssignment::decimal_automaton()), underapprox_length(underapprox_length) {
         };
 
         /// Gets a solution for which we want to compute the LIA formula (can be called multiple times to get formula for different solutions)

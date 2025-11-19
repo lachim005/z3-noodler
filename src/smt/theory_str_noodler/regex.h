@@ -116,8 +116,8 @@ namespace smt::noodler::regex {
         const_iterator cend() const { return alphabet.cend(); }
 
         bool is_full () const {
-            if (contains(util::get_dummy_symbol())) { return size() == zstring::max_char(); }
-            else { return size()+1 == zstring::max_char(); }
+            if (contains(util::get_dummy_symbol())) { return size() == zstring::max_char()+2; }
+            else { return size() == zstring::max_char()+1; }
         }
 
         bool insert_dummy_if_not_full() {

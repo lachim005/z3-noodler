@@ -75,6 +75,8 @@ namespace smt::noodler::regex {
             }
         }
 
+        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { }
+
         const std::set<mata::Symbol>& get_set_alphabet() const { return alphabet; }
         const mata::EnumAlphabet& get_mata_alphabet() const { return mata_alphabet; }
 

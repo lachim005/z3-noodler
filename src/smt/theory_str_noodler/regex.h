@@ -115,7 +115,10 @@ namespace smt::noodler::regex {
         const_iterator cbegin() const { return alphabet.cbegin(); }
         const_iterator cend() const { return alphabet.cend(); }
 
-        bool is_full () const { return size() == zstring::max_char(); }
+        bool is_full () const {
+            if (contains(util::get_dummy_symbol())) { return size()-1 == zstring::max_char(); }
+            else { return size() == zstring::max_char(); }
+        }
 
         bool insert_dummy_if_not_full() {
             if (is_full()) {
@@ -132,8 +135,11 @@ namespace smt::noodler::regex {
         /// @brief Return zstring corresponding the the word @p word, where dummy symbol is replaced with some valid symbol not in the alphabet.
         zstring get_string_from_mata_word(mata::Word word) const {
             zstring res;
-            mata::Symbol unused_symbol = get_unused_symbol();
-            std::replace(word.begin(), word.end(), util::get_dummy_symbol(), unused_symbol);
+            if (std::ranges::find(word, util::get_dummy_symbol()) != word.end()) {
+                SASSERT(alphabet.contains(util::get_dummy_symbol()));
+                mata::Symbol unused_symbol = get_unused_symbol();
+                std::replace(word.begin(), word.end(), util::get_dummy_symbol(), unused_symbol);
+            }
             return zstring(word.size(), word.data());
         }
     };

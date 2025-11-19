@@ -288,6 +288,7 @@ namespace smt::noodler {
     }
 
     void SolvingState::replace_dummy_symbol_in_transducers_with(std::set<mata::Symbol> replacements) {
+        if (replacements.empty()) { return; }
         for (const Predicate& trans : transducers) {
             util::replace_dummy_symbol_in_transducer_with(*trans.get_transducer(), replacements);
         }

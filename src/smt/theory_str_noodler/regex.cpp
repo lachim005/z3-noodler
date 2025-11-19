@@ -14,7 +14,7 @@ namespace {
 namespace smt::noodler::regex {
 
     mata::Symbol Alphabet::get_unused_symbol() const {
-        if (alphabet.size() == zstring::max_char()) {
+        if (is_full()) {
             // alphabet is full, we throw error (TODO: should probably return nullopt or something like that)
             util::throw_error("Trying to get a fresh symbol in full alphabet");
             return 0; // this is unreachable, return something so we can compile

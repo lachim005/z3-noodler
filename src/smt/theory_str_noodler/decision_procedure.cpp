@@ -1183,19 +1183,21 @@ namespace smt::noodler {
                     // the code value is not a symbol of an alphabet, therefore it is "hidden" in a dummy symbol
                     // we want to "unhide" it, and make it explicit
                     set_of_symbols_to_replace_dummy_symbol_with.insert(to_code_value_as_symbol);
-                    solution.aut_ass.add_symbol_to_alphabet(to_code_value.get_unsigned());
                 }
                 update_model_and_aut_ass(var, zstring(to_code_value.get_unsigned())); // zstring(unsigned) returns char with the code point of the argument
             } // for the case to_code_value == -1 we should have (str.len var) != 1, this restriction will be sorted out further
         }
 
-        // if there is no symbol from code-point conversions, we add a fresh one instead
-        if (set_of_symbols_to_replace_dummy_symbol_with.empty()) {
-            set_of_symbols_to_replace_dummy_symbol_with.insert(solution.aut_ass.add_fresh_symbol_to_alphabet());
+        if (solution.aut_ass.get_alphabet().contains(util::get_dummy_symbol())) {
+            // if there is no symbol from code-point conversions, we add a fresh one instead
+            if (set_of_symbols_to_replace_dummy_symbol_with.empty()) {
+                set_of_symbols_to_replace_dummy_symbol_with.insert(solution.aut_ass.get_alphabet().get_unused_symbol());
+            }
+
+            // we can now replace dummy symbol in automata
+            solution.aut_ass.replace_dummy_with_symbols(set_of_symbols_to_replace_dummy_symbol_with);
         }
 
-        // we can now replace dummy symbol in automata
-        solution.aut_ass.replace_dummy_with_symbols(set_of_symbols_to_replace_dummy_symbol_with);
         // we have to also replace dummy symbol in transducers
         // TODO it is incorrect, dummy symbols need to be replaced on the level of transducer transitions, not on nfa transitions (works only if there is one symbol to replace with)
         solution.replace_dummy_symbol_in_transducers_with(set_of_symbols_to_replace_dummy_symbol_with);

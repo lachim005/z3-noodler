@@ -14,6 +14,7 @@
 #include <mata/nfa/builder.hh>
 
 #include "formula.h"
+#include "regex.h"
 
 namespace smt::noodler {
 
@@ -28,7 +29,7 @@ namespace smt::noodler {
 
     private:
         /// Union of all alphabets of automata in the aut assignment
-        std::set<mata::Symbol> alphabet;
+        regex::Alphabet alphabet;
 
         void update_alphabet() {
             this->alphabet.clear();
@@ -224,7 +225,7 @@ namespace smt::noodler {
             }
         }
 
-        const std::set<mata::Symbol>& get_alphabet() const {
+        const regex::Alphabet& get_alphabet() const {
             return this->alphabet;
         }
 

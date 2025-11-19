@@ -53,7 +53,7 @@ namespace smt::noodler::regex {
      */
     struct Alphabet {
         std::set<mata::Symbol> alphabet;
-        mata::OnTheFlyAlphabet mata_alphabet;
+        mata::EnumAlphabet mata_alphabet;
 
         Alphabet() = default;
         Alphabet(const Alphabet&) = default;
@@ -61,17 +61,20 @@ namespace smt::noodler::regex {
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
 
-        Alphabet(mata::OnTheFlyAlphabet alph) : alphabet(), mata_alphabet(alph) {
+        Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
                 alphabet.insert(s);
             }
         }
         
-        Alphabet(std::set<mata::Symbol> alph) : alphabet(alph) {
+        Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
-                this->mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+                this->mata_alphabet.add_new_symbol(symbol);
             }
         }
+
+        const std::set<mata::Symbol>& get_set_alphabet() const { return alphabet; }
+        const mata::EnumAlphabet& get_mata_alphabet() const { return mata_alphabet; }
 
         void clear() {
             alphabet.clear();
@@ -85,7 +88,7 @@ namespace smt::noodler::regex {
         void insert(const mata::Symbol s) {
             SASSERT(s <= zstring::max_char() || s != util::get_dummy_symbol());
             alphabet.insert(s);
-            mata_alphabet.add_new_symbol(std::to_string(s), s);
+            mata_alphabet.add_new_symbol(s);
         }
 
         template<class InputIt>
@@ -109,7 +112,6 @@ namespace smt::noodler::regex {
         const_iterator end() const { return alphabet.cend(); }
         const_iterator cbegin() const { return alphabet.cbegin(); }
         const_iterator cend() const { return alphabet.cend(); }
-
 
         /// @brief Returns any symbol that is not in the alphabet
         mata::Symbol get_unused_symbol() const;

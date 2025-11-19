@@ -42,6 +42,8 @@ namespace smt::noodler {
     public:
         using std::unordered_map<BasicTerm, std::shared_ptr<mata::nfa::Nfa>>::unordered_map;
 
+        AutAssignment(regex::Alphabet alph) : alphabet(std::move(alph)) { }
+
         // used for tests, do not use normally
         AutAssignment(std::map<BasicTerm, mata::nfa::Nfa> val) {
             for (const auto &key_value : val) {
@@ -229,11 +231,8 @@ namespace smt::noodler {
             return this->alphabet;
         }
 
-        void set_alphabet(const std::set<uint32_t>& alphabet) {
-            this->alphabet.clear();
-            for (const auto& symbol : alphabet) {
-                this->alphabet.insert(symbol);
-            }
+        void set_alphabet(regex::Alphabet alph) {
+            this->alphabet = std::move(alph);
         }
 
         void add_symbol_to_alphabet(mata::Symbol s) {

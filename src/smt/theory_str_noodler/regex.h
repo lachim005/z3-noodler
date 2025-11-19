@@ -64,30 +64,7 @@ namespace smt::noodler::regex {
         }
 
         /// @brief Returns any symbol that is not in the alphabet
-        mata::Symbol get_unused_symbol() const {
-            if (alphabet.size() == zstring::max_char()) {
-                // alphabet is full, we throw error (TODO: should probably return nullopt or something like that)
-                util::throw_error("Trying to get a fresh symbol in full alphabet");
-                return 0; // this is unreachable, return something so we can compile
-            }
-            // std::set is ordered, so alphabet is also ordered
-            if (alphabet.empty() || *alphabet.begin() != 0) {
-                return 0;
-            } else {
-                auto it = alphabet.begin();
-                while (true) {
-                    auto old_it = it++;
-                    // we are trying to find two values in alphabet that have something inbetween,
-                    // i.e., they differ more than by one, or if no such space exists, the last
-                    // symbol will not be max_char() (because of the test at the beginning of the
-                    // function), so we can return the value one larger
-                    if ((*old_it)+1 != *it // the values at old_it and at it differ by more than one
-                      || it == alphabet.end()) {
-                        return (*old_it)+1;
-                    }
-                }
-            }
-        }
+        mata::Symbol get_unused_symbol() const;
 
         /// @brief Return zstring corresponding the the word @p word, where dummy symbol is replaced with some valid symbol not in the alphabet.
         zstring get_string_from_mata_word(mata::Word word) const {

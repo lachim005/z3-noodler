@@ -13,6 +13,45 @@ namespace {
 
 namespace smt::noodler::regex {
 
+    mata::Symbol Alphabet::get_unused_symbol() const {
+        if (alphabet.size() == zstring::max_char()) {
+            // alphabet is full, we throw error (TODO: should probably return nullopt or something like that)
+            util::throw_error("Trying to get a fresh symbol in full alphabet");
+            return 0; // this is unreachable, return something so we can compile
+        }
+
+        // We want to find first "nice" character where we go in this order
+        //  - lowercase a-z
+        //  - uppercase A-Z
+        //  - digits 0-9
+        //  - printable ASCII characters except space
+        //  - space
+        //  - ASCII control codes 0-31
+        //  - ASCII control code DEL (127)
+        //  - anything over 127, always incrementing by one
+        auto get_next_symbol = [](const mata::Symbol s) {
+            if (s == zstring::max_char()) { util::throw_error("Trying to get a fresh symbol in full alphabet"); return mata::Symbol{0}; }
+            else if (s == 'z') { return mata::Symbol{'A'}; } // lowercase is followed by uppercase
+            else if (s == 'Z') { return mata::Symbol{'0'}; } // uppercase is followed by digits
+            else if (s == '9') { return mata::Symbol{33}; } // digits are followed by printable ASCII characters (starting with '!')
+            else if (s == 47) { return mata::Symbol{58}; } // we are in printable ASCII characters, jumping over digits 0-9
+            else if (s == 64) { return mata::Symbol{91}; } // we are in printable ASCII characters, jumping over uppercase A-Z
+            else if (s == 96) { return mata::Symbol{123}; } // we are in printable ASCII characters, jumping over lowercase a-z
+            else if (s == 126) { return mata::Symbol{32}; } // last printable ASCII character, return space
+            else if (s == 32) { return mata::Symbol{0}; } // space is followed by ASCII contol codes 0-31
+            else if (s == 31) { return mata::Symbol{127}; } // last control code in 0-31 followed by DEL (127)
+            else { return s+1; }
+        };
+
+        mata::Symbol current_symbol{'a'}; // start with 'a'
+
+        while (alphabet.contains(current_symbol)) {
+            current_symbol = get_next_symbol(current_symbol);
+        }
+
+        return current_symbol;
+    }
+
     void extract_symbols(expr* const ex, const seq_util& m_util_s, std::set<uint32_t>& alphabet) {
         if (m_util_s.str.is_string(ex)) {
             auto ex_app{ to_app(ex) };

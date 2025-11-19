@@ -54,12 +54,62 @@ namespace smt::noodler::regex {
     struct Alphabet {
         std::set<mata::Symbol> alphabet;
         mata::OnTheFlyAlphabet mata_alphabet;
+
+        Alphabet() = default;
+        Alphabet(const Alphabet&) = default;
+        Alphabet(Alphabet&&) = default;
+        Alphabet& operator=(const Alphabet&) = default;
+        Alphabet& operator=(Alphabet&&) = default;
+
+        Alphabet(mata::OnTheFlyAlphabet alph) : alphabet(), mata_alphabet(alph) {
+            for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
+                alphabet.insert(s);
+            }
+        }
         
-        Alphabet(const std::set<mata::Symbol>& alph) : alphabet(alph) {
-            for (const auto& symbol : alph) {
+        Alphabet(std::set<mata::Symbol> alph) : alphabet(alph) {
+            for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
             }
         }
+
+        void clear() {
+            alphabet.clear();
+            mata_alphabet.clear();
+        }
+
+        size_t size() const { return alphabet.size(); }
+
+        bool empty() const { return alphabet.empty(); }
+
+        void insert(const mata::Symbol s) {
+            SASSERT(s <= zstring::max_char() || s != util::get_dummy_symbol());
+            alphabet.insert(s);
+            mata_alphabet.add_new_symbol(std::to_string(s), s);
+        }
+
+        template<class InputIt>
+        void insert(InputIt first, InputIt last) {
+            static_assert(std::is_convertible_v<typename std::iterator_traits<InputIt>::value_type, mata::Symbol>,
+                "Iterator must yield mata::Symbol or a type convertible to mata::Symbol");
+
+            for (; first != last; ++first) { insert(*first); }
+        }
+
+        bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
+
+        void erase(const mata::Symbol s) {
+            alphabet.erase(s);
+            mata_alphabet.erase(s);
+        }
+
+        using const_iterator = std::set<mata::Symbol>::const_iterator;
+
+        const_iterator begin() const { return alphabet.cbegin(); }
+        const_iterator end() const { return alphabet.cend(); }
+        const_iterator cbegin() const { return alphabet.cbegin(); }
+        const_iterator cend() const { return alphabet.cend(); }
+
 
         /// @brief Returns any symbol that is not in the alphabet
         mata::Symbol get_unused_symbol() const;

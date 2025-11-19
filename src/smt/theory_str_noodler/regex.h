@@ -51,10 +51,12 @@ namespace smt::noodler::regex {
     /**
      * @brief Alphabet wrapper for Z3 alphabet represented by std::set<mata::Symbol> and a Mata alphabet.
      */
-    struct Alphabet {
+    class Alphabet {
+    private:
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
 
+    public:
         Alphabet() = default;
         Alphabet(const Alphabet&) = default;
         Alphabet(Alphabet&&) = default;
@@ -113,6 +115,17 @@ namespace smt::noodler::regex {
         const_iterator cbegin() const { return alphabet.cbegin(); }
         const_iterator cend() const { return alphabet.cend(); }
 
+        bool is_full () const { return size() == zstring::max_char(); }
+
+        bool insert_dummy_if_not_full() {
+            if (is_full()) {
+                return false;
+            } else {
+                insert(util::get_dummy_symbol());
+                return true;
+            }
+        }
+
         /// @brief Returns any symbol that is not in the alphabet
         mata::Symbol get_unused_symbol() const;
 
@@ -131,7 +144,7 @@ namespace smt::noodler::regex {
      * @param[in] m_util_s Seq util for AST.
      * @param[out] alphabet A set of symbols with where found symbols are appended to.
      */
-    void extract_symbols(expr* const ex, const seq_util& m_util_s, std::set<uint32_t>& alphabet);
+    void extract_symbols(expr* const ex, const seq_util& m_util_s, Alphabet& alphabet);
 
     /**
      * Convert expression @p expr to NFA.
@@ -273,7 +286,7 @@ namespace smt::noodler::regex {
          * @param mata_alph The alphabet used for creating the transducer
          * @return The simultaneous transducer
          */
-        mata::nft::Nft create_transducer(mata::Alphabet* mata_alph);
+        mata::nft::Nft create_transducer(const Alphabet& mata_alph);
     };
 
     /**
@@ -289,7 +302,7 @@ namespace smt::noodler::regex {
      * @param[out] transducer_preds Newly created transducer constraints
      */
     void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, 
-        std::map<BasicTerm, expr_ref>& var_name, mata::Alphabet* mata_alph, Formula& transducer_preds);
+        std::map<BasicTerm, expr_ref>& var_name, const Alphabet& mata_alph, Formula& transducer_preds);
 
 }
 

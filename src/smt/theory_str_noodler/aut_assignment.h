@@ -260,12 +260,7 @@ namespace smt::noodler {
          * @return true Is complement of a finite language
          */
         bool is_co_finite(const BasicTerm& t) const {
-            mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : this->alphabet) {
-                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-            }
-
-            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
+            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), alphabet.get_mata_alphabet()));
             return cmp.trim().is_acyclic();
         }
 
@@ -407,11 +402,7 @@ namespace smt::noodler {
          * @return mata::nfa::Nfa 
          */
         mata::nfa::Nfa complement_aut(const mata::nfa::Nfa& aut) const {
-            mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : get_alphabet()) {
-                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-            }
-            return mata::nfa::complement(aut, mata_alphabet);
+            return mata::nfa::complement(aut, alphabet.get_mata_alphabet());
         }
 
         /**

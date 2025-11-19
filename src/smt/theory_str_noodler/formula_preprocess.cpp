@@ -1825,7 +1825,7 @@ namespace smt::noodler {
             }
             // TODO: for simplicity, we assume only one input variable in the concatenation. It could be generalized 
             // to multiple input variables by concatenating NFAs for them, removing epsilons and composing with the transducer.
-            if(pred.get_left_side().size() > 1) {
+            if(pred.get_left_side().size() > 1 || pred.get_left_side().empty()) {
                 continue;
             }
             mata::nft::Nft nft = *(trans[0]);

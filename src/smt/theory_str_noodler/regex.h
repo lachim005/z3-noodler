@@ -21,9 +21,7 @@
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
-#include "formula.h"
 #include "util.h"
-#include "aut_assignment.h"
 
 // FIXME most if not all these functions should probably be in theory_str_noodler
 

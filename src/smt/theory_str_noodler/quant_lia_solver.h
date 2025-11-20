@@ -42,7 +42,7 @@ namespace smt::noodler {
 
             // another options for a solver: mk_smt_solver(m, p, symbol("LIA")); (no tactic)
             // tactic solver used by z3 to solve quantified LIA formula
-            solver* sl = mk_tactic2solver(m, mk_lia_tactic(m, p), p, false, true, false, symbol("ALL"));
+            solver* sl = mk_tactic2solver(m, mk_lia_tactic(m, p), p, false, true, true, symbol("ALL"));
 
             erv.push_back(e);
             sl->assert_expr(erv);

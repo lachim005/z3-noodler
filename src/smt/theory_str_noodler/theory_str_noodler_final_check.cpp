@@ -765,7 +765,7 @@ namespace smt::noodler {
 
         // if the length formula has quantifiers --> use quant_lia_solver
         // TODO: the quant_lia_solver does not support UNSAT cores
-        if(expr_cases::has_quantifier(len_formula, m)) {
+        if(expr_cases::has_quantifier(len_formula, m) || this->input_has_quantifiers) {
             m_rewrite(len_formula);
             quant_lia_solver m_quant_int_solver(get_manager());
             m_quant_int_solver.initialize(get_context());

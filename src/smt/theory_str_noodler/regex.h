@@ -90,7 +90,7 @@ namespace smt::noodler::regex {
         bool empty() const { return alphabet.empty(); }
 
         void insert(const mata::Symbol s) {
-            SASSERT(s <= zstring::max_char() || s != util::get_dummy_symbol());
+            SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
             alphabet.insert(s);
             mata_alphabet.add_new_symbol(s);
         }

@@ -65,4 +65,11 @@ namespace smt::noodler {
             );
         }
     }
+
+    void int_expr_solver::get_unsat_core(expr_ref& dst) {
+        dst = m.mk_true();
+        for (unsigned i = 0; i < m_kernel.get_unsat_core_size(); ++i) {
+            dst = m.mk_and(dst, m_kernel.get_unsat_core_expr(i));
+        }
+    }
 }

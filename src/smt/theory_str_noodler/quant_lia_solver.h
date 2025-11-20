@@ -8,17 +8,20 @@
 #include "solver/tactic2solver.h"
 #include "smt/smt_solver.h"
 #include "tactic/smtlogics/quant_tactics.h"
+#include "smt/theory_str_noodler/lia_solver.h"
 
 namespace smt::noodler {
-    class quant_lia_solver {
+    class quant_lia_solver : public lia_solver {
     
     private:
         ast_manager& m;
         bool initialized;
         expr_ref_vector erv;
+        expr_ref_vector unsat_core;
+
     
     public:
-        quant_lia_solver(ast_manager& m) : m(m), erv(m) {
+        quant_lia_solver(ast_manager& m) : m(m), erv(m), unsat_core(m) {
             initialized=false;
         }
 
@@ -29,7 +32,7 @@ namespace smt::noodler {
          * @param e Length formula
          * @return lbool Satisfiability check result
          */
-        lbool check_sat(expr* e) {
+        lbool check_sat(expr* e) override {
             params_ref p;
             
             // parameters used by z3 for quantified LIA formulae
@@ -47,6 +50,7 @@ namespace smt::noodler {
             erv.push_back(e);
             sl->assert_expr(erv);
             auto res = sl->check_sat();
+            sl->get_unsat_core(unsat_core);
             erv.pop_back();
 
             return res;
@@ -59,7 +63,7 @@ namespace smt::noodler {
          * @param ctx Current context
          * @param include_ass Include the current assignment from the context?
          */
-        void initialize(context& ctx, bool include_ass = true) {
+        void initialize(context& ctx, bool include_ass = true) override {
             if(!initialized){
                 initialized=true;
                 expr_ref_vector Assigns(m);
@@ -81,6 +85,10 @@ namespace smt::noodler {
 
         void assert_expr(expr * e) {
             erv.push_back(e);
+        }
+
+        void get_unsat_core(expr_ref& dst) override {
+            dst = m.mk_and(unsat_core);
         }
     };
 }

@@ -397,6 +397,7 @@ lbool to_lbool(const std::string &status) {
         return l_undef;
     }
     FAIL("Unsupported :status value: " << status);
+    return l_undef;
 }
 
 std::vector<std::string> build_model_assertions(const std::vector<model_binding> &bindings) {

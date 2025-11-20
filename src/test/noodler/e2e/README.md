@@ -1,0 +1,14 @@
+# Noodler end-to-end tests
+
+Put SMT-LIB v2 testcases in this directory (sub-folders are allowed). Each
+smt2 file must:
+
+- contain exactly one `(set-info :status <sat|unsat|unknown>)` directive;
+- include at least one `(check-sat)` command (it is ignored during parsing and
+  re-issued by the harness).
+
+During testing, the harness rebuilds the command context, ignores user
+`check-sat` commands and invokes its own call to ensure the reported status
+matches `:status`. When the solver produces a model for a satisfiable script,
+the harness extracts that model from the solver output, asserts the bindings
+back into the script, and checks satisfiability again.

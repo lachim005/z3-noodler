@@ -16,6 +16,7 @@ if (Catch2_FOUND)
             main.cc
             inclusion-graph-node.cc
             theory_str_noodler.cc
+            end_to_end.cpp
             formula-preprocess.cpp
             decision-procedure.cpp
             parikh.cc

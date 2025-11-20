@@ -439,18 +439,20 @@ namespace smt::noodler {
          * @param ex Equation
          * @return true <-> is temporary transducer constraint
          */
-        bool is_tmp_transducer_eq(app* const ex);
+        [[nodiscard]] bool is_tmp_transducer_eq(app* const ex);
 
         /**
          * @brief Creates noodler formula containing relevant word equations and disequations
          * 
          * @param alph Set of symbols of the current instance (for transducer constraints)
          */
-        Formula get_formula_from_relevant(const std::set<mata::Symbol>& alph);
+        [[nodiscard]] Formula get_formula_from_relevant(const regex::Alphabet& alph);
+
         /**
          * @brief Get all symbols used in relevant word (dis)equations and memberships
          */
-        std::set<mata::Symbol> get_symbols_from_relevant();
+        [[nodiscard]] regex::Alphabet get_symbols_from_relevant();
+
         /**
          * Get automata assignment for formula @p instance using relevant memberships in m_membership_todo_rel.
          * As a side effect updates mapping of variables (BasicTerm) to the corresponding z3 expr and adds
@@ -458,21 +460,20 @@ namespace smt::noodler {
          * @param instance Formula containing (dis)equations
          * @param noodler_alphabet Set of symbols occuring in the formula and memberships
          */
-        [[nodiscard]] AutAssignment create_aut_assignment_for_formula(
-                Formula& instance,
-                const std::set<mata::Symbol>& noodler_alphabet
-        );
+        [[nodiscard]] AutAssignment create_aut_assignment_for_formula(Formula& instance, const regex::Alphabet& noodler_alphabet);
+
         /**
          * Get initial length variables as a set of @c BasicTerm from their expressions.
          */
         std::unordered_set<BasicTerm> get_init_length_vars(AutAssignment& ass);
+
         /**
          * @brief Get the conversions (to/from_int/code) with noodler variables
          * 
          * Side effect: string variables in conversions which are not mapped in the automata
          * assignment @p ass will be mapped to sigma* after this.
          */
-        std::vector<TermConversion> get_conversions_as_basicterms(AutAssignment &ass, const std::set<mata::Symbol>& noodler_alphabet);
+        std::vector<TermConversion> get_conversions_as_basicterms(AutAssignment &ass);
 
         /**
          * Solves relevant language (dis)equations from m_lang_eq_or_diseq_todo_rel. If some of them

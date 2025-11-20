@@ -289,6 +289,7 @@ namespace smt::noodler {
 
             /// Replaces transitions with dummy symbol in @c nft and @c transition_to_var by new transitions with the symbols from @p set_of_symbols_to_replace_dummy_symbol_with and maps them to the same var
             void replace_dummy_symbol(const std::set<mata::Symbol>& set_of_symbols_to_replace_dummy_symbol_with) {
+                if (set_of_symbols_to_replace_dummy_symbol_with.empty()) { return; }
                 if (set_of_symbols_to_replace_dummy_symbol_with.size() > 1) {
                     // TODO fix this? if we had more dummy symbols, for code-points vars, we can only have transitions with the correct code-point value
                     util::throw_error("We cannot replace dummy symbol by more than one symbol in transducers yet");

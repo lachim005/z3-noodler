@@ -113,10 +113,6 @@ namespace smt::noodler {
         bool contains_word_equations = !this->m_word_eq_todo_rel.empty();
         bool contains_word_disequations = !this->m_word_diseq_todo_rel.empty();
         bool contains_conversions = !this->m_conversion_todo.empty();
-        bool contains_int_conversion = false;
-        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_INT || c.type == ConversionType::TO_INT) { contains_int_conversion = true; break; } }
-        bool contains_real_conversion = false;
-        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_REAL || c.type == ConversionType::TO_REAL) { contains_real_conversion = true; break; } }
         bool contains_eqs_and_diseqs_only = this->m_not_contains_todo_rel.empty() && this->m_conversion_todo.empty();
 
         // nothing is trivially SAT
@@ -166,16 +162,7 @@ namespace smt::noodler {
         }
 
         // Gather symbols from relevant (dis)equations and from regular expressions of relevant memberships
-        std::set<mata::Symbol> symbols_in_formula = get_symbols_from_relevant();
-
-        // If we have to_int/from_int/to_real/from_real, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle the conversions
-        if (contains_int_conversion || contains_real_conversion) {
-            for (mata::Symbol s = AutAssignment::DIGIT_SYMBOL_START; s <= AutAssignment::DIGIT_SYMBOL_END; ++s) {
-                symbols_in_formula.insert(s);
-            }
-        }
-        // If we have to_real/from_real, we also add '.', so that decimal point is not represented by dummy symbol
-        if (contains_real_conversion) { symbols_in_formula.insert(AutAssignment::REAL_NUMBER_DELIMITER); }
+        regex::Alphabet symbols_in_formula = get_symbols_from_relevant();
 
         // Gather relevant word (dis)equations (and transducers that occur in them) to noodler formula
         Formula instance = get_formula_from_relevant(symbols_in_formula);
@@ -185,7 +172,7 @@ namespace smt::noodler {
 
         bool contains_transducers = instance.contains_pred_type(PredicateType::Transducer);
 
-        std::vector<TermConversion> conversions = get_conversions_as_basicterms(aut_assignment, symbols_in_formula);
+        std::vector<TermConversion> conversions = get_conversions_as_basicterms(aut_assignment);
 
         for (const auto& [var, nfa] : aut_assignment) {
             relevant_vars.insert(var);
@@ -506,13 +493,8 @@ namespace smt::noodler {
         return false;
     }
 
-    Formula theory_str_noodler::get_formula_from_relevant(const std::set<mata::Symbol>& alph) {
+    Formula theory_str_noodler::get_formula_from_relevant(const regex::Alphabet& alph) {
         Formula instance;
-        // create mata alphabet for transducer constraints
-        mata::EnumAlphabet mata_alph{};
-        for(const mata::Symbol& symb : alph) {
-            mata_alph.add_new_symbol(symb);
-        }
 
         for (const auto &we: this->m_word_eq_todo_rel) {
             // ignore trivial equations obtained from axiomatization of 
@@ -525,16 +507,16 @@ namespace smt::noodler {
             }
             Predicate inst = this->conv_eq_pred(ctx.mk_eq_atom(we.first, we.second));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
-            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
+            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
             instance.add_predicate(inst);
         }
 
         for (const auto& wd : this->m_word_diseq_todo_rel) {
             Predicate inst = this->conv_eq_pred(m.mk_not(ctx.mk_eq_atom(wd.first, wd.second)));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
-            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
+            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
             instance.add_predicate(inst);
         }
 
@@ -544,26 +526,26 @@ namespace smt::noodler {
             util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, left);
             util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, right);
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
-            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
             Predicate inst = Predicate::create_not_contains(left, right);
             instance.add_predicate(inst);
         }
 
         for (const auto& conv : this->m_conversion_todo) {
-            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
+            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
         }
 
         for (const auto& len: len_vars) {
-            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alph, instance);
+            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
         }
 
         return instance;
     }
 
-    std::set<mata::Symbol> theory_str_noodler::get_symbols_from_relevant() {
+    regex::Alphabet theory_str_noodler::get_symbols_from_relevant() {
         // start with symbol representing everything not in formula
-        std::set<mata::Symbol> symbols_in_formula{util::get_dummy_symbol()};
+        regex::Alphabet symbols_in_formula{};
 
         for (const auto &word_equation: m_word_eq_todo_rel) {
             regex::extract_symbols(word_equation.first, m_util_s, symbols_in_formula);
@@ -584,17 +566,29 @@ namespace smt::noodler {
             regex::extract_symbols(not_contains.second, m_util_s, symbols_in_formula);
         }
 
+        bool contains_int_conversion = false;
+        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_INT || c.type == ConversionType::TO_INT) { contains_int_conversion = true; break; } }
+        bool contains_real_conversion = false;
+        for (const auto& c : m_conversion_todo) { if (c.type == ConversionType::FROM_REAL || c.type == ConversionType::TO_REAL) { contains_real_conversion = true; break; } }
+
+        // If we have to_int/from_int/to_real/from_real, we keep digits (0-9) as explicit symbols, so that they are not represented by dummy_symbol and it is easier to handle the conversions
+        if (contains_int_conversion || contains_real_conversion) {
+            for (mata::Symbol s = AutAssignment::DIGIT_SYMBOL_START; s <= AutAssignment::DIGIT_SYMBOL_END; ++s) {
+                symbols_in_formula.insert(s);
+            }
+        }
+        // If we have to_real/from_real, we also add '.', so that decimal point is not represented by dummy symbol
+        if (contains_real_conversion) { symbols_in_formula.insert(AutAssignment::REAL_NUMBER_DELIMITER); }
+
+        // we also insert dummy symbol representing all symbols NOT occurring in formula (but only if we do not have ALL symbols in formula)
+        symbols_in_formula.insert_dummy_if_not_full();
+
         return symbols_in_formula;
     }
 
-    AutAssignment theory_str_noodler::create_aut_assignment_for_formula(
-            Formula& instance,
-            const std::set<mata::Symbol>& noodler_alphabet
-    ) {
-        AutAssignment aut_assignment{};
-        aut_assignment.set_alphabet(noodler_alphabet);
-        regex::Alphabet alph(noodler_alphabet);
-        mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
+    AutAssignment theory_str_noodler::create_aut_assignment_for_formula(Formula& instance, const regex::Alphabet& noodler_alphabet) {
+        AutAssignment aut_assignment{noodler_alphabet};
+        const regex::Alphabet &alph = aut_assignment.get_alphabet();
         for (const auto &membership: m_membership_todo_rel) {
             const expr_ref& var_expr{ std::get<0>(membership) };
             assert(is_app(var_expr));
@@ -624,13 +618,11 @@ namespace smt::noodler {
             }
 
             // we also need to gather transducer constraints for the var
-            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, this->var_name, &mata_alphabet, instance);
+            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
         }
 
         // create sigma star automaton for our alphabet
-        auto nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&mata_alphabet));
-        // remove the pointer to alphabet in the automaton, as it points to local variable (and we have the alphabet in aut_assignment)
-        nfa_sigma_star->alphabet = nullptr;
+        std::shared_ptr<mata::nfa::Nfa> nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(aut_assignment.sigma_star_automaton());
 
         // some variables/literals are not assigned to anything yet, we need to fix that
         for (const auto &pred : instance.get_predicates()) {
@@ -670,9 +662,8 @@ namespace smt::noodler {
         return init_lengths;
     }
 
-    std::vector<TermConversion> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass, const std::set<mata::Symbol>& noodler_alphabet) {
-        mata::EnumAlphabet mata_alphabet(noodler_alphabet.begin(), noodler_alphabet.end());
-        auto nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&mata_alphabet));
+    std::vector<TermConversion> theory_str_noodler::get_conversions_as_basicterms(AutAssignment& ass) {
+        std::shared_ptr<mata::nfa::Nfa> nfa_sigma_star = std::make_shared<mata::nfa::Nfa>(ass.sigma_star_automaton());
 
         std::vector<TermConversion> conversions;
         for (const auto& transf : m_conversion_todo) {
@@ -702,10 +693,9 @@ namespace smt::noodler {
             );
 
             // get symbols from both sides
-            std::set<uint32_t> alphabet;
-            regex::extract_symbols(left_side, m_util_s, alphabet);
-            regex::extract_symbols(right_side, m_util_s, alphabet);
-            regex::Alphabet alph(alphabet);
+            regex::Alphabet alph;
+            regex::extract_symbols(left_side, m_util_s, alph);
+            regex::extract_symbols(right_side, m_util_s, alph);
 
             // construct NFAs for both sides
             mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );

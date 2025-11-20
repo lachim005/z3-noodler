@@ -301,6 +301,7 @@ namespace smt::noodler::util {
     }
 
     void replace_dummy_symbol_in_transducer_with(mata::nft::Nft& transducer, const std::set<mata::Symbol>& symbols_to_replace_with) {
+        if (symbols_to_replace_with.empty()) { return; }
         if (symbols_to_replace_with.size() > 1) {
             // different transitions with dummy symbol can be connected, i.e. they should have the same symbol, if we would replace
             // by multiple symbols, it would allow situations where the transitions have different symbols on them

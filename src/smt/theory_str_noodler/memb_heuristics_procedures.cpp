@@ -24,15 +24,15 @@ namespace smt::noodler {
                 // the universal automaton (as complementation can blow up)
 
                 // create alphabet (start with minterm representing symbols not ocurring in the regex)
-                std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
-                regex::extract_symbols(regex, m_util_s, symbols_in_regex);
-                regex::Alphabet alph(symbols_in_regex);
+                regex::Alphabet alph;
+                regex::extract_symbols(regex, m_util_s, alph);
+                alph.insert_dummy_if_not_full();
 
                 mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
 
                 if (produce_model) {
                     mata::nfa::Run model_run;
-                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.mata_alphabet, &model_run)) {
+                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.get_mata_alphabet(), &model_run)) {
                         // x does not belong to universal automaton -> it must be unsat
                         return l_false;
                     } else {
@@ -41,7 +41,7 @@ namespace smt::noodler {
                         return l_true;
                     }
                 } else {
-                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.mata_alphabet, nullptr)) {
+                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.get_mata_alphabet(), nullptr)) {
                         return l_false;
                     } else {
                         return l_true;
@@ -69,9 +69,9 @@ namespace smt::noodler {
         // TODO try handling also complement of regex directly
 
         // create alphabet (start with minterm representing symbols not ocurring in the regex)
-        std::set<mata::Symbol> symbols_in_regex{util::get_dummy_symbol()};
-        regex::extract_symbols(regex, m_util_s, symbols_in_regex);
-        regex::Alphabet alph(symbols_in_regex);
+        regex::Alphabet alph;
+        regex::extract_symbols(regex, m_util_s, alph);
+        alph.insert_dummy_if_not_full();
 
         mata::nfa::Nfa reg_nfa = regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false);
 
@@ -79,7 +79,7 @@ namespace smt::noodler {
         if (is_regex_positive) {
             word = reg_nfa.get_word().value();
         } else {
-            word = reg_nfa.get_word_from_complement(&alph.mata_alphabet).value();
+            word = reg_nfa.get_word_from_complement(&alph.get_mata_alphabet()).value();
         }
         return alph.get_string_from_mata_word(word);
     }
@@ -104,7 +104,7 @@ namespace smt::noodler {
             // Compute intersection L of all regexes that should not be complemented
             mata::nfa::Nfa intersection(1, {0}, {0});
             // initalize to universal automaton
-            for (const mata::Symbol& symb : alph.alphabet) {
+            for (const mata::Symbol& symb : alph) {
                 intersection.delta.add(0, symb, 0);
             }
 

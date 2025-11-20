@@ -14,6 +14,7 @@
 #include <mata/nfa/builder.hh>
 
 #include "formula.h"
+#include "regex.h"
 
 namespace smt::noodler {
 
@@ -28,7 +29,7 @@ namespace smt::noodler {
 
     private:
         /// Union of all alphabets of automata in the aut assignment
-        std::set<mata::Symbol> alphabet;
+        regex::Alphabet alphabet;
 
         void update_alphabet() {
             this->alphabet.clear();
@@ -40,6 +41,8 @@ namespace smt::noodler {
 
     public:
         using std::unordered_map<BasicTerm, std::shared_ptr<mata::nfa::Nfa>>::unordered_map;
+
+        AutAssignment(regex::Alphabet alph) : alphabet(std::move(alph)) { }
 
         // used for tests, do not use normally
         AutAssignment(std::map<BasicTerm, mata::nfa::Nfa> val) {
@@ -224,25 +227,17 @@ namespace smt::noodler {
             }
         }
 
-        const std::set<mata::Symbol>& get_alphabet() const {
+        const regex::Alphabet& get_alphabet() const {
             return this->alphabet;
         }
 
-        void set_alphabet(const std::set<uint32_t>& alphabet) {
-            this->alphabet.clear();
-            for (const auto& symbol : alphabet) {
-                this->alphabet.insert(symbol);
-            }
+        void set_alphabet(regex::Alphabet alph) {
+            this->alphabet = std::move(alph);
         }
 
         void add_symbol_to_alphabet(mata::Symbol s) {
             this->alphabet.insert(s);
         }
-
-        mata::Symbol add_fresh_symbol_to_alphabet();
-
-        /// @brief Add symbol @p s to alphabet and removes it from dummy symbol (i.e. adds transitions trough @p s in all automata if there is transition trough dummy symbol)
-        void add_symbol_from_dummy(mata::Symbol s);
 
         bool replace_dummy_with_symbols(std::set<mata::Symbol> symbols);
 
@@ -260,12 +255,7 @@ namespace smt::noodler {
          * @return true Is complement of a finite language
          */
         bool is_co_finite(const BasicTerm& t) const {
-            mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : this->alphabet) {
-                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-            }
-
-            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), mata_alphabet));
+            mata::nfa::Nfa cmp = mata::nfa::minimize(mata::nfa::complement(*(*this).at(t), alphabet.get_mata_alphabet()));
             return cmp.trim().is_acyclic();
         }
 
@@ -407,11 +397,7 @@ namespace smt::noodler {
          * @return mata::nfa::Nfa 
          */
         mata::nfa::Nfa complement_aut(const mata::nfa::Nfa& aut) const {
-            mata::OnTheFlyAlphabet mata_alphabet{};
-            for (const auto& symbol : get_alphabet()) {
-                mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
-            }
-            return mata::nfa::complement(aut, mata_alphabet);
+            return mata::nfa::complement(aut, alphabet.get_mata_alphabet());
         }
 
         /**

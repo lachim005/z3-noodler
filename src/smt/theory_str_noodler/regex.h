@@ -21,9 +21,7 @@
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
-#include "formula.h"
 #include "util.h"
-#include "aut_assignment.h"
 
 // FIXME most if not all these functions should probably be in theory_str_noodler
 
@@ -53,13 +51,83 @@ namespace smt::noodler::regex {
     /**
      * @brief Alphabet wrapper for Z3 alphabet represented by std::set<mata::Symbol> and a Mata alphabet.
      */
-    struct Alphabet {
+    class Alphabet {
+    private:
         std::set<mata::Symbol> alphabet;
-        mata::OnTheFlyAlphabet mata_alphabet;
+        mata::EnumAlphabet mata_alphabet;
+
+    public:
+        Alphabet() = default;
+        Alphabet(const Alphabet&) = default;
+        Alphabet(Alphabet&&) = default;
+        Alphabet& operator=(const Alphabet&) = default;
+        Alphabet& operator=(Alphabet&&) = default;
+
+        Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
+            for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
+                alphabet.insert(s);
+            }
+        }
         
-        Alphabet(const std::set<mata::Symbol>& alph) : alphabet(alph) {
-            for (const auto& symbol : alph) {
-                this->mata_alphabet.add_new_symbol(std::to_string(symbol), symbol);
+        Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
+            for (const auto& symbol : alphabet) {
+                this->mata_alphabet.add_new_symbol(symbol);
+            }
+        }
+
+        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { }
+
+        const std::set<mata::Symbol>& get_set_alphabet() const { return alphabet; }
+        const mata::EnumAlphabet& get_mata_alphabet() const { return mata_alphabet; }
+
+        void clear() {
+            alphabet.clear();
+            mata_alphabet.clear();
+        }
+
+        size_t size() const { return alphabet.size(); }
+
+        bool empty() const { return alphabet.empty(); }
+
+        void insert(const mata::Symbol s) {
+            SASSERT(s <= zstring::max_char() || s != util::get_dummy_symbol());
+            alphabet.insert(s);
+            mata_alphabet.add_new_symbol(s);
+        }
+
+        template<class InputIt>
+        void insert(InputIt first, InputIt last) {
+            static_assert(std::is_convertible_v<typename std::iterator_traits<InputIt>::value_type, mata::Symbol>,
+                "Iterator must yield mata::Symbol or a type convertible to mata::Symbol");
+
+            for (; first != last; ++first) { insert(*first); }
+        }
+
+        bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
+
+        void erase(const mata::Symbol s) {
+            alphabet.erase(s);
+            mata_alphabet.erase(s);
+        }
+
+        using const_iterator = std::set<mata::Symbol>::const_iterator;
+
+        const_iterator begin() const { return alphabet.cbegin(); }
+        const_iterator end() const { return alphabet.cend(); }
+        const_iterator cbegin() const { return alphabet.cbegin(); }
+        const_iterator cend() const { return alphabet.cend(); }
+
+        bool is_full () const {
+            if (contains(util::get_dummy_symbol())) { return size() == zstring::max_char()+2; }
+            else { return size() == zstring::max_char()+1; }
+        }
+
+        bool insert_dummy_if_not_full() {
+            if (is_full()) {
+                return false;
+            } else {
+                insert(util::get_dummy_symbol());
+                return true;
             }
         }
 
@@ -69,8 +137,11 @@ namespace smt::noodler::regex {
         /// @brief Return zstring corresponding the the word @p word, where dummy symbol is replaced with some valid symbol not in the alphabet.
         zstring get_string_from_mata_word(mata::Word word) const {
             zstring res;
-            mata::Symbol unused_symbol = get_unused_symbol();
-            std::replace(word.begin(), word.end(), util::get_dummy_symbol(), unused_symbol);
+            if (std::ranges::find(word, util::get_dummy_symbol()) != word.end()) {
+                SASSERT(alphabet.contains(util::get_dummy_symbol()));
+                mata::Symbol unused_symbol = get_unused_symbol();
+                std::replace(word.begin(), word.end(), util::get_dummy_symbol(), unused_symbol);
+            }
             return zstring(word.size(), word.data());
         }
     };
@@ -81,7 +152,7 @@ namespace smt::noodler::regex {
      * @param[in] m_util_s Seq util for AST.
      * @param[out] alphabet A set of symbols with where found symbols are appended to.
      */
-    void extract_symbols(expr* const ex, const seq_util& m_util_s, std::set<uint32_t>& alphabet);
+    void extract_symbols(expr* const ex, const seq_util& m_util_s, Alphabet& alphabet);
 
     /**
      * Convert expression @p expr to NFA.
@@ -223,7 +294,7 @@ namespace smt::noodler::regex {
          * @param mata_alph The alphabet used for creating the transducer
          * @return The simultaneous transducer
          */
-        mata::nft::Nft create_transducer(mata::Alphabet* mata_alph);
+        mata::nft::Nft create_transducer(const Alphabet& mata_alph);
     };
 
     /**
@@ -239,7 +310,7 @@ namespace smt::noodler::regex {
      * @param[out] transducer_preds Newly created transducer constraints
      */
     void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, 
-        std::map<BasicTerm, expr_ref>& var_name, mata::Alphabet* mata_alph, Formula& transducer_preds);
+        std::map<BasicTerm, expr_ref>& var_name, const Alphabet& mata_alph, Formula& transducer_preds);
 
 }
 

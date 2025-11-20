@@ -2288,19 +2288,14 @@ void seq_rewriter::replace_all_subvectors(expr_ref_vector const& a, expr_ref_vec
 br_status seq_rewriter::replace_re_version(expr* a, expr* b, expr* c, expr_ref& result, bool is_all_version) {
     zstring s1, s2;
     if (str().is_string(a, s1) && str().is_string(c, s2) && u().is_re(b)) {
-        std::set<mata::Symbol> symbols;
-        smt::noodler::regex::extract_symbols(a, u(), symbols);
-        smt::noodler::regex::extract_symbols(b, u(), symbols);
-        smt::noodler::regex::Alphabet alph(symbols);
-        mata::EnumAlphabet mata_alph{};
-        for(const mata::Symbol& symb : symbols) {
-            mata_alph.add_new_symbol(symb);
-        }
+        smt::noodler::regex::Alphabet alph;
+        smt::noodler::regex::extract_symbols(a, u(), alph);
+        smt::noodler::regex::extract_symbols(b, u(), alph);
         mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(b), u(), m(), alph); // this should throw error/unknown if b is a regex variable (so we can assume it is regex constant)
         mata::nft::Nft transducer = mata::applications::strings::replace::replace_reluctant_regex(
                                             mata::nfa::determinize(find_nfa),
                                             smt::noodler::util::get_mata_word_zstring(s2),
-                                            &mata_alph,
+                                            &alph.get_mata_alphabet(),
                                             is_all_version ?
                                                 mata::applications::strings::replace::ReplaceMode::All :
                                                 mata::applications::strings::replace::ReplaceMode::Single);

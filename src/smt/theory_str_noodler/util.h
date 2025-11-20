@@ -22,6 +22,7 @@
 #include "util/union_find.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
+#include "ast/for_each_expr.h"
 
 #include "formula.h"
 
@@ -233,6 +234,30 @@ namespace smt::noodler::util {
      * @param[out] var_name Mapping from BasicTerm to the original variable expr; populated/updated by this call.
      */
     void add_vars_to_map(app *const ex, ast_manager& m, const seq_util& m_util_s, std::map<BasicTerm, expr_ref>& var_name);
+
+    /**
+     * @brief Check whether an expression contains bound (quantified) variables.
+     *
+     * Inspects the AST rooted at @p e and returns true if it finds any variables
+     * that are bound by quantifiers (i.e., variables introduced by `forall`/`exists`).
+     *
+     * @param m AST manager used for traversal.
+     * @param e Expression to inspect.
+     * @return true if the expression contains quantified (bound) variables, false otherwise.
+     */
+    bool has_quanfied_vars(ast_manager& m, expr* e);
+
+    /**
+     * @brief Check whether an expression contains quantifier nodes.
+     *
+     * Traverses the AST rooted at @p e and returns true if any quantifier nodes
+     * (`forall` or `exists`) are present anywhere in the expression.
+     *
+     * @param m AST manager used for traversal.
+     * @param e Expression to inspect.
+     * @return true if the expression contains any quantifiers, false otherwise.
+     */
+    bool has_quantifiers(ast_manager& m, expr* e);
 }
 
 #endif

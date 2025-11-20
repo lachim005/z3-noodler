@@ -40,7 +40,12 @@ namespace smt::noodler {
             TRACE(str, tout << "Last run was sat on scope level " << scope_with_last_run_was_sat << "\n";);
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
-                add_axiom(sat_length_formula);
+                if(this->input_has_quantifiers) {
+                    ctx.assert_expr(sat_length_formula);
+                    ctx.internalize_assertions();
+                } else {
+                    add_axiom(sat_length_formula);
+                }
             }
             return FC_DONE;
         }
@@ -1134,7 +1139,12 @@ namespace smt::noodler {
             // WARNING: the model generation is not supported for tag automata stuff. 
             // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
             // (so-far the internal solver timeouts with quntified axioms)
-            add_axiom(length_formula);
+            if(this->input_has_quantifiers) {
+                ctx.assert_expr(sat_length_formula);
+                ctx.internalize_assertions();
+            } else {
+                add_axiom(sat_length_formula);
+            }
         }
     }
 

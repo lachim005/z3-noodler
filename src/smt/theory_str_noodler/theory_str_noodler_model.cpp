@@ -1,5 +1,6 @@
 #include "smt/smt_context.h"
 #include "smt/smt_model_generator.h"
+#include "model/seq_factory.h"
 
 #include "theory_str_noodler.h"
 #include "decision_procedure.h"
@@ -45,8 +46,12 @@ namespace smt::noodler {
                 STRACE(str_model, tout << "Arith model of " << needed_vars[i] << " is " << val << std::endl;);
                 var_to_arith_model[needed_vars[i]] = val;
             }
-
-            return th.m_util_s.str.mk_string(th.dec_proc->get_model(str_var, var_to_arith_model));
+            zstring s = th.dec_proc->get_model(str_var, var_to_arith_model);
+            expr* v = th.m_util_s.str.mk_string(s);
+            if (th.m_seq_factory) {
+                th.m_seq_factory->register_value(v);
+            }
+            return to_app(v);
         }
     };
 
@@ -74,7 +79,18 @@ namespace smt::noodler {
     
         app * mk_value(model_generator & m, expr_ref_vector const & values) override {
             if (!length_relevant) {
-                // because the length is not relevant, we can return anything, so we return empty string
+                // because the length is not relevant, we can return any string; let the
+                // standard sequence factory pick a fresh value when available, to avoid
+                // collapsing the string universe to a single element.
+                // try to obtain the seq_factory from the proto_model owned by
+                // the model generator and use it to pick a fresh string value
+                // when available.
+                proto_model& mdl = m.get_model();
+                value_factory* vf = mdl.get_factory(m_util_s.get_family_id());
+                if (auto* f = dynamic_cast<seq_factory*>(vf)) {
+                    expr* v = f->get_fresh_value(m_util_s.str.mk_string_sort());
+                    return to_app(v);
+                }
                 return m_util_s.str.mk_string(zstring());
             } else {
                 // values[0] contain the length of str_var, so we return some string of this length
@@ -82,8 +98,15 @@ namespace smt::noodler {
                 rational val(0);
                 SASSERT(values.size() == 1);
                 VERIFY(m_util_a.is_numeral(values[0], val, is_int) && is_int);
-                std::vector<unsigned> res(val.get_unsigned(), 'a'); // we can return anything, so we will just fill it with 'a'
-                return m_util_s.str.mk_string(zstring(res.size(), res.data()));
+                unsigned len = val.get_unsigned();
+                std::vector<unsigned> res(len, 'a');
+                expr* v = m_util_s.str.mk_string(zstring(res.size(), res.data()));
+                proto_model& mdl = m.get_model();
+                value_factory* vf = mdl.get_factory(m_util_s.get_family_id());
+                if (auto* f = dynamic_cast<seq_factory*>(vf)) {
+                    f->register_value(v);
+                }
+                return to_app(v);
             }
         }
     };
@@ -124,7 +147,13 @@ namespace smt::noodler {
                 VERIFY(m_util_s.str.is_string(value, value_string));
                 res = res + value_string;
             }
-            return m_util_s.str.mk_string(res);
+            expr* v = m_util_s.str.mk_string(res);
+            proto_model& mdl = m.get_model();
+            value_factory* vf = mdl.get_factory(m_util_s.get_family_id());
+            if (auto* f = dynamic_cast<seq_factory*>(vf)) {
+                f->register_value(v);
+            }
+            return to_app(v);
         }
     };
 
@@ -208,9 +237,15 @@ namespace smt::noodler {
 
     void theory_str_noodler::init_model(model_generator &mg) {
         STRACE(str, tout << "init_model\n");
+        if (!m_seq_factory) {
+            m_seq_factory = alloc(seq_factory, m, m_util_s.get_family_id(), mg.get_model());
+            mg.register_factory(m_seq_factory);
+        }
     }
 
     void theory_str_noodler::finalize_model(model_generator &mg) {
         STRACE(str, tout << "finalize_model\n";);
+        // factory lifetime is managed by the model; just clear our pointer
+        m_seq_factory = nullptr;
     }
 }

@@ -140,6 +140,7 @@ namespace smt::noodler {
         for (unsigned i = 0; i < nFormulas; ++i) {
             STRACE(str_init_formula, tout << "Initial asserted formula " << i << ": " << expr_ref(ctx.get_asserted_formula(i), m) << std::endl;);
             expr *ex = ctx.get_asserted_formula(i);
+            this->input_has_quantifiers |= util::has_quantifiers(m, ex);
             if (!add_len_num_axioms(ex)) {
                 obj_hashtable<app> lens;
                 util::get_len_exprs(ctx.get_asserted_formula(i), m_util_s, m, lens);
@@ -157,41 +158,40 @@ namespace smt::noodler {
 
     }
 
-    void theory_str_noodler::string_theory_propagation(expr *expr, bool init, bool neg, bool var_lengths) {
+    void theory_str_noodler::string_theory_propagation(expr *ex, bool init, bool neg, bool var_lengths) {
         STRACE(str, tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
-        STRACE(str_propagation, tout << mk_pp(expr, get_manager()) << std::endl;);
+        STRACE(str_propagation, tout << mk_pp(ex, get_manager()) << std::endl;);
 
         context &ctx = get_context();
-
-        if (!ctx.e_internalized(expr)) {
+        if (!ctx.e_internalized(ex)) {
             // expr might be in a logical context (e.g., and, or, not)
-            ctx.internalize(expr, true);
+            ctx.internalize(ex, true);
         }
         //We do not mark the expression as relevant since we do not want bias a
         //fresh SAT solution by the newly added theory axioms.
         // enode *n = ctx.get_enode(expr);
         // ctx.mark_as_relevant(n);
 
-        if(m.is_not(expr)) {
+        if(m.is_not(ex)) {
             neg = !neg;
         }
 
         // TODO weird, we have to do it because inequations are handled differently as equations, and they might not have been set as relevant
-        if(init && m.is_eq(expr) && neg) {
-            ctx.mark_as_relevant(m.mk_not(expr));
+        if(init && m.is_eq(ex) && neg) {
+            ctx.mark_as_relevant(m.mk_not(ex));
         }
         // we need to propagate all string predicates (including their negated forms) before the actual solve (in init_search), because we need to ensure these axioms are 
         // generated only once on the decision level 0 (if they are generated on a higher level, they can cause looping for some reason)
         if(init && (
-                m_util_s.str.is_prefix(expr) ||
-                m_util_s.str.is_suffix(expr) ||
-                m_util_s.str.is_contains(expr) ||
-                m_util_s.str.is_is_digit(expr)
+                m_util_s.str.is_prefix(ex) ||
+                m_util_s.str.is_suffix(ex) ||
+                m_util_s.str.is_contains(ex) ||
+                m_util_s.str.is_is_digit(ex)
                 // we cannot do it for conversions (and for string inequalities which lead to to_code conversions) because otherwise all conversions become relevant and there is a degradation on benchmarks
                 // (this degradation should not happen for other predicates, because they are transformed into simpler atoms such as equation, regular membership... whose relevancy we can check when it is needed)
             )) {
-            if(neg) ctx.mark_as_relevant(m.mk_not(expr));
-            else ctx.mark_as_relevant(expr);
+            if(neg) ctx.mark_as_relevant(m.mk_not(ex));
+            else ctx.mark_as_relevant(ex);
         }
 
         // in the initialization phase, we need to mark all string terms as relevant. We want to 
@@ -199,35 +199,35 @@ namespace smt::noodler {
         // on higher decision level than 0 (otherwise the axioms are lost).
         // String propagation of the input formula works on level 0.
         if(init && (
-            m_util_s.str.is_index(expr) || 
-            m_util_s.str.is_at(expr) ||
-            m_util_s.str.is_extract(expr) ||
-            m_util_s.str.is_replace(expr) || 
-            m_util_s.str.is_replace_all(expr) ||
-            m_util_s.str.is_replace_re_all(expr)
+            m_util_s.str.is_index(ex) || 
+            m_util_s.str.is_at(ex) ||
+            m_util_s.str.is_extract(ex) ||
+            m_util_s.str.is_replace(ex) || 
+            m_util_s.str.is_replace_all(ex) ||
+            m_util_s.str.is_replace_re_all(ex)
         )) {
-            ctx.mark_as_relevant(expr);
+            ctx.mark_as_relevant(ex);
         }
 
         // Check if we already axiomatized the expr
-        if (propagated_string_theory.contains(expr)) {
+        if (propagated_string_theory.contains(ex)) {
             return;
         }     
-        propagated_string_theory.insert(expr);
+        propagated_string_theory.insert(ex);
 
-        sort *expr_sort = expr->get_sort();
+        sort *expr_sort = ex->get_sort();
         sort *str_sort = m_util_s.str.mk_string_sort();
 
         if (expr_sort == str_sort) {
-            enode *n = ctx.get_enode(expr);
+            enode *n = ctx.get_enode(ex);
             propagate_basic_string_axioms(n, var_lengths);
-            if (is_app(expr) && m_util_s.str.is_concat(to_app(expr))) {
+            if (is_app(ex) && m_util_s.str.is_concat(to_app(ex))) {
                 propagate_concat_axiom(n);
             }
         }
         // if expr is an application, recursively inspect all arguments
-        if (is_app(expr) && !m_util_s.str.is_length(expr)) {
-            app *term = to_app(expr);
+        if (is_app(ex) && !m_util_s.str.is_length(ex)) {
+            app *term = to_app(ex);
             unsigned num_args = term->get_num_args();
             for (unsigned i = 0; i < num_args; i++) {
                 string_theory_propagation(term->get_arg(i), init, neg, var_lengths);

@@ -766,31 +766,37 @@ namespace smt::noodler {
             return l_true;
         }
 
-        std::unique_ptr<lia_solver> solver;
         if (expr_cases::has_quantifier(len_formula, m) || this->input_has_quantifiers) {
             m_rewrite(len_formula);
-            auto quant_solver = std::make_unique<quant_lia_solver>(get_manager());
-            quant_solver->initialize(get_context());
-            solver = std::move(quant_solver);
+            quant_lia_solver solver(get_manager());
+            solver.initialize(get_context());
+            lbool ret = solver.check_sat(len_formula);
+            STRACE(str, tout << "ret (quant): " << ret << std::endl;);
+            if (unsat_core != nullptr) {
+                expr_ref solver_core(m);
+                solver_core = m.mk_true();
+                solver.get_unsat_core(solver_core);
+                *unsat_core = m.mk_and(*unsat_core, solver_core);
+            }
+            return ret;
         } else {
-            auto int_solver = std::make_unique<int_expr_solver>(get_manager(), get_fparams());
+            int_expr_solver solver(get_manager(), get_fparams());
             // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
             bool include_ass = true;
             if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
                 include_ass = false;
             }
-            int_solver->initialize(get_context(), include_ass);
-            solver = std::move(int_solver);
-        }
 
-        lbool ret = solver->check_sat(len_formula);
-        if (unsat_core != nullptr) {
-            expr_ref solver_core(m);
-            solver_core = m.mk_true();
-            solver->get_unsat_core(solver_core);
-            *unsat_core = m.mk_and(*unsat_core, solver_core);
+            solver.initialize(get_context(), include_ass);
+            lbool ret = solver.check_sat(len_formula);
+            if (unsat_core != nullptr) {
+                expr_ref solver_core(m);
+                solver_core = m.mk_true();
+                solver.get_unsat_core(solver_core);
+                *unsat_core = m.mk_and(*unsat_core, solver_core);
+            }
+            return ret;
         }
-        return ret;
     }
 
     void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {

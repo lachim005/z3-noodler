@@ -1,4 +1,5 @@
 #include <queue>
+#include <random>
 #include <utility>
 #include <algorithm>
 #include <functional>
@@ -572,6 +573,8 @@ namespace smt::noodler {
                                                                     false,
                                                                     {{"reduce", "forward"}});
 
+        auto rng = std::default_random_engine{};
+        std::shuffle(noodles.begin(), noodles.end(), rng);
         for (const auto &noodle : noodles) {
             util::check_limit(m);
             STRACE(str, tout << "Processing noodle" << (is_trace_enabled(TraceTag::str_nfa) ? " with automata:" : "") << std::endl;);
@@ -746,6 +749,8 @@ namespace smt::noodler {
         SASSERT(output_vars_divisions.size() == output_vars.size());
 
         std::vector<mata::applications::strings::seg_nfa::TransducerNoodle> noodles = mata::applications::strings::seg_nfa::noodlify_for_transducer(transducer_to_process.get_transducer(), input_vars_automata, output_vars_automata, true, m_params.m_homomorphism_heuristic);
+        auto rng = std::default_random_engine{};
+        std::shuffle(noodles.begin(), noodles.end(), rng);
         for (const auto& noodle : noodles) {
             util::check_limit(m);
             // each noodle is a vector of tuples (T,i,Ai,o,Ao) where

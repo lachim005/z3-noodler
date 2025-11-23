@@ -5068,6 +5068,8 @@ br_status seq_rewriter::mk_re_union(expr* a, expr* b, expr_ref& result) {
     // we take largest i, i<n, i<m, where for each j<=i we have Aj = Bj.
     // We can then return
     //      A1.A2.A3....Ai.(re.union A_{i+1}...An B_{i+1}...Bm)
+    // If i==n (and similarly i==m), we return
+    //      A1.A2.A3....Ai.(re.union \eps B_{i+1}...Bm)
     if (re().is_union(result, a, b)) {
         ptr_vector<expr> a_args;
         ptr_vector<expr> b_args;
@@ -5079,23 +5081,22 @@ br_status seq_rewriter::mk_re_union(expr* a, expr* b, expr_ref& result) {
                 for (size_t j = 1; j < i; ++j) {
                     result = re().mk_concat(result, a_args[j]);
                 }
-                if (i == a_args.size()) {
-                    for (size_t j = i; j < b_args.size(); ++j) {
-                        result = re().mk_concat(result, b_args[j]);
-                    }
-                } else if (i == b_args.size()) {
-                    for (size_t j = i; j < a_args.size(); ++j) {
-                        result = re().mk_concat(result, a_args[j]);
-                    }
-                } else {
-                    expr_ref concat_suffix_a(a_args[i], m());
-                    for (size_t j = i+1; j < a_args.size(); ++j) {
-                        concat_suffix_a = re().mk_concat(concat_suffix_a, a_args[j]);
-                    }
-                    expr_ref concat_suffix_b(b_args[i], m());
-                    for (size_t j = i+1; j < b_args.size(); ++j) {
-                        concat_suffix_b = re().mk_concat(concat_suffix_b, b_args[j]);
-                    }
+
+                if (i != a_args.size() || i != b_args.size()) {
+                    auto re_mk_concat = [this](const ptr_vector<expr>& args, size_t from, sort* seq_sort) {
+                        if (from == args.size()) { return expr_ref(re().mk_epsilon(str().mk_string_sort()), m()); }
+                        else {
+                            expr_ref result(args[from], m());
+                            for (size_t j = from+1; j < args.size(); ++j) {
+                                result = re().mk_concat(result, args[j]);
+                            }
+                            return result;
+                        }
+                    };
+
+                    expr_ref concat_suffix_a = re_mk_concat(a_args, i, a->get_sort());
+                    expr_ref concat_suffix_b = re_mk_concat(b_args, i, b->get_sort());
+
                     result = re().mk_concat(result, re().mk_union(concat_suffix_a, concat_suffix_b));
                 }
             }

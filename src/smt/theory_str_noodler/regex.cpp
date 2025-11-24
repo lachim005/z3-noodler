@@ -1026,7 +1026,7 @@ namespace smt::noodler::regex {
         return result;
     }
 
-    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, std::map<BasicTerm, expr_ref>& var_name, const regex::Alphabet& alph, Formula& transducer_preds) {
+    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const regex::Alphabet& alph, Formula& transducer_preds) {
         if (m_util_s.str.is_string(ex)) { // Handle string literals.
             return;
         }
@@ -1034,7 +1034,7 @@ namespace smt::noodler::regex {
         if (util::is_variable(ex)) {
             for (const auto& key_value : pred_replace) {
                 if (to_app(key_value.m_value) == ex) {
-                    gather_transducer_constraints(to_app(key_value.m_key), m, m_util_s, pred_replace, var_name, alph, transducer_preds);
+                    gather_transducer_constraints(to_app(key_value.m_key), m, m_util_s, pred_replace, alph, transducer_preds);
                 }
             }
             return;
@@ -1043,8 +1043,8 @@ namespace smt::noodler::regex {
         expr * a1 = nullptr, *a2 = nullptr, *a3 = nullptr;
 
         if (m_util_s.str.is_concat(ex, a1, a2)) {
-            gather_transducer_constraints(to_app(a1), m, m_util_s, pred_replace, var_name, alph, transducer_preds);
-            gather_transducer_constraints(to_app(a2), m, m_util_s, pred_replace, var_name, alph, transducer_preds);
+            gather_transducer_constraints(to_app(a1), m, m_util_s, pred_replace, alph, transducer_preds);
+            gather_transducer_constraints(to_app(a2), m, m_util_s, pred_replace, alph, transducer_preds);
             return;
         }
 
@@ -1094,11 +1094,11 @@ namespace smt::noodler::regex {
 
         if (!find_and_replace.empty()) {
             // recursively call on nested parameters
-            gather_transducer_constraints(ex, m, m_util_s, pred_replace, var_name, alph, transducer_preds);
+            gather_transducer_constraints(ex, m, m_util_s, pred_replace, alph, transducer_preds);
 
             // collect and replace replace_(re)_all argument with a concatenation of basic terms
             std::vector<BasicTerm> side {};
-            util::collect_terms(ex, m, m_util_s, pred_replace, var_name, side);
+            util::collect_terms(ex, m, m_util_s, pred_replace, side);
 
             // iterate backwards and construct transducer representing the replace operations
             auto backward_iterator = find_and_replace.rbegin();

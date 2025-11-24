@@ -433,13 +433,14 @@ namespace smt::noodler {
             m_util_s.str.is_from_code(n) // str.from_code
         ) {
             handle_conversion(n);
+        } else if (util::is_str_variable(n, m_util_s)) {
+            SASSERT(!var_name.contains(util::get_variable_basic_term(n)));
+            var_name.insert({util::get_variable_basic_term(n), expr_ref(n, m)});
         } else if (
             m_util_s.str.is_concat(n) || // str.++
             m_util_s.re.is_to_re(n) || // str.to_re
             m_util_s.str.is_in_re(n) || // str.in_re
-            m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...)
-            util::is_str_variable(n, m_util_s) || // string variable
-            // RegLan variables should never occur here, they are always eliminated by rewriter I think
+            m_util_s.is_re(n) || // one of re. command (re.none, re.all, re.comp, ...), or possibly RegLan variable
             m_util_s.str.is_string(n) // string literal
         ) {
             // we do not need to handle these, concatenation is handled in the decision procedure (it is a basic term)
@@ -2284,7 +2285,6 @@ namespace smt::noodler {
                 this->predicate_replace.insert(arg, z3_var_for_arg);
             }
             var_for_arg = util::get_variable_basic_term(z3_var_for_arg);
-            var_name.insert({var_for_arg, z3_var_for_arg});
             // we need exact solution for the argument, so that we can compute
             // the arithmetic formula for the result in final_check_eh
             len_vars.insert(z3_var_for_arg);
@@ -2298,7 +2298,6 @@ namespace smt::noodler {
             this->predicate_replace.insert(conversion, z3_var_for_conversion);
             len_vars.insert(z3_var_for_conversion); // we need exact solution for the result, to compute the arithmetic formula
             var_for_conversion = util::get_variable_basic_term(z3_var_for_conversion);
-            var_name.insert({var_for_conversion, z3_var_for_conversion});
 
             // The range of from_* functions is bounded, we have to bound it also for the decision procedure
             app *epsilon = m_util_s.re.mk_epsilon(conversion->get_sort());

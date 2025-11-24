@@ -476,17 +476,9 @@ namespace smt::noodler {
         SASSERT(eq->get_arg(0));
         SASSERT(eq->get_arg(1));
 
-        obj_hashtable<expr> vars;
-        util::get_str_variables(ex, this->m_util_s, this->m, vars);
-        for(expr * const v : vars) {
-
-            BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
-            this->var_name.insert({vterm, expr_ref(v, this->m)});
-        }
-
         std::vector<BasicTerm> left, right;
-        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, this->var_name, left);
-        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, this->var_name, right);
+        util::collect_terms(to_app(eq->get_arg(0)), m, this->m_util_s, this->predicate_replace, left);
+        util::collect_terms(to_app(eq->get_arg(1)), m, this->m_util_s, this->predicate_replace, right);
 
         return Predicate(ptype, std::vector<std::vector<BasicTerm>>{left, right});
     }
@@ -510,44 +502,41 @@ namespace smt::noodler {
             // ignore trivial equations obtained from axiomatization of 
             // transducer constraints, e.g., tmp = replace_all(...)
             if(is_tmp_transducer_eq(ctx.mk_eq_atom(we.first, we.second))) {
-                // add variables to var_name map (the fresh variables are not converted to str.len in length formula otherwise)
-                util::add_vars_to_map(to_app(we.first), this->m, this->m_util_s, this->var_name);
-                util::add_vars_to_map(to_app(we.second), this->m, this->m_util_s, this->var_name);
                 continue;
             }
             Predicate inst = this->conv_eq_pred(ctx.mk_eq_atom(we.first, we.second));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
-            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, alph, instance);
             instance.add_predicate(inst);
         }
 
         for (const auto& wd : this->m_word_diseq_todo_rel) {
             Predicate inst = this->conv_eq_pred(m.mk_not(ctx.mk_eq_atom(wd.first, wd.second)));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
-            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, alph, instance);
             instance.add_predicate(inst);
         }
 
         // construct not contains predicates
         for(const auto& not_contains : this->m_not_contains_todo_rel) {
             std::vector<BasicTerm> left, right;
-            util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, left);
-            util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, right);
+            util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, left);
+            util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, right);
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
-            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, alph, instance);
             Predicate inst = Predicate::create_not_contains(left, right);
             instance.add_predicate(inst);
         }
 
         for (const auto& conv : this->m_conversion_todo) {
-            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, alph, instance);
         }
 
         for (const auto& len: len_vars) {
-            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, alph, instance);
         }
 
         return instance;
@@ -607,10 +596,8 @@ namespace smt::noodler {
             const std::string& variable_name{ var_app->get_decl()->get_name().str() };
 
             zstring s;
-            BasicTerm term{ BasicTermType::Variable, variable_name };
-            if(m_util_s.str.is_string(var_app, s)) {
-                term = BasicTerm(BasicTermType::Literal, s.encode());
-            }
+            BasicTerm term = m_util_s.str.is_string(var_app, s) ? BasicTerm(BasicTermType::Literal, s.encode()) : util::get_variable_basic_term(var_expr);
+
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(membership) };
             mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, make_complement, make_complement) };
@@ -623,12 +610,10 @@ namespace smt::noodler {
 
             } else { // We create a regular constraint for the current variable for the first time.
                 aut_assignment[term] = std::make_shared<mata::nfa::Nfa>(std::forward<mata::nfa::Nfa>(std::move(nfa)));
-                // TODO explain after this function is moved to theory_str_noodler, we do this because var_name contains only variables occuring in instance and not those that occur only in str.in_re
-                this->var_name.insert({term, var_expr});
             }
 
             // we also need to gather transducer constraints for the var
-            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, this->var_name, alph, instance);
+            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, alph, instance);
         }
 
         // create sigma star automaton for our alphabet

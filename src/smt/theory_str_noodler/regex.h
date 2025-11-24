@@ -305,12 +305,10 @@ namespace smt::noodler::regex {
      * @param m AST manager
      * @param m_util_s Seq util for AST.
      * @param pred_replace Replacement of predicate and functions
-     * @param var_name Mapping of BasicTerm variables to z3 variables
      * @param mata_alph Mata alphabet containing symbols from the current instance
      * @param[out] transducer_preds Newly created transducer constraints
      */
-    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, 
-        std::map<BasicTerm, expr_ref>& var_name, const Alphabet& mata_alph, Formula& transducer_preds);
+    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, Formula& transducer_preds);
 
 }
 

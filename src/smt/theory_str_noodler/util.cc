@@ -40,28 +40,20 @@ namespace smt::noodler::util {
     }
 
     void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, std::vector<BasicTerm>& terms) {
-
-        if(m_util_s.str.is_string(ex)) { // Handle string literals.
+        if (m_util_s.str.is_string(ex)) { // string literals
             terms.emplace_back(BasicTermType::Literal, ex->get_parameter(0).get_zstring());
-            return;
-        }
-
-        if(is_variable(ex)) {
+        } else if (is_variable(ex)) { // string variables
             terms.emplace_back(get_variable_basic_term(ex));
-            return;
-        }
-
-        if(!m_util_s.str.is_concat(ex)) {
+        } else if (m_util_s.str.is_concat(ex)) { // concatenation
+            SASSERT(ex->get_num_args() == 2);
+            app *a_x = to_app(ex->get_arg(0));
+            app *a_y = to_app(ex->get_arg(1));
+            collect_terms(a_x, m, m_util_s, pred_replace, terms);
+            collect_terms(a_y, m, m_util_s, pred_replace, terms);
+        } else { // other expressions, should be replaced by some variable
             expr* rpl = pred_replace.find(ex); // dies if it is not found
             collect_terms(to_app(rpl), m, m_util_s, pred_replace, terms);
-            return;
         }
-
-        SASSERT(ex->get_num_args() == 2);
-        app *a_x = to_app(ex->get_arg(0));
-        app *a_y = to_app(ex->get_arg(1));
-        collect_terms(a_x, m, m_util_s, pred_replace, terms);
-        collect_terms(a_y, m, m_util_s, pred_replace, terms);
     }
 
     BasicTerm get_variable_basic_term(expr *const variable) {

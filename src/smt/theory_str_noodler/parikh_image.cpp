@@ -784,7 +784,7 @@ namespace smt::noodler::parikh {
 
         // Populate registers in sampling order
         for (int register_idx = 0; register_idx < register_count; register_idx++) {
-            std::string var_name = "reg_ord" + std::to_string(register_idx);
+            std::string var_name = "reg_ord" + util::FRESH_VAR_DELIMITER + std::to_string(register_idx);
             BasicTerm var = BasicTerm(BasicTermType::Variable, var_name);
             LenNode var_node (var);
             this->registers_in_sampling_order.push_back(var_node);
@@ -796,8 +796,8 @@ namespace smt::noodler::parikh {
             DiseqSide lhs = {predicate_idx, AtomicSymbol::PredicateSide::LEFT};
             DiseqSide rhs = {predicate_idx, AtomicSymbol::PredicateSide::RIGHT};
 
-            std::string lhs_var_name = "reg_diseq" + std::to_string(predicate_idx) + "_left";
-            std::string rhs_var_name = "reg_diseq" + std::to_string(predicate_idx) + "_right";
+            std::string lhs_var_name = util::FRESH_VAR_DELIMITER + "reg_diseq" + std::to_string(predicate_idx) + "_left";
+            std::string rhs_var_name = util::FRESH_VAR_DELIMITER + "reg_diseq" + std::to_string(predicate_idx) + "_right";
 
             BasicTerm lhs_var = BasicTerm(BasicTermType::Variable, lhs_var_name);
             BasicTerm rhs_var = BasicTerm(BasicTermType::Variable, rhs_var_name);
@@ -943,8 +943,8 @@ namespace smt::noodler::parikh {
 
     void ParikhImageDiseqTag::init_mismatch_pos_inside_vars_per_diseq() {
         for (size_t predicate_idx = 0; predicate_idx < this->get_predicate_count(); predicate_idx++) {
-            std::string lhs_mismatch_pos_var_name = "mismatch_pos_" + std::to_string(predicate_idx) + "_L";
-            std::string rhs_mismatch_pos_var_name = "mismatch_pos_" + std::to_string(predicate_idx) + "_R";
+            std::string lhs_mismatch_pos_var_name = util::FRESH_VAR_DELIMITER + "mismatch_pos_" + std::to_string(predicate_idx) + "_L";
+            std::string rhs_mismatch_pos_var_name = util::FRESH_VAR_DELIMITER + "mismatch_pos_" + std::to_string(predicate_idx) + "_R";
 
             BasicTerm lhs_mismatch_pos_var (BasicTermType::Variable, lhs_mismatch_pos_var_name);
             BasicTerm rhs_mismatch_pos_var (BasicTermType::Variable, rhs_mismatch_pos_var_name);

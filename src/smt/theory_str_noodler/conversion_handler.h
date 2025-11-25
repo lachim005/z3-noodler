@@ -179,19 +179,19 @@ namespace smt::noodler {
         bool are_there_any_conversions() const { return !conversions.empty(); }
 
         /// Returns the code var version of @p var used to encode code-string conversions
-        BasicTerm code_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_code"); }
+        BasicTerm code_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + util::FRESH_VAR_DELIMITER + "to_code"); }
 
         /// Returns the int var version of @p var used to encode int-string conversions
-        BasicTerm int_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!to_int"); }
+        BasicTerm int_version_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + util::FRESH_VAR_DELIMITER + "to_int"); }
 
         /// Returns the variable for @p var encoding the decimal separator position in @p var
-        BasicTerm dot_position_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!dot_position"); }
+        BasicTerm dot_position_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + util::FRESH_VAR_DELIMITER + "dot_position"); }
 
         /// Returns the variable for @p var encoding the whole part before the decimal separator in @p var
-        BasicTerm whole_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!whole_part"); }
+        BasicTerm whole_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + util::FRESH_VAR_DELIMITER + "whole_part"); }
 
         /// Returns the variable for @p var encoding the decimal part after the decimal separator in @p var
-        BasicTerm decimal_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + "!decimal_part"); }
+        BasicTerm decimal_part_of(const BasicTerm& var) { return BasicTerm(BasicTermType::Variable, var.get_name() + util::FRESH_VAR_DELIMITER + "decimal_part"); }
 
         /// Get all variables needed to generate model for conversions
         std::vector<BasicTerm> get_arith_vars_needed_for_model();

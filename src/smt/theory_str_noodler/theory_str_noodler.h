@@ -265,7 +265,7 @@ namespace smt::noodler {
          * @param name Infix of the name (rest is added to get a unique name)
          */
         expr_ref mk_str_var_fresh(const std::string& name) {
-            app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
+            app* fresh_var = m.mk_fresh_const(name + std::string(" "), m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
             return expr_ref(fresh_var, m);
         }
 

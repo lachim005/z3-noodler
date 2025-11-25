@@ -1056,7 +1056,7 @@ namespace smt::noodler::regex {
 
         // check if we have not constructed this transducer already 
         expr* rpl = pred_replace.find(ex); // dies if it is not found
-        BasicTerm result_var(BasicTermType::Variable, to_app(rpl)->get_decl()->get_name().str());
+        BasicTerm result_var = util::get_variable_basic_term(rpl);
         for (const Predicate& trans_pred : transducer_preds.get_predicates()) {
             if (trans_pred.is_transducer() && trans_pred.get_output().size() == 1 && trans_pred.get_output()[0] == result_var) {
                 return;

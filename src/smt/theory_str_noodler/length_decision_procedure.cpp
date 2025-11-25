@@ -11,7 +11,7 @@
 namespace smt::noodler {
 
     BasicTerm begin_of(zstring of, zstring from) {
-        return BasicTerm(BasicTermType::Variable, "B!" + of.encode() + "_IN_" + from.encode());
+        return BasicTerm(BasicTermType::Variable, "B" + util::FRESH_VAR_DELIMITER + of.encode() + "_IN_" + from.encode());
     }
 
     bool VarConstraint::check_side(const Concat& side) {

@@ -99,6 +99,8 @@ namespace smt::noodler::util {
 
     void get_len_exprs(expr* ex, const seq_util& m_util_s, ast_manager& m, obj_hashtable<app>& res);
 
+    constexpr std::string FRESH_VAR_DELIMITER = "#";
+
     /**
      * @brief Create a fresh noodler (BasicTerm) variable with a given @p name followed by a unique suffix.
      *
@@ -110,7 +112,7 @@ namespace smt::noodler::util {
         // TODO kinda ugly, function is defined in header and have static variable
         // so it needs to be inline, maybe we should define some variable handler class
         static std::map<std::string,unsigned> next_id_of_name;
-        return BasicTerm{BasicTermType::Variable, name + std::string("!n") + std::to_string((next_id_of_name[name])++)};
+        return BasicTerm{BasicTermType::Variable, name + FRESH_VAR_DELIMITER + std::string("n") + std::to_string((next_id_of_name[name])++)};
     }
 
     /**

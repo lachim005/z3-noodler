@@ -5061,6 +5061,48 @@ br_status seq_rewriter::mk_re_union0(expr* a, expr* b, expr_ref& result) {
 /* Creates a normalized union. */
 br_status seq_rewriter::mk_re_union(expr* a, expr* b, expr_ref& result) {
     result = mk_regex_union_normalize(a, b);
+
+    // NOODLER rewrite rule, for union of
+    //     A1.A2.A3...An
+    //     B1.B2.B3...Bm
+    // we take largest i, i<n, i<m, where for each j<=i we have Aj = Bj.
+    // We can then return
+    //      A1.A2.A3....Ai.(re.union A_{i+1}...An B_{i+1}...Bm)
+    // If i==n (and similarly i==m), we return
+    //      A1.A2.A3....Ai.(re.union \eps B_{i+1}...Bm)
+    if (re().is_union(result, a, b)) {
+        ptr_vector<expr> a_args;
+        ptr_vector<expr> b_args;
+        if (re().is_concat(a, a_args) && re().is_concat(b, b_args)) {
+            size_t i = 0;
+            while (i < a_args.size() && i < b_args.size() && a_args[i] == b_args[i]) { ++i; }
+            if (i != 0) {
+                result = a_args[0];
+                for (size_t j = 1; j < i; ++j) {
+                    result = re().mk_concat(result, a_args[j]);
+                }
+
+                if (i != a_args.size() || i != b_args.size()) {
+                    auto re_mk_concat = [this](const ptr_vector<expr>& args, size_t from, sort* seq_sort) {
+                        if (from == args.size()) { return expr_ref(re().mk_epsilon(str().mk_string_sort()), m()); }
+                        else {
+                            expr_ref result(args[from], m());
+                            for (size_t j = from+1; j < args.size(); ++j) {
+                                result = re().mk_concat(result, args[j]);
+                            }
+                            return result;
+                        }
+                    };
+
+                    expr_ref concat_suffix_a = re_mk_concat(a_args, i, a->get_sort());
+                    expr_ref concat_suffix_b = re_mk_concat(b_args, i, b->get_sort());
+
+                    result = re().mk_concat(result, re().mk_union(concat_suffix_a, concat_suffix_b));
+                }
+            }
+        }
+    }
+
     return BR_DONE;
 }
 

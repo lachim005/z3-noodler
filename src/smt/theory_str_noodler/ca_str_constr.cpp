@@ -691,7 +691,7 @@ namespace smt::noodler::ca {
 
     LenNode convert_loop_representation_of_var_word_lengths_into_formula(const std::set<std::pair<int, int>>& loop_repr, const BasicTerm& var) {
         LenNode disjunction_across_all_loops (LenFormulaType::OR, {});
-        BasicTerm loop_rep_var = noodler::util::mk_noodler_var_fresh(var.get_name().encode() + "_loop_rep");
+        BasicTerm loop_rep_var = noodler::util::mk_noodler_var_fresh(var.get_name() + zstring("_loop_rep"));
 
         for (const auto& [stem_size, loop_size] : loop_repr) {
             LenNode repeated_loop_length (LenFormulaType::TIMES, {loop_size, loop_rep_var});

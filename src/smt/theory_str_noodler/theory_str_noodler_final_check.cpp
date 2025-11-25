@@ -596,7 +596,7 @@ namespace smt::noodler {
             const std::string& variable_name{ var_app->get_decl()->get_name().str() };
 
             zstring s;
-            BasicTerm term = m_util_s.str.is_string(var_app, s) ? BasicTerm(BasicTermType::Literal, s.encode()) : util::get_variable_basic_term(var_expr);
+            BasicTerm term = m_util_s.str.is_string(var_app, s) ? BasicTerm{BasicTermType::Literal, s} : util::get_variable_basic_term(var_expr);
 
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(membership) };

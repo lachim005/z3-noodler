@@ -99,7 +99,11 @@ namespace smt::noodler::util {
 
     void get_len_exprs(expr* ex, const seq_util& m_util_s, ast_manager& m, obj_hashtable<app>& res);
 
-    constexpr std::string FRESH_VAR_DELIMITER = "#";
+    /// @brief Create a noodler (BasicTerm) variable with a given @p name representing an internal variable (should not clash with user-defined variables)
+    inline BasicTerm mk_internal_noodler_var(const zstring& name) {
+        // according to SMT-LIB standard, variable names starting with '@' are reserved for internal use
+        return BasicTerm{BasicTermType::Variable, zstring("@") + name};
+    }
 
     /**
      * @brief Create a fresh noodler (BasicTerm) variable with a given @p name followed by a unique suffix.
@@ -108,11 +112,11 @@ namespace smt::noodler::util {
      *
      * @param name Infix of the name (rest is added to get a unique name)
      */
-    inline BasicTerm mk_noodler_var_fresh(const std::string& name) {
+    inline BasicTerm mk_noodler_var_fresh(const zstring& name) {
         // TODO kinda ugly, function is defined in header and have static variable
         // so it needs to be inline, maybe we should define some variable handler class
-        static std::map<std::string,unsigned> next_id_of_name;
-        return BasicTerm{BasicTermType::Variable, name + FRESH_VAR_DELIMITER + std::string("n") + std::to_string((next_id_of_name[name])++)};
+        static std::map<zstring,unsigned> next_id_of_name;
+        return mk_internal_noodler_var(name + std::string("!n") + std::to_string((next_id_of_name[name])++));
     }
 
     /**

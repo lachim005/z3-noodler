@@ -211,7 +211,7 @@ namespace smt::noodler::ca {
         AtomicSymbol(TagType tag_type, const BasicTerm& var, int predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
             : type(tag_type), var(var), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
         AtomicSymbol(TagType tag_type, int predicate_idx, PredicateSide side, size_t copy_idx, mata::Symbol symb )
-            : type(tag_type), var(BasicTermType::Variable, util::FRESH_VAR_DELIMITER  + "dummy"), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
+            : type(tag_type), var(util::mk_internal_noodler_var(std::string("dummy"))), predicate_idx(predicate_idx), predicate_side(side), copy_idx(copy_idx), symbol(symb) {}
     };
 
     using TagSet = std::set<AtomicSymbol>;

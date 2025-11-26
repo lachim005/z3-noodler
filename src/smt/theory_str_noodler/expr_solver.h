@@ -26,7 +26,7 @@ namespace smt::noodler {
        }
 
         lbool check_sat(expr* e) override;
-        void initialize(context& ctx, bool include_ass = true) override;
+        void initialize(context& ctx, bool include_assignment = true) override;
         void get_unsat_core(expr_ref& dst) override;
         void assert_expr(expr * e);
     };

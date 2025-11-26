@@ -25,9 +25,9 @@ namespace smt::noodler {
          * @brief Initialize the solver with formulas present in the given Z3 `context`.
          *
          * @param ctx The Z3 `context` from which to take asserted formulas and current assignment.
-         * @param include_ass If true, include current assignment formulas as part of initialization.
+         * @param include_assignment If true, include (assert) expressions corresponding to the current model returned by SMT core.
          */
-        virtual void initialize(context& ctx, bool include_ass = true) = 0;
+        virtual void initialize(context& ctx, bool include_assignment = true) = 0;
 
         /**
          * @brief Check satisfiability of the given length/arithmetic expression together

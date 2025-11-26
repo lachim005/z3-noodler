@@ -61,9 +61,9 @@ namespace smt::noodler {
          * current assignment and add them to the vector of solved LIA formulae.
          * 
          * @param ctx Current context
-         * @param include_ass Include the current assignment from the context?
+         * @param include_assignment Include the current assignment from the context?
          */
-        void initialize(context& ctx, bool include_ass = true) override {
+        void initialize(context& ctx, bool include_assignment = true) override {
             if(!initialized){
                 initialized=true;
                 expr_ref_vector Assigns(m);
@@ -72,7 +72,7 @@ namespace smt::noodler {
                     STRACE(str_lia, tout<< "check_sat context from asserted: " << mk_pp(ctx.get_asserted_formula(i),m) << std::endl);
                     assert_expr(ctx.get_asserted_formula(i));
                 }
-                if (include_ass) {
+                if (include_assignment) {
                     for (auto & e : Assigns){
                         if(ctx.is_relevant(e)) {
                             STRACE(str_lia, tout << "check_sat context from assign: " << mk_pp(e, m) << std::endl);

@@ -601,6 +601,8 @@ namespace smt::noodler::util {
         struct has_bound_var_proc {
             bool found = false;
             void operator()(expr* e) {
+                // Free variables are nulary applications --> is_app. 
+                // For the bounded variables De Bruijn indices are used (so they are basically numbers) --> is_var.
                 if (is_var(e)) // bound variable (quantified)
                     found = true;
             }

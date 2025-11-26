@@ -44,6 +44,8 @@ namespace smt::noodler {
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
                 if(this->input_has_quantifiers) {
+                    // for the quantified formulae, we must avoid add_axiom as 
+                    // adding axioms leads to unknown immediately (fails in the internalization). Probably add_axiom interferes with quantifier instantiation.
                     ctx.assert_expr(sat_length_formula);
                     ctx.internalize_assertions();
                 } else {

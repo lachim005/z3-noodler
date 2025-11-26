@@ -18,12 +18,12 @@ jobs:
     name: "MacOS (build-&-test)"
     runs-on: macos-15
     steps:
-      - name: Clone Mata
+      - name: Clone Mata (pinned v1.23.4)
         uses: GuillaumeFalourd/clone-github-repo-action@v2.3
         with:
           owner: 'VeriFIT'
           repository: 'mata'
-          branch: devel
+          branch: v1.23.4
           depth: 1
 
       - name: Install dependencies
@@ -59,12 +59,12 @@ jobs:
     name: "Ubuntu (build-&-test)"
     runs-on: ubuntu-latest
     steps:
-      - name: Clone Mata
+      - name: Clone Mata (pinned v1.23.4)
         uses: GuillaumeFalourd/clone-github-repo-action@v2.3
         with:
           owner: 'VeriFIT'
           repository: 'mata'
-          branch: devel
+          branch: v1.23.4
           depth: 1
 
       - name: Install dependencies

@@ -27,12 +27,12 @@ jobs:
           version: 3.1.73
           actions-cache-folder: 'emsdk-cache'
 
-      - name: Clone Mata
+      - name: Clone Mata (pinned v1.23.4)
         uses: GuillaumeFalourd/clone-github-repo-action@v2.3
         with:
           owner: 'VeriFIT'
           repository: 'mata'
-          branch: devel
+          branch: v1.23.4
           depth: 1
 
       - name: Install Mata

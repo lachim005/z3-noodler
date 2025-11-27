@@ -120,9 +120,7 @@ namespace smt::noodler::util {
     }
 
     /**
-     * @brief 
-     * 
-     */
+     * @brief Check whether the expression @p val is of the form ( @p num_res ) + (len @p s ).
      *
      * @param val Expression to be checked
      * @param s String term with length

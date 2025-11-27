@@ -1149,6 +1149,8 @@ namespace smt::noodler {
             // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
             // (so-far the internal solver timeouts with quntified axioms)
             if(this->input_has_quantifiers) {
+                // for the quantified formulae, we must avoid add_axiom as 
+                // adding axioms leads to unknown immediately (fails in the internalization). Probably add_axiom interferes with quantifier instantiation.
                 ctx.assert_expr(sat_length_formula);
                 ctx.internalize_assertions();
             } else {

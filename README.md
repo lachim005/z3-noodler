@@ -113,7 +113,8 @@ Tests for Z3-Noodler are located in [src/test/noodler](src/test/noodler).
 ## Licensing
 
 Z3-Noodler is licensed under the MIT License for general use (see [LICENSE.md](./LICENSE.md)).
-Any use of this software or its derivatives in the SMT-COMP competition requires a separate license.
+However, use of this software, or any derivative work, as a participant in the SMT-COMP competition requires a separate Competition Use License from the copyright holder.
+For competitor licensing requests, contact the authors.
 
 Z3-Noodler is a derivative work of the SMT solver Z3.
 The original SMT solver Z3 from the [Z3 repository](https://github.com/Z3Prover/z3) is licensed under the MIT License. See [LICENSE_Z3.txt](./LICENSE_Z3.txt).

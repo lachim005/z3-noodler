@@ -1086,8 +1086,8 @@ namespace smt::noodler {
                 init_length_sensitive_vars.insert(var2);
 
                 // variables that are results of to_code applied to var1/var2
-                BasicTerm var1_to_code = BasicTerm(BasicTermType::Variable, var1.get_name().encode() + "!ineq_to_code");
-                BasicTerm var2_to_code = BasicTerm(BasicTermType::Variable, var2.get_name().encode() + "!ineq_to_code");
+                BasicTerm var1_to_code = util::mk_internal_noodler_var(var1.get_name() + zstring("!ineq_to_code"));
+                BasicTerm var2_to_code = util::mk_internal_noodler_var(var2.get_name() + zstring("!ineq_to_code"));
 
                 // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
                 conversion_handler.add_conversion(TermConversion{ConversionType::TO_CODE, var1, var1_to_code});

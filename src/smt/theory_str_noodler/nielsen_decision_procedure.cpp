@@ -517,7 +517,7 @@ namespace smt::noodler {
      */
     bool NielsenDecisionProcedure::get_label_formula(const CounterLabel& lab, std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
         // fresh output variable
-        out_var = util::mk_noodler_var_fresh(lab.left.get_name().encode());
+        out_var = util::mk_noodler_var_fresh(lab.left.get_name());
 
         // label of the form x := 0 --> out_var = 0
         if(lab.sum.size() == 1) {
@@ -559,7 +559,7 @@ namespace smt::noodler {
      * @return bool True iff the formula was successfully created
      */
     bool NielsenDecisionProcedure::get_label_sl_formula(const CounterLabel& lab, const std::map<BasicTerm, BasicTerm>& in_vars, BasicTerm& out_var, std::vector<LenNode>& conjuncts) {
-        out_var = util::mk_noodler_var_fresh(lab.left.get_name().encode());
+        out_var = util::mk_noodler_var_fresh(lab.left.get_name());
 
         if(lab.sum.size() == 1) {
             // nielsen: incomplete

@@ -395,7 +395,7 @@ public:
      */
     BasicTerm get_tape_var_for_symbol_mapping(const BasicTerm& tape_var, mata::Symbol symbol) const {
         SASSERT(vars_that_need_symbol_mapping.contains(tape_var));
-        return BasicTerm{ BasicTermType::Variable, zstring(tape_var.get_name() + "!symbolmappingfor" + zstring(rational(symbol))) };
+        return util::mk_internal_noodler_var(zstring(tape_var.get_name() + "symbolmappingfor" + zstring(rational(symbol))));
     }
 
     /**

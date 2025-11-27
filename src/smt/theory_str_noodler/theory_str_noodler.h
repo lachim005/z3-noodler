@@ -255,7 +255,8 @@ namespace smt::noodler {
          * @param name Infix of the name (rest is added to get a unique name)
          */
         expr_ref mk_int_var_fresh(const std::string& name) {
-            app* fresh_var = m.mk_fresh_const(name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
+            // according to SMT-LIB standard, variable names starting with '@' are reserved for internal use
+            app* fresh_var = m.mk_fresh_const("@" + name, m_util_a.mk_int(), true); // need to be skolem, because it seems they are not printed for models
             return expr_ref(fresh_var, m);
         }
         
@@ -265,46 +266,9 @@ namespace smt::noodler {
          * @param name Infix of the name (rest is added to get a unique name)
          */
         expr_ref mk_str_var_fresh(const std::string& name) {
-            app* fresh_var = m.mk_fresh_const(name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
+            // according to SMT-LIB standard, variable names starting with '@' are reserved for internal use
+            app* fresh_var = m.mk_fresh_const("@" + name, m_util_s.mk_string_sort(), true); // need to be skolem, because it seems they are not printed for models
             return expr_ref(fresh_var, m);
-        }
-
-        /**
-         * @brief Get Z3 int var with exact given @p name
-         *
-         * @param name Name of the var
-         */
-        expr_ref mk_int_var(const std::string& name) {
-            // quantified int variables we need to create as z3 variables. If they are created as skolem const, the quantification is 
-            // ignored (because everything there is a constant).
-            // WARNING: currently, we do not support occurrences of variables with the same name in different 
-            // scopes (both quantified and free)
-            auto it = this->quantif_vars.find(name);
-            if(it != this->quantif_vars.end()) {
-                return expr_ref(m.mk_var(it->second, m_util_a.mk_int()), m);
-            }
-            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_int()); // need to be skolem, because it seems they are not printed for models
-            return expr_ref(var, m);
-        }
-
-        /**
-         * @brief Get Z3 real var with exact given @p name
-         *
-         * @param name Name of the var
-         */
-        expr_ref mk_real_var(const std::string& name) {
-            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_a.mk_real()); // need to be skolem, because it seems they are not printed for models
-            return expr_ref(var, m);
-        }
-
-        /**
-         * @brief Get Z3 string var with exact given @p name
-         *
-         * @param name Name of the var
-         */
-        expr_ref mk_str_var(const std::string& name) {
-            app* var = m.mk_skolem_const(symbol(name.c_str()), m_util_s.mk_string_sort()); // need to be skolem, because it seems they are not printed for models
-            return expr_ref(var, m);
         }
 
         /**

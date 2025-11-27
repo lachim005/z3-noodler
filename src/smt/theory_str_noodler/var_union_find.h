@@ -96,8 +96,7 @@ namespace smt::noodler {
                 std::set<BasicTerm> st;
                 int len = key_to_value.at(t.m_key);
                 for (const auto& s : t.m_value) {
-                    std::string var = to_app(s)->get_decl()->get_name().str();
-                    BasicTerm bvar(BasicTermType::Variable, var);
+                    BasicTerm bvar = util::get_variable_basic_term(s);
                     
                     if(len != -1 && len > 1) {
                         std::set<std::pair<int, int>> aut_constr = mata::applications::strings::get_word_lengths(*aut_ass.at(bvar));

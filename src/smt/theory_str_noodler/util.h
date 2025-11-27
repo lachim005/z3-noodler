@@ -60,16 +60,6 @@ namespace smt::noodler::util {
     void check_limit(ast_manager& m);
 
     /**
-    Get variables from a given expression @p ex. Append to the output parameter @p res.
-    @param ex Expression to be checked for variables.
-    @param m_util_s Seq util for AST
-    @param m AST manager
-    @param[out] res Vector of found variables (may contain duplicities).
-    @param pred_map predicate to variable mapping
-    */
-    void get_str_variables(expr* ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res, obj_map<expr, expr*>* pred_map=nullptr);
-
-    /**
      * Check whether an @p expression is a string variable.
      *
      * Function checks only the top-level expression and is not recursive.
@@ -89,15 +79,6 @@ namespace smt::noodler::util {
     bool is_variable(const expr* expression);
 
     /**
-     * Get variable names from a given expression @p ex. Append to the output parameter @p res.
-     * @param[in] ex Expression to be checked for variables.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] m AST manager.
-     * @param[out] res Vector of found variables (may contain duplicities).
-     */
-    void get_variable_names(expr* ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res);
-
-    /**
      * Collect basic terms (vars, literals) from a concatenation @p ex. Append the basic terms to the output parameter
      *  @p terms.
      * @param ex Expression to be checked for basic terms.
@@ -107,9 +88,7 @@ namespace smt::noodler::util {
      *
      * TODO: Test.
      */
-    void collect_terms(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
-                       std::map<BasicTerm, expr_ref>& var_name, std::vector<BasicTerm>& terms
-    );
+    void collect_terms(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, std::vector<BasicTerm>& terms);
 
     /**
      * Convert variable in @c expr form to @c BasicTerm.
@@ -120,6 +99,12 @@ namespace smt::noodler::util {
 
     void get_len_exprs(expr* ex, const seq_util& m_util_s, ast_manager& m, obj_hashtable<app>& res);
 
+    /// @brief Create a noodler (BasicTerm) variable with a given @p name representing an internal variable (should not clash with user-defined variables)
+    inline BasicTerm mk_internal_noodler_var(const zstring& name) {
+        // according to SMT-LIB standard, variable names starting with '@' are reserved for internal use
+        return BasicTerm{BasicTermType::Variable, zstring("@") + name};
+    }
+
     /**
      * @brief Create a fresh noodler (BasicTerm) variable with a given @p name followed by a unique suffix.
      *
@@ -127,11 +112,11 @@ namespace smt::noodler::util {
      *
      * @param name Infix of the name (rest is added to get a unique name)
      */
-    inline BasicTerm mk_noodler_var_fresh(const std::string& name) {
+    inline BasicTerm mk_noodler_var_fresh(const zstring& name) {
         // TODO kinda ugly, function is defined in header and have static variable
         // so it needs to be inline, maybe we should define some variable handler class
-        static std::map<std::string,unsigned> next_id_of_name;
-        return BasicTerm{BasicTermType::Variable, name + std::string("!n") + std::to_string((next_id_of_name[name])++)};
+        static std::map<zstring,unsigned> next_id_of_name;
+        return mk_internal_noodler_var(name + std::string("!n") + std::to_string((next_id_of_name[name])++));
     }
 
     /**
@@ -215,25 +200,6 @@ namespace smt::noodler::util {
      * @return std::optional<std::vector<mata::Word>> The accepting words or std::nullopt if none exist.
      */
     std::optional<std::vector<mata::Word>> get_word_from_nft(const mata::nft::Nft nft, const std::vector<unsigned>& lengths, const std::set<mata::nft::State>& potentional_initial_states, const std::map<mata::nft::Transition,std::shared_ptr<unsigned>>& num_of_transitions_passes);
-
-    /**
-     * @brief Insert string variables occurring in the given (concat) expression into the provided map.
-     *
-     * Traverses the application @p ex and, for every
-     * encountered string variable, inserts an entry into @p var_name. The key is the corresponding
-     * BasicTerm created from the variable, and the value is the original Z3 expression reference.
-     *
-     * Notes:
-     * - The map is updated in-place; existing entries are preserved.
-     * - Only string variables are considered; non-string terms (ints, regexes, composites) are ignored.
-     * - This helper complements collect_terms(), which also accepts @p var_name for consistent mapping.
-     *
-     * @param ex       Application to inspect (may be a concatenation or a standalone term).
-     * @param m        AST manager used to manage lifetimes of expr_ref values.
-     * @param m_util_s Sequence utilities used to recognize string constructs.
-     * @param[out] var_name Mapping from BasicTerm to the original variable expr; populated/updated by this call.
-     */
-    void add_vars_to_map(app *const ex, ast_manager& m, const seq_util& m_util_s, std::map<BasicTerm, expr_ref>& var_name);
 
     /**
      * @brief Check whether an expression contains bound (quantified) variables.

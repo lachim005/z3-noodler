@@ -27,52 +27,6 @@ namespace smt::noodler::util {
         }
     }
 
-    void get_str_variables(expr* const ex, const seq_util& m_util_s, const ast_manager& m, obj_hashtable<expr>& res, obj_map<expr, expr*>* pred_map) {
-        if(m_util_s.str.is_string(ex)) {
-            return;
-        }
-
-        if(is_str_variable(ex, m_util_s)) {
-            res.insert(ex);
-            return;
-        }
-
-        SASSERT(is_app(ex));
-        app* ex_app{ to_app(ex) };
-        if(pred_map != nullptr) {
-            expr* rpl;
-            if(pred_map->find(ex_app, rpl)) {
-                get_str_variables(rpl, m_util_s, m, res, pred_map);
-            }
-        }
-
-        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-            SASSERT(is_app(ex_app->get_arg(i)));
-            app *arg = to_app(ex_app->get_arg(i));
-            get_str_variables(arg, m_util_s, m, res, pred_map);
-        }
-    }
-
-    void get_variable_names(expr* const ex, const seq_util& m_util_s, const ast_manager& m, std::unordered_set<std::string>& res) {
-        if(m_util_s.str.is_string(ex)) {
-            return;
-        }
-
-        if(is_variable(ex)) {
-            res.insert(std::to_string(to_app(ex)->get_name()));
-            return;
-        }
-
-        SASSERT(is_app(ex));
-        app* ex_app{ to_app(ex) };
-
-        for(unsigned i = 0; i < ex_app->get_num_args(); i++) {
-            SASSERT(is_app(ex_app->get_arg(i)));
-            app *arg = to_app(ex_app->get_arg(i));
-            get_variable_names(arg, m_util_s, m, res);
-        }
-    }
-
     bool is_variable(const expr* expression) {
         if (!is_app(expression)) {
             return false;
@@ -85,44 +39,21 @@ namespace smt::noodler::util {
         return m_util_s.is_string(expression->get_sort()) && is_variable(expression);
     }
 
-
-    void add_vars_to_map(app *const ex, ast_manager& m, const seq_util& m_util_s, std::map<BasicTerm, expr_ref>& var_name) {
-        obj_hashtable<expr> vars;
-        util::get_str_variables(ex, m_util_s, m, vars);
-        for(expr * const v : vars) {
-
-            BasicTerm vterm(BasicTermType::Variable, to_app(v)->get_name().str());
-            var_name.insert({vterm, expr_ref(v, m)});
-        }
-    }
-
-    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace,
-                       std::map<BasicTerm, expr_ref>& var_name, std::vector<BasicTerm>& terms) {
-
-        if(m_util_s.str.is_string(ex)) { // Handle string literals.
+    void collect_terms(app* const ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, std::vector<BasicTerm>& terms) {
+        if (m_util_s.str.is_string(ex)) { // string literals
             terms.emplace_back(BasicTermType::Literal, ex->get_parameter(0).get_zstring());
-            return;
-        }
-
-        if(is_variable(ex)) {
-            std::string var = ex->get_decl()->get_name().str();
-            BasicTerm bvar(BasicTermType::Variable, var);
-            terms.emplace_back(bvar);
-            var_name.insert({bvar, expr_ref(ex, m)});
-            return;
-        }
-
-        if(!m_util_s.str.is_concat(ex)) {
+        } else if (is_variable(ex)) { // string variables
+            terms.emplace_back(get_variable_basic_term(ex));
+        } else if (m_util_s.str.is_concat(ex)) { // concatenation
+            SASSERT(ex->get_num_args() == 2);
+            app *a_x = to_app(ex->get_arg(0));
+            app *a_y = to_app(ex->get_arg(1));
+            collect_terms(a_x, m, m_util_s, pred_replace, terms);
+            collect_terms(a_y, m, m_util_s, pred_replace, terms);
+        } else { // other expressions, should be replaced by some variable
             expr* rpl = pred_replace.find(ex); // dies if it is not found
-            collect_terms(to_app(rpl), m, m_util_s, pred_replace, var_name, terms);
-            return;
+            collect_terms(to_app(rpl), m, m_util_s, pred_replace, terms);
         }
-
-        SASSERT(ex->get_num_args() == 2);
-        app *a_x = to_app(ex->get_arg(0));
-        app *a_y = to_app(ex->get_arg(1));
-        collect_terms(a_x, m, m_util_s, pred_replace, var_name, terms);
-        collect_terms(a_y, m, m_util_s, pred_replace, var_name, terms);
     }
 
     BasicTerm get_variable_basic_term(expr *const variable) {

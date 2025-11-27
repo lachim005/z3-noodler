@@ -98,6 +98,23 @@ namespace smt::noodler {
                 rational val(0);
                 SASSERT(values.size() == 1);
                 VERIFY(m_util_a.is_numeral(values[0], val, is_int) && is_int);
+                // part for getting a model that could work also for quantified formulae
+                // We want to avoid getting models of this form:
+                // sat
+                // (
+                //   ;; universe for String:
+                //   ;;   String!val!0 
+                //   ;; -----------
+                //   ;; definitions for universe elements:
+                //   (declare-fun String!val!0 () String)
+                //   ;; cardinality constraint:
+                //   (forall ((x String)) (= x String!val!0))
+                //   ;; -----------
+                //   (define-fun v0 () String
+                //     "\u{0}")
+                //   (define-fun fun0 ((x!0 String) (x!1 String) (x!2 Int)) String
+                //     (ite (and (= x!0 "\u{0}") (= x!1 ".")) "\u{0}" String!val!0))
+                // )
                 unsigned len = val.get_unsigned();
                 std::vector<unsigned> res(len, 'a');
                 expr* v = m_util_s.str.mk_string(zstring(res.size(), res.data()));
@@ -206,6 +223,7 @@ namespace smt::noodler {
                 return alloc(expr_wrapper_proc, tgt);
             }
         } else if (m_util_s.str.is_string(tgt)) {
+            // TODO: use seq_factory to register string literal?
             // for string literal, we just return the string
             return alloc(expr_wrapper_proc, tgt);
         } else if (util::is_str_variable(tgt, m_util_s)) {

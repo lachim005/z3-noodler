@@ -20,6 +20,7 @@ Eternal glory to Yu-Fang.
 #include "params/smt_params.h"
 #include "ast/arith_decl_plugin.h"
 #include "ast/seq_decl_plugin.h"
+#include "model/seq_factory.h"
 #include "params/theory_str_noodler_params.h"
 #include "smt/smt_kernel.h"
 #include "smt/smt_theory.h"
@@ -82,6 +83,10 @@ namespace smt::noodler {
         th_rewriter m_rewrite;
         arith_util m_util_a;
         seq_util m_util_s;
+        seq_factory* m_seq_factory = nullptr;
+
+        // has input formula quantifiers?
+        bool input_has_quantifiers = false;
 
         // equivalence of z3 terms based on their length (terms are equiv if their length is for sure the same)
         var_union_find var_eqs;

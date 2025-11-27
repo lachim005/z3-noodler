@@ -9,9 +9,10 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_kernel.h"
 #include "params/smt_params.h"
 #include "smt/smt_context.h"
+#include "smt/theory_str_noodler/lia_solver.h"
 
 namespace smt::noodler {
-    class int_expr_solver {
+    class int_expr_solver : public lia_solver {
         bool unsat_core=false;
         ast_manager& m;
         bool initialized;
@@ -24,8 +25,9 @@ namespace smt::noodler {
             initialized=false;
        }
 
-        lbool check_sat(expr* e);
-        void initialize(context& ctx, bool include_ass = true);
+        lbool check_sat(expr* e) override;
+        void initialize(context& ctx, bool include_assignment = true) override;
+        void get_unsat_core(expr_ref& dst) override;
         void assert_expr(expr * e);
     };
 }

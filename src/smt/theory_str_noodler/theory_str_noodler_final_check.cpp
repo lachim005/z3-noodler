@@ -1,6 +1,9 @@
 #include <mata/nfa/builder.hh>
+#include <memory>
 #include "formula.h"
 #include "smt/theory_str_noodler/theory_str_noodler.h"
+#include "smt/theory_str_noodler/expr_solver.h"
+#include "smt/theory_str_noodler/quant_lia_solver.h"
 #include "memb_heuristics_procedures.h"
 
 namespace smt::noodler {
@@ -40,7 +43,14 @@ namespace smt::noodler {
             TRACE(str, tout << "Last run was sat on scope level " << scope_with_last_run_was_sat << "\n";);
             if (m_params.m_produce_models) {
                 // we need to add previous axioms, so that z3 arith solver returns correct model
-                add_axiom(sat_length_formula);
+                if(this->input_has_quantifiers) {
+                    // for the quantified formulae, we must avoid add_axiom as 
+                    // adding axioms leads to unknown immediately (fails in the internalization). Probably add_axiom interferes with quantifier instantiation.
+                    ctx.assert_expr(sat_length_formula);
+                    ctx.internalize_assertions();
+                } else {
+                    add_axiom(sat_length_formula);
+                }
             }
             return FC_DONE;
         }
@@ -758,33 +768,37 @@ namespace smt::noodler {
             return l_true;
         }
 
-        // if the length formula has quantifiers --> use quant_lia_solver
-        // TODO: the quant_lia_solver does not support UNSAT cores
-        if(expr_cases::has_quantifier(len_formula, m)) {
+        if (expr_cases::has_quantifier(len_formula, m) || this->input_has_quantifiers) {
             m_rewrite(len_formula);
-            quant_lia_solver m_quant_int_solver(get_manager());
-            m_quant_int_solver.initialize(get_context());
-
-            lbool is_sat = m_quant_int_solver.check_sat(len_formula);
-            return is_sat;
-        }
-
-        int_expr_solver m_int_solver(get_manager(), get_fparams());
-        // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
-        bool include_ass = true;
-        if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
-            include_ass = false;
-        }
-        m_int_solver.initialize(get_context(), include_ass);
-        auto ret = m_int_solver.check_sat(len_formula);
-        // construct an unsat core --> might be expensive
-        // TODO: better interface of m_int_solver
-        if(unsat_core != nullptr) {
-            for(unsigned i=0;i<m_int_solver.m_kernel.get_unsat_core_size();i++){
-                *unsat_core = m.mk_and(*unsat_core, m_int_solver.m_kernel.get_unsat_core_expr(i));
+            quant_lia_solver solver(get_manager());
+            solver.initialize(get_context());
+            lbool ret = solver.check_sat(len_formula);
+            STRACE(str, tout << "ret (quant): " << ret << std::endl;);
+            if (unsat_core != nullptr) {
+                expr_ref solver_core(m);
+                solver_core = m.mk_true();
+                solver.get_unsat_core(solver_core);
+                *unsat_core = m.mk_and(*unsat_core, solver_core);
             }
+            return ret;
+        } else {
+            int_expr_solver solver(get_manager(), get_fparams());
+            // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
+            bool include_ass = true;
+            if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
+                include_ass = false;
+            }
+
+            solver.initialize(get_context(), include_ass);
+            lbool ret = solver.check_sat(len_formula);
+            if (unsat_core != nullptr) {
+                expr_ref solver_core(m);
+                solver_core = m.mk_true();
+                solver.get_unsat_core(solver_core);
+                *unsat_core = m.mk_and(*unsat_core, solver_core);
+            }
+            return ret;
         }
-        return ret;
     }
 
     void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
@@ -1134,7 +1148,14 @@ namespace smt::noodler {
             // WARNING: the model generation is not supported for tag automata stuff. 
             // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
             // (so-far the internal solver timeouts with quntified axioms)
-            add_axiom(length_formula);
+            if(this->input_has_quantifiers) {
+                // for the quantified formulae, we must avoid add_axiom as 
+                // adding axioms leads to unknown immediately (fails in the internalization). Probably add_axiom interferes with quantifier instantiation.
+                ctx.assert_expr(sat_length_formula);
+                ctx.internalize_assertions();
+            } else {
+                add_axiom(sat_length_formula);
+            }
         }
     }
 

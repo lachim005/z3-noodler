@@ -27,7 +27,7 @@ namespace smt::noodler {
         return r;
     }
 
-    void int_expr_solver::initialize(context& ctx, bool include_ass) {
+    void int_expr_solver::initialize(context& ctx, bool include_assignment) {
         if(!initialized){
             initialized=true;
             expr_ref_vector Assigns(m);
@@ -37,7 +37,7 @@ namespace smt::noodler {
                 assert_expr(ctx.get_asserted_formula(i));
 
             }
-            if (include_ass) {
+            if (include_assignment) {
                 for (auto & e : Assigns){
                     if(ctx.is_relevant(e)) {
                         STRACE(str_lia, tout << "check_sat context from assign: " << mk_pp(e, m) << std::endl);
@@ -63,6 +63,13 @@ namespace smt::noodler {
                     }
                 }
             );
+        }
+    }
+
+    void int_expr_solver::get_unsat_core(expr_ref& dst) {
+        dst = m.mk_true();
+        for (unsigned i = 0; i < m_kernel.get_unsat_core_size(); ++i) {
+            dst = m.mk_and(dst, m_kernel.get_unsat_core_expr(i));
         }
     }
 }

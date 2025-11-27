@@ -17,7 +17,7 @@ For a brief overview of the architecture, see [SMT-COMP'24 Z3-Noodler descriptio
 
 ### Dependencies
 
-1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.23.4`.
+1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.24.0`.
     ```shell
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata

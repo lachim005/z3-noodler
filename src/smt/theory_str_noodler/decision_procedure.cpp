@@ -56,42 +56,36 @@ namespace smt::noodler {
             return new_predicates;
         };
 
-        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides](const FormulaGraph &graph) {
-            FormulaGraph new_graph{};
-            std::map<FormulaGraphNode, FormulaGraphNode> new_node_map;
-            std::set<FormulaGraphNode> removed_nodes;
+        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides](FormulaGraph &graph) {
+            std::set<FormulaGraph::NodeIdx> removed_nodes;
+            FormulaGraph::Nodes new_nodes;
+            auto nodes = graph.get_nodes();
 
             // Substitutes nodes
-            for (auto node : graph.get_nodes()) {
+            for (unsigned i = 0; i < nodes.size(); i++) {
+                auto node = nodes[i];
                 Predicate new_pred = substitute_predicate(node.get_predicate());
 
                 // We don't need inclusions with the same sides
                 if (inclusion_has_same_sides(new_pred)) {
-                    removed_nodes.insert(node);
+                    removed_nodes.insert(i);
                 }
 
-                FormulaGraphNode new_node = new_graph.add_node(new_pred, node.is_reversed());
-                new_node_map.insert({node, new_node});
+                FormulaGraphNode new_node = FormulaGraphNode(new_pred, node.is_reversed());
+                new_nodes.push_back(new_node);
             }
-            // Substitutes edges
-            for (auto node : graph.get_nodes()) {
-                if (removed_nodes.contains(node)) { continue; }
-                FormulaGraphNode new_node = new_node_map.at(node);
+            graph.substitute_edges(new_nodes);
 
-                auto edges_from = graph.get_edges_from(node);
-                for (auto target : edges_from) {
-                    if (removed_nodes.contains(target)) { continue; }
-                    new_graph.add_edge(new_node, new_node_map.at(target));
-                }
+            for (auto i : removed_nodes) {
+                graph.remove_node_at(i);
             }
-            return new_graph;
         };
 
         inclusions = substitute_set(inclusions);
         transducers = substitute_set(transducers);
         predicates_not_on_cycle = substitute_set(predicates_not_on_cycle);
 
-        simplified_splitting_graph = substitute_formula_graph(simplified_splitting_graph);
+        substitute_formula_graph(simplified_splitting_graph);
 
         // substituting predicates to process is bit harder, it is possible that two predicates that were supposed to
         // be processed become same after substituting, so we do not want to keep both in predicates to process

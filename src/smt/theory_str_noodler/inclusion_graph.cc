@@ -1,5 +1,6 @@
 #include "inclusion_graph.h"
 #include "util.h"
+#include <random>
 
 namespace {
     using namespace smt::noodler;
@@ -89,32 +90,47 @@ FormulaGraph smt::noodler::FormulaGraph::create_simplified_splitting_graph(const
 }
 
 FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& simplified_splitting_graph) {
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(1,10000); // distribution in range [1, 6]
     FormulaGraph inclusion_graph{};
 
     NodeSet erased_nodes;
-    bool splitting_graph_changed{ true };
-    while (splitting_graph_changed) {
-        splitting_graph_changed = false;
+    while (true) {
+        std::map<FormulaGraphNode, unsigned> init_nodes_with_score;
 
         for (const FormulaGraphNode& node: simplified_splitting_graph.get_nodes()) {
             if (!erased_nodes.contains(node) && simplified_splitting_graph.inverse_edges[node].empty()) { // if node is initial (has no transitions going into it)
-                inclusion_graph.nodes.push_back(node);
-                STRACE(str, tout << "Added node " << node.print() << " to the graph without the reversed inclusion." << std::endl;);
-                SCTRACE(str_nfa, node.get_predicate().is_transducer(), tout << "Transducer T" << node.get_predicate().get_transducer() << ":\n" << node.get_predicate().get_transducer()->print_to_dot(true););
-                inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
-
-                FormulaGraphNode reversed_node{ node.get_reversed() };
-
-                // Remove edges of node and switched node.
-                erased_nodes.insert(node);
-                simplified_splitting_graph.remove_edges_with(node);
-                erased_nodes.insert(reversed_node);
-                simplified_splitting_graph.remove_edges_with(reversed_node);
-
-                splitting_graph_changed = true;
-                break;
+                init_nodes_with_score[node] = dist(rng);
             }
         }
+
+        if (init_nodes_with_score.empty()) {
+            // there is no initial node anymore
+            break;
+        }
+
+        auto best_score_it = init_nodes_with_score.begin();
+        for (auto it = init_nodes_with_score.begin(); it != init_nodes_with_score.end(); ++it) {
+            if (it->second > best_score_it->second) { //score of this node is better
+                best_score_it = it;
+            }
+        }
+
+        const FormulaGraphNode& best_initial_node = best_score_it->first;
+        inclusion_graph.nodes.push_back(best_initial_node);
+        STRACE(str, tout << "Added node " << best_initial_node.print() << " to the graph without the reversed inclusion." << std::endl;);
+        SCTRACE(str_nfa, best_initial_node.get_predicate().is_transducer(), tout << "Transducer T" << best_initial_node.get_predicate().get_transducer() << ":\n" << best_initial_node.get_predicate().get_transducer()->print_to_dot(true););
+        inclusion_graph.nodes_not_on_cycle.insert(best_initial_node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
+
+        FormulaGraphNode reversed_node{ best_initial_node.get_reversed() };
+
+        // Remove edges of node and switched node.
+        erased_nodes.insert(best_initial_node);
+        simplified_splitting_graph.remove_edges_with(best_initial_node);
+        erased_nodes.insert(reversed_node);
+        simplified_splitting_graph.remove_edges_with(reversed_node);
+
     }
 
     // we add rest of the nodes (the ones on the cycles) to the inclusion graph

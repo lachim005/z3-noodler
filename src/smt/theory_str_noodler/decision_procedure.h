@@ -128,6 +128,12 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // Simplified splitting graph from which we will be taking inclusions and adding them to the other sets
+        FormulaGraph simplified_splitting_graph;
+        // Will become true once we get all the nodes from simplified_splitting_graph
+        // HOWEVER, even if this variable is false, the simplified_splitting_graph could be empty
+        bool ssg_empty = false;
+
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
@@ -136,14 +142,16 @@ namespace smt::noodler {
                      std::set<Predicate> transducers,
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
-                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
+                     FormulaGraph simplified_splitting_graph)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
                           transducers(transducers),
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
-                          length_sensitive_vars(length_sensitive_vars) {}
+                          length_sensitive_vars(length_sensitive_vars),
+                          simplified_splitting_graph(simplified_splitting_graph) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
         void push_front_unique(const Predicate &predicate) {
@@ -343,6 +351,14 @@ namespace smt::noodler {
 
         /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
         void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
+
+        using Score = unsigned long;
+        /// @brief Returns score indicating how suitable the predicate is to process
+        Score calculate_node_score(FormulaGraphNode node);
+        /// @brief Returns a predicate to process which is found to be the most suitable and removes it from the worklist
+        Predicate get_predicate_to_process();
+        /// @brief True if there are still predicates that need to be processed
+        bool has_predicates_to_process();
 
         /**
          * @brief Get the length constraints for variable @p var
@@ -544,7 +560,7 @@ namespace smt::noodler {
             std::string old_DOT_name = solving_state.DOT_name;
             solving_state.set_new_DOT_name();
             STRACE(str_noodle_dot, tout << solving_state.print_to_DOT() << std::endl << old_DOT_name << " -> " << solving_state.DOT_name << ";\n");
-            if (solving_state.predicates_to_process.empty()) {
+            if (!solving_state.has_predicates_to_process()) {
                 possible_solutions.push_back(std::move(solving_state));
             } else {
                 if (to_back) {

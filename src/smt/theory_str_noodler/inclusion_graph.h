@@ -120,12 +120,16 @@ namespace smt::noodler {
     public:
         using Nodes = std::vector<FormulaGraphNode>;
         using NodeSet = std::set<FormulaGraphNode>;
-        using Edges = std::map<FormulaGraphNode,NodeSet>;
+        using NodeIdx = unsigned;
+        using NodeIdxSet = std::set<NodeIdx>;
+        using Edges = std::vector<NodeIdxSet>;
     private:
         Nodes nodes;
         Edges edges;
         Edges inverse_edges;
+        NodeIdx counter = 0;
         static const NodeSet empty_nodes;
+        static const NodeIdxSet empty_indices;
         // set of nodes that are NOT on some cycle
         // it is guaranteed to be correct ONLY after creating inclusion graph???
         NodeSet nodes_not_on_cycle;
@@ -133,6 +137,13 @@ namespace smt::noodler {
     public:
 
         const Nodes& get_nodes() const { return nodes; }
+
+        NodeIdx get_index_of(const FormulaGraphNode& node) const {
+            for (NodeIdx i = 0; i < nodes.size(); i++) {
+                if (nodes[i] == node) return i;
+            }
+            return nodes.size();
+        }
 
         bool contains_node(const FormulaGraphNode& node) const {
             for (const FormulaGraphNode& node_of_graph : nodes) {
@@ -144,27 +155,33 @@ namespace smt::noodler {
         }
 
         void add_edge(const FormulaGraphNode& source, const FormulaGraphNode& target) {
-            edges[source].insert(target);
-            inverse_edges[target].insert(source);
+            auto src_idx = get_index_of(source);
+            auto target_idx = get_index_of(target);
+            edges.at(src_idx).insert(target_idx);
+            inverse_edges.at(target_idx).insert(src_idx);
         }
 
         void remove_edge(const FormulaGraphNode& source, const FormulaGraphNode& target) {
-            edges[source].erase(target);
-            inverse_edges[target].erase(source);
+            auto src_idx = get_index_of(source);
+            auto target_idx = get_index_of(target);
+            edges.at(src_idx).erase(target_idx);
+            inverse_edges.at(target_idx).erase(src_idx);
         }
 
         void remove_edges_from(const FormulaGraphNode& source) {
-            for (const FormulaGraphNode& target : get_edges_from(source)) {
-                inverse_edges[target].erase(source);
+            auto src_idx = get_index_of(source);
+            for (NodeIdx target : get_edge_indices_from(source)) {
+                inverse_edges.at(target).erase(src_idx);
             }
-            edges.erase(source);
+            edges.at(src_idx).clear();
         }
 
         void remove_edges_to(const FormulaGraphNode& target) {
-            for (const FormulaGraphNode& source : get_edges_to(target)) {
-                edges[source].erase(target);
+            auto target_idx = get_index_of(target);
+            for (NodeIdx source : get_edge_indices_to(target)) {
+                edges.at(source).erase(target_idx);
             }
-            inverse_edges.erase(target);
+            inverse_edges.at(target_idx).clear();
         }
 
         void remove_edges_with(const FormulaGraphNode& node) {
@@ -180,28 +197,64 @@ namespace smt::noodler {
         size_t get_num_of_edges() const {
             size_t num_of_edges{ 0 };
             for (const auto& edge_set: edges) {
-                num_of_edges += edge_set.second.size();
+                num_of_edges += edge_set.size();
             }
             return num_of_edges;
         }
 
         const Edges& get_edges() const { return edges; }
 
-        const NodeSet& get_edges_from(const FormulaGraphNode& source) const {
+        void substitute_edges(Nodes new_nodes) {
+            nodes = new_nodes;
+        }
+
+        const NodeSet get_edges_from(const FormulaGraphNode& source) const {
             SASSERT(contains_node(source));
-            if (edges.contains(source)) {
-                return edges.at(source);
+            auto src_idx = get_index_of(source);
+            if (src_idx != nodes.size()) {
+                NodeIdxSet edge_indices = edges.at(src_idx);
+                NodeSet res;
+                for (NodeIdx i : edge_indices) {
+                    res.insert(nodes[i]);
+                }
+                return res;
             } else {
                 return empty_nodes;
             }
         }
 
-        const NodeSet& get_edges_to(const FormulaGraphNode& target) const {
+        const NodeIdxSet& get_edge_indices_from(const FormulaGraphNode& source) const {
+            SASSERT(contains_node(source));
+            auto src_idx = get_index_of(source);
+            if (src_idx != nodes.size()) {
+                return edges.at(src_idx);
+            } else {
+                return empty_indices;
+            }
+        }
+
+        const NodeSet get_edges_to(const FormulaGraphNode& target) const {
             SASSERT(contains_node(target));
-            if (inverse_edges.contains(target)) {
-                return inverse_edges.at(target);
+            auto target_idx = get_index_of(target);
+            if (target_idx != nodes.size()) {
+                NodeIdxSet edge_indices = inverse_edges.at(target_idx);
+                NodeSet res;
+                for (NodeIdx i : edge_indices) {
+                    res.insert(nodes[i]);
+                }
+                return res;
             } else {
                 return empty_nodes;
+            }
+        }
+
+        const NodeIdxSet& get_edge_indices_to(const FormulaGraphNode& target) const {
+            SASSERT(contains_node(target));
+            auto target_idx = get_index_of(target);
+            if (target_idx != nodes.size()) {
+                return inverse_edges.at(target_idx);
+            } else {
+                return empty_indices;
             }
         }
 
@@ -212,6 +265,8 @@ namespace smt::noodler {
          */
         const FormulaGraphNode& add_node(const Predicate& predicate, bool is_reversed = false) {
             nodes.push_back(FormulaGraphNode(predicate, is_reversed));
+            edges.push_back({});
+            inverse_edges.push_back({});
             return nodes.back();
         }
 
@@ -221,12 +276,42 @@ namespace smt::noodler {
          * Invalidates iterator in nodes.
          */
         void remove_node(const FormulaGraphNode& node) {
-            remove_edges_with(node);
-            for (auto iter = nodes.begin(); iter != nodes.end(); ++iter) {
-                if (*iter == node) {
-                    nodes.erase(iter);
-                    return;
+            remove_node_at(get_index_of(node));
+        }
+        void remove_node_at(NodeIdx idx) {
+            nodes.erase(nodes.begin() + idx);
+            edges.erase(edges.begin() + idx);
+            inverse_edges.erase(inverse_edges.begin() + idx);
+            // Update indices
+            for (unsigned i = 0; i < edges.size(); i++) {
+                NodeIdxSet set = edges[i];
+                NodeIdxSet new_edges{};
+                for (auto i : set) {
+                    if (i == idx) {
+                        continue;
+                    }
+                    if (i > idx) {
+                        new_edges.insert(i - 1);
+                        continue;
+                    }
+                    new_edges.insert(i);
                 }
+                edges[i] = new_edges;
+            }
+            for (unsigned i = 0; i < inverse_edges.size(); i++) {
+                NodeIdxSet set = inverse_edges[i];
+                NodeIdxSet new_edges{};
+                for (auto i : set) {
+                    if (i == idx) {
+                        continue;
+                    }
+                    if (i > idx) {
+                        new_edges.insert(i - 1);
+                        continue;
+                    }
+                    new_edges.insert(i);
+                }
+                inverse_edges[i] = new_edges;
             }
         }
 

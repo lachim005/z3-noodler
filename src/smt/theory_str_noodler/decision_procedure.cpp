@@ -1,3 +1,4 @@
+#include <cmath>
 #include <queue>
 #include <utility>
 #include <algorithm>
@@ -5,6 +6,9 @@
 #include <ranges>
 
 #include <mata/applications/strings.hh>
+#include <vector>
+#include "smt/theory_str_noodler/formula.h"
+#include "smt/theory_str_noodler/inclusion_graph.h"
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -52,9 +56,36 @@ namespace smt::noodler {
             return new_predicates;
         };
 
+        auto substitute_formula_graph = [&substitute_predicate, &inclusion_has_same_sides](FormulaGraph &graph) {
+            std::set<FormulaGraph::NodeIdx> removed_nodes;
+            FormulaGraph::Nodes new_nodes;
+            auto nodes = graph.get_nodes();
+
+            // Substitutes nodes
+            for (unsigned i = 0; i < nodes.size(); i++) {
+                auto node = nodes[i];
+                Predicate new_pred = substitute_predicate(node.get_predicate());
+
+                // We don't need inclusions with the same sides
+                if (inclusion_has_same_sides(new_pred)) {
+                    removed_nodes.insert(i);
+                }
+
+                FormulaGraphNode new_node = FormulaGraphNode(new_pred, node.is_reversed());
+                new_nodes.push_back(new_node);
+            }
+            graph.substitute_edges(new_nodes);
+
+            for (auto i : removed_nodes) {
+                graph.remove_node_at(i);
+            }
+        };
+
         inclusions = substitute_set(inclusions);
         transducers = substitute_set(transducers);
         predicates_not_on_cycle = substitute_set(predicates_not_on_cycle);
+
+        substitute_formula_graph(simplified_splitting_graph);
 
         // substituting predicates to process is bit harder, it is possible that two predicates that were supposed to
         // be processed become same after substituting, so we do not want to keep both in predicates to process
@@ -84,6 +115,154 @@ namespace smt::noodler {
                 aut_ass.erase(var);
             }
         }
+    }
+
+    SolvingState::Score SolvingState::calculate_node_score(FormulaGraphNode node) {
+        std::vector<BasicTerm> left_side = node.get_real_left_side();
+        std::vector<BasicTerm> right_side = node.get_real_right_side();
+
+        if (left_side.empty() || right_side.empty()) { return 1; }
+
+        // Calculates state count for each split on each side
+        std::vector<unsigned> left_states;
+        std::vector<unsigned> right_states;
+        std::vector<unsigned> left_transition_coefficients;
+        std::vector<unsigned> right_transition_coefficients;
+
+        std::shared_ptr<mata::nfa::Nfa> prev_aut = nullptr;
+        for (auto var : left_side) {
+            auto aut = this->aut_ass.at(var);
+            left_states.push_back(aut->num_of_states());
+            if (prev_aut != nullptr) {
+                left_transition_coefficients.push_back(aut->initial.size() * prev_aut->final.size());
+            }
+            prev_aut = aut;
+        }
+
+        unsigned subcount = 0;
+        prev_aut = nullptr;
+        for (auto var : right_side) {
+            auto aut = this->aut_ass.at(var);
+            if (this->length_sensitive_vars.contains(var)) {
+                if (prev_aut != nullptr) {
+                    right_transition_coefficients.push_back(aut->initial.size() * prev_aut->final.size());
+                }
+                if (subcount != 0) right_states.push_back(subcount);
+                subcount = aut->num_of_states();
+            } else {
+                subcount += aut->num_of_states();
+            }
+            prev_aut = aut;
+        }
+        if (subcount != 0) {
+            right_states.push_back(subcount);
+        }
+
+        // Estimates noodle count
+        int right_splits = right_states.size();
+        int left_splits = left_states.size();
+
+        Score *buffer = new Score[right_splits];
+        buffer[right_splits - 1] = 1;
+
+        if (right_splits > 1) {
+            for (int i = right_splits - 2; i >= 0; i--) {
+                buffer[i] = buffer[i + 1] * left_states[left_splits - 1] * right_transition_coefficients[i];
+            }
+        }
+
+        if (left_splits > 1) {
+            for (int i = left_splits - 2; i >= 0; i--) {
+                for (int j = right_splits - 1; j >= 0; j--) {
+                    Score score = 0;
+                    score += buffer[j] * right_states[j] * left_transition_coefficients[i];
+                    if (j + 1 != right_splits) {
+                        score += buffer[j + 1] * left_states[i] * right_transition_coefficients[j];
+                    }
+                    buffer[j] = score;
+                }
+            }
+        }
+
+        Score score = buffer[0];
+        delete[] buffer;
+
+        return score;
+    }
+
+    Predicate SolvingState::get_predicate_to_process() {
+        // First, we check the worklist
+        if (!this->predicates_to_process.empty()) {
+            Predicate p = this->predicates_to_process.front();
+            this->predicates_to_process.pop_front();
+            return p;
+        }
+
+        // Then we get an inclusion from the splitting graph
+        FormulaGraphNode best_node{Predicate()};
+        Score best_score = ~((Score)0);
+
+        bool ran_out_of_initial_nodes = true;
+
+        for (const FormulaGraphNode& node: this->simplified_splitting_graph.get_nodes()) {
+            // Check if node is initial
+            auto edges_to_node = this->simplified_splitting_graph.get_edges_to(node);
+            if (!edges_to_node.empty()) { continue; }
+
+            ran_out_of_initial_nodes = false;
+
+            Score node_score = calculate_node_score(node);
+
+            if (node_score < best_score) {
+                best_node = node;
+                best_score = node_score;
+            }
+        }
+
+        if (ran_out_of_initial_nodes) {
+            // We ran out of initial nodes in simplified_splitting_graph,
+            // so we push the rest of them into the worklist
+            for (auto node : this->simplified_splitting_graph.get_nodes()) {
+                Predicate node_pred = node.get_real_predicate();
+
+                if (node_pred.is_equation()) {
+                    this->inclusions.insert(node_pred);
+                } else { // transducer
+                    SASSERT(node_pred.is_transducer());
+                    util::throw_error("We cannot handle non-chain free constraints with transducers");
+                }
+                this->predicates_to_process.push_back(node_pred);
+            }
+
+            this->simplified_splitting_graph = {};
+
+            // Small hack, pops the first inclusion in the worklist
+            return get_predicate_to_process();
+        }
+
+        Predicate best_real_predicate = best_node.get_real_predicate();
+
+        // Removes predicate from simplified_splitting_graph
+        FormulaGraphNode reversed_node{ best_node.get_reversed() };
+        simplified_splitting_graph.remove_node(best_node);
+        simplified_splitting_graph.remove_node(reversed_node);
+
+        // The predicate is new, so we add it to all sets
+        if (best_real_predicate.is_equation()) {
+            this->inclusions.insert(best_real_predicate);
+        } else { // transducer
+            SASSERT(best_real_predicate.is_transducer());
+            this->transducers.insert(best_real_predicate);
+        }
+        this->predicates_not_on_cycle.insert(best_real_predicate);
+
+        return best_real_predicate;
+    }
+
+    bool SolvingState::has_predicates_to_process() {
+        bool worklist_empty = this->predicates_to_process.empty();
+        bool ssg_empty = this->simplified_splitting_graph.get_nodes().empty();
+        return !(worklist_empty && ssg_empty);
     }
 
     LenNode SolvingState::get_lengths(const BasicTerm& var) const {
@@ -360,12 +539,22 @@ namespace smt::noodler {
             return print_strings(var_names, order, (delimit_by_space ? "\\ " : "\\n"));
         };
 
+        auto print_ssg_to_DOT = [&print_predicate_to_DOT](FormulaGraph ssg) {
+            std::ostringstream res;
+            for (auto node : ssg.get_nodes()) {
+                auto pred = node.get_real_predicate();
+                res << print_predicate_to_DOT(pred) << "\\n";
+            }
+            return res.str();
+        };
+
         std::ostringstream res;
         res << DOT_name << "[shape=record,label=\"" << print_predicate_container_to_DOT(inclusions, true);
         if (!inclusions.empty() && !transducers.empty()) {
             res << "\\n";
         }
         res << print_predicate_container_to_DOT(transducers, true) << "|" << print_predicate_container_to_DOT(predicates_to_process, false) << "|";
+        res << print_ssg_to_DOT(simplified_splitting_graph) << "|";
 
         std::vector<std::string> strings_to_print;
         for (const auto& [var,subst_vars] : substitution_map) {
@@ -397,7 +586,7 @@ namespace smt::noodler {
             util::check_limit(m);
             SolvingState element_to_process = pop_from_worklist();
 
-            if (element_to_process.predicates_to_process.empty()) {
+            if (!element_to_process.has_predicates_to_process()) {
                 // we found another solution, element_to_process contain the automata
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
@@ -427,8 +616,7 @@ namespace smt::noodler {
 
             // we will now process one inclusion from the inclusion graph which is at front
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+            Predicate predicate_to_process = element_to_process.get_predicate_to_process();
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);
@@ -1778,26 +1966,8 @@ namespace smt::noodler {
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
 
         if (!equations_and_transducers.get_predicates().empty()) {
-            FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers);
-            for (const FormulaGraphNode &node : incl_graph.get_nodes()) {
-                Predicate node_pred = node.get_real_predicate();
-                if (node_pred.is_equation()) { // inclusion
-                    init_solving_state.inclusions.insert(node_pred);
-                } else { // transducer
-                    SASSERT(node_pred.is_transducer());
-                    if (incl_graph.is_on_cycle(node)) {
-                        util::throw_error("We cannot handle non-chain free constraints with transducers");
-                    }
-                    init_solving_state.transducers.insert(node_pred);
-                }
-
-                if (!incl_graph.is_on_cycle(node)) {
-                    init_solving_state.predicates_not_on_cycle.insert(node_pred);
-                }
-
-                // we assume that nodes of incl_graph are ordered by the topological order
-                init_solving_state.predicates_to_process.push_back(node_pred);
-            }
+            FormulaGraph ssg = FormulaGraph::create_simplified_splitting_graph(equations_and_transducers);
+            init_solving_state.simplified_splitting_graph = ssg;
         }
 
         init_solving_state.flatten_substition_map();
@@ -1944,7 +2114,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {});
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, {});
             return l_true;
         } else {
             // preprocessing was not able to solve it

@@ -33,6 +33,7 @@ namespace {
 } // Anonymous namespace.
 
 const smt::noodler::FormulaGraph::NodeSet smt::noodler::FormulaGraph::empty_nodes = smt::noodler::FormulaGraph::NodeSet();
+const smt::noodler::FormulaGraph::NodeIdxSet smt::noodler::FormulaGraph::empty_indices = smt::noodler::FormulaGraph::NodeIdxSet();
 
 void smt::noodler::FormulaGraph::add_inclusion_graph_edges() {
     for (auto& source_node: get_nodes() ) {
@@ -97,8 +98,8 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
         splitting_graph_changed = false;
 
         for (const FormulaGraphNode& node: simplified_splitting_graph.get_nodes()) {
-            if (!erased_nodes.contains(node) && simplified_splitting_graph.inverse_edges[node].empty()) { // if node is initial (has no transitions going into it)
-                inclusion_graph.nodes.push_back(node);
+            if (!erased_nodes.contains(node) && simplified_splitting_graph.inverse_edges[simplified_splitting_graph.get_index_of(node)].empty()) { // if node is initial (has no transitions going into it)
+                inclusion_graph.add_node(node.get_predicate(), node.is_reversed());
                 STRACE(str, tout << "Added node " << node.print() << " to the graph without the reversed inclusion." << std::endl;);
                 SCTRACE(str_nfa, node.get_predicate().is_transducer(), tout << "Transducer T" << node.get_predicate().get_transducer() << ":\n" << node.get_predicate().get_transducer()->print_to_dot(true););
                 inclusion_graph.nodes_not_on_cycle.insert(node); // the inserted node cannot be on the cycle, because it is either initial or all nodes leading to it were not on cycle
@@ -120,7 +121,7 @@ FormulaGraph smt::noodler::FormulaGraph::create_inclusion_graph(FormulaGraph& si
     // we add rest of the nodes (the ones on the cycles) to the inclusion graph
     for (auto& node: simplified_splitting_graph.get_nodes()) {
         if (!erased_nodes.contains(node)) {
-            inclusion_graph.nodes.push_back(node);
+            inclusion_graph.add_node(node.get_predicate(), node.is_reversed());
             STRACE(str, tout << "Added node " << node.print() << " to the graph with its reversed inclusion." << std::endl;);
             SCTRACE(str_nfa, node.get_predicate().is_transducer(), tout << "Transducer T" << node.get_predicate().get_transducer() << ":\n" << *node.get_predicate().get_transducer(););
         }

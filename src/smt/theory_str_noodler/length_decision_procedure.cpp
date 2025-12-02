@@ -632,10 +632,7 @@ namespace smt::noodler {
             BasicTerm term = t.first;
             std::set<smt::noodler::BasicTerm> vars_in_eqs = this->formula.get_vars();    // Variables in all predicates
 
-            // term does not appear in any predicate
-            if (vars_in_eqs.find(term) == vars_in_eqs.end()) {
-                len_formula.succ.emplace_back(this->init_aut_ass.get_lengths(term));
-            }
+            len_formula.succ.emplace_back(this->init_aut_ass.get_lengths(term));
         }
 
         return {len_formula, this->precision};

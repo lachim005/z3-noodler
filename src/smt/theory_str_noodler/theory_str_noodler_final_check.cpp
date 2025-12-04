@@ -757,9 +757,15 @@ namespace smt::noodler {
         dec_proc->init_computation();
         this->statistics.at("underapprox").num_start++;
 
-        while(dec_proc->compute_next_solution() == l_true) {
+        bool check_with_context = !init_length_sensitive_vars.empty();
+        auto check_lens = [this, &check_with_context]() {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
-            if(check_len_sat(lengths, !init_length_sensitive_vars.empty()) == l_true) { // if there are no length vars in the current string formula, we do not need to check with context
+            return check_len_sat(lengths, check_with_context);
+        };
+
+        while(main_dec_proc->compute_next_solution_with_len_checks(check_lens).first == l_true) {
+            expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
+            if(check_len_sat(lengths, check_with_context) == l_true) { // if there are no length vars in the current string formula, we do not need to check with context
                 sat_handling(lengths);
                 this->statistics.at("underapprox").num_finish++;
                 return l_true;

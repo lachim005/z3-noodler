@@ -313,7 +313,7 @@ namespace smt::noodler {
 
         expr_ref block_len(m.mk_false(), m);
 
-        auto check_lens = [this, &lengths, &block_len, &check_len_sat_with_context]() {
+        auto check_lens_with_precision = [this, &lengths, &block_len, &check_len_sat_with_context]() {
             auto [noodler_lengths, precision] = dec_proc->get_lengths();
 
             lengths = len_node_to_z3_formula(noodler_lengths);
@@ -330,12 +330,13 @@ namespace smt::noodler {
             }
             return std::pair<lbool, LenNodePrecision>(sat, precision);
         };
+        auto check_lens = [&check_lens_with_precision]() { return check_lens_with_precision().first; };
 
         while (true) {
             util::check_limit(m);
-            result = dec_proc->compute_next_solution();
+            auto [result, some_skipped] = main_dec_proc->compute_next_solution_with_len_checks(check_lens);
             if (result == l_true) {
-                auto [is_lengths_sat, precision] = check_lens();
+                auto [is_lengths_sat, precision] = check_lens_with_precision();
 
                 if (is_lengths_sat == l_true) {
                     STRACE(str, tout << "len sat " << mk_pp(lengths, m) << std::endl;);
@@ -368,7 +369,8 @@ namespace smt::noodler {
                     // if we were not checking length satisfiability with the context, then the current string assignment must be unsatisfiable on its own => we can block it completely
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
-                    block_curr_len(block_len);
+                    // If some solving states were skipped, an overapproximation was added to block_len
+                    block_curr_len(block_len, true, some_skipped);
                 }
                 this->statistics.at("stabilization").num_finish++;
                 return FC_CONTINUE;

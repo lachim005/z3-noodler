@@ -36,6 +36,8 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // indicates whether this solving state has any siblings in the solving state tree
+        bool has_siblings = false;
 
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
@@ -44,14 +46,16 @@ namespace smt::noodler {
                      std::set<Predicate> transducers,
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
-                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
+                     bool has_siblings)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
                           transducers(transducers),
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
-                          length_sensitive_vars(length_sensitive_vars) {}
+                          length_sensitive_vars(length_sensitive_vars),
+                          has_siblings(has_siblings) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
         void push_front_unique(const Predicate &predicate) {

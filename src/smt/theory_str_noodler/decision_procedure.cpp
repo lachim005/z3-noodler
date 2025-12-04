@@ -198,6 +198,7 @@ namespace smt::noodler {
                                                                     right_side_automata,
                                                                     false,
                                                                     {{"reduce", "forward"}});
+        bool more_than_one_noodle = noodles.size() > 1;
 
         for (const auto &noodle : noodles) {
             util::check_limit(m);
@@ -272,6 +273,7 @@ namespace smt::noodler {
 
             // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
             // and if there is no cycle, we do not need to do BFS, the algorithm should end
+            new_element.has_siblings = more_than_one_noodle;
             push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
         }
 
@@ -1055,7 +1057,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {});
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, false);
             return l_true;
         } else {
             // preprocessing was not able to solve it

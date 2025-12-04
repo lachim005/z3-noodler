@@ -312,21 +312,30 @@ namespace smt::noodler {
         this->statistics.at("stabilization").num_start++;
 
         expr_ref block_len(m.mk_false(), m);
+
+        auto check_lens = [this, &lengths, &block_len, &check_len_sat_with_context]() {
+            auto [noodler_lengths, precision] = dec_proc->get_lengths();
+
+            lengths = len_node_to_z3_formula(noodler_lengths);
+
+            STRACE(str_print_notcontains_lia,
+                std::ofstream out_file("./not-contains-lia.smt2");
+                write_z3_expr_into_stream(this->m, out_file, lengths);
+                out_file.close();
+            );
+
+            lbool sat = check_len_sat(lengths, check_len_sat_with_context);
+            if (sat == l_false) {
+                block_len = m.mk_or(block_len, lengths);
+            }
+            return std::pair<lbool, LenNodePrecision>(sat, precision);
+        };
+
         while (true) {
             util::check_limit(m);
             result = dec_proc->compute_next_solution();
             if (result == l_true) {
-                auto [noodler_lengths, precision] = dec_proc->get_lengths();
-
-                lengths = len_node_to_z3_formula(noodler_lengths);
-
-                STRACE(str_print_notcontains_lia,
-                    std::ofstream out_file("./not-contains-lia.smt2");
-                    write_z3_expr_into_stream(this->m, out_file, lengths);
-                    out_file.close();
-                );
-
-                lbool is_lengths_sat = check_len_sat(lengths, check_len_sat_with_context);
+                auto [is_lengths_sat, precision] = check_lens();
 
                 if (is_lengths_sat == l_true) {
                     STRACE(str, tout << "len sat " << mk_pp(lengths, m) << std::endl;);
@@ -340,7 +349,6 @@ namespace smt::noodler {
                     return FC_DONE;
                 } else if (is_lengths_sat == l_false) {
                     STRACE(str, tout << "len unsat " <<  mk_pp(lengths, m) << std::endl;);
-                    block_len = m.mk_or(block_len, lengths);
 
                     if(precision == LenNodePrecision::UNDERAPPROX) {
                         ctx.get_fparams().is_underapprox = true;

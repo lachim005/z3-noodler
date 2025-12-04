@@ -286,7 +286,7 @@ namespace smt::noodler {
             STRACE(str, tout << "Underapproximation did not help\n";);
         }
 
-        dec_proc = std::move(main_dec_proc);
+        dec_proc = main_dec_proc;
 
         STRACE(str, tout << "Starting preprocessing" << std::endl);
         lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment, ctx, m_util_s));
@@ -738,7 +738,8 @@ namespace smt::noodler {
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<TermConversion> conversions) {
         context& ctx = get_context();
-        dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions, m);
+        std::shared_ptr<DecisionProcedure> main_dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions, m);
+        dec_proc = main_dec_proc;
         if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment, ctx, m_util_s)) == l_false) {
             return l_undef;
         }

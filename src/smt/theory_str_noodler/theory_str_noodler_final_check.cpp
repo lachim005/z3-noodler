@@ -361,7 +361,7 @@ namespace smt::noodler {
                 } else if(init_length_sensitive_vars.size() == 0 && dec_proc->get_init_length_sensitive_vars().empty()) {
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
-                    block_curr_len(block_len, !added_overapprox_to_block_len);
+                    block_curr_len(block_len, true, added_overapprox_to_block_len);
                 }
                 this->statistics.at("stabilization").num_finish++;
                 return FC_CONTINUE;

@@ -26,6 +26,7 @@ namespace smt::noodler {
                            << "------------------------" << std::endl;);
 
         bool len_checks_enabled = check_lens != nullptr &&
+                                  m_params.m_try_premature_len_checks &&
                                   !conversion_handler.are_there_any_conversions() &&
                                   disequations.get_predicates().empty() &&
                                   not_contains.get_predicates().empty();

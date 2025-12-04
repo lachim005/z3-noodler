@@ -153,6 +153,12 @@ namespace smt::noodler {
             ctx.mark_as_relevant(ex);
             string_theory_propagation(ex, true, false);  
         }
+        // it seems that for quantified formulae, the model generation infrastructure is necessary for 
+        // the solving (even though the model is not requested). Probably it has something to do with 
+        // model-based quantifier instantiation.
+        if(this->input_has_quantifiers) {
+            const_cast<theory_str_noodler_params&>(m_params).m_produce_models = true;
+        }
         add_conversion_num_axioms();
         STRACE(str, tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
 

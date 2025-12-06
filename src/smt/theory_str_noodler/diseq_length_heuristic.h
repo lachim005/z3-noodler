@@ -123,16 +123,12 @@ namespace smt::noodler {
          * @return Word of the requested length accepted by the automaton, empty string on failure
          */
         zstring get_model(BasicTerm var, const std::map<BasicTerm, rational>& arith_model) override {
-            auto it = arith_model.find(var);
-            if (it == arith_model.end() || !it->second.is_int() || it->second.is_neg()) {
-                return zstring("");
-            }
-
-            const rational& total_length = it->second;
-            mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+            const rational& total_length = arith_model.at(var);
+            mata::nfa::Nfa sigma_length 
+            = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
             auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
             if (!maybe_word.has_value()) {
-                return zstring("");
+                util::throw_error("empty NFA during the model generation");
             }
 
             return aut_ass.get_alphabet().get_string_from_mata_word(*maybe_word);

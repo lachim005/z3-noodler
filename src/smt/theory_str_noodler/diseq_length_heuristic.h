@@ -25,6 +25,9 @@ namespace smt::noodler {
         AutAssignment aut_ass;
         const theory_str_noodler_params& m_params;
 
+        // the length formula from preprocessing, get_lengths should create conjunct with it
+        LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
+
     public:
         /**
          * Initialize the disequation-length heuristic for formulas containing only disequations.
@@ -56,19 +59,16 @@ namespace smt::noodler {
             this->diseq_formula = prep_handler.get_modified_formula();
             this->aut_ass = prep_handler.get_aut_assignment();
             this->length_sensitive_vars = prep_handler.get_len_variables();
-
-            for (const auto& [term, aut] : this->aut_ass) {
-                (void)aut;
-                if (term.is_variable()) {
-                    this->length_sensitive_vars.insert(term);
-                }
-            }
-
+            this->preprocessing_len_formula = prep_handler.get_len_formula();
+            
             if (this->diseq_formula.get_predicates().size() > 0) {
                 this->aut_ass.reduce();
             }
 
             if (prep_handler.contains_unsat_eqs_or_diseqs()) {
+                return l_false;
+            }
+            if(!this->aut_ass.is_sat()) {
                 return l_false;
             }
 
@@ -97,7 +97,7 @@ namespace smt::noodler {
          */
         std::pair<LenNode, LenNodePrecision> get_lengths() override {
             std::vector<LenNode> conjuncts;
-            conjuncts.emplace_back(LenFormulaType::TRUE);
+            conjuncts.emplace_back(this->preprocessing_len_formula);
             for (const auto& diseq : diseq_formula.get_predicates()) {
                 conjuncts.push_back(diseq.get_formula_eq()); // produces |lhs| != |rhs|
             }

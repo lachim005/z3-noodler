@@ -98,6 +98,12 @@ namespace smt::noodler {
         std::pair<LenNode, LenNodePrecision> get_lengths() override {
             std::vector<LenNode> conjuncts;
             conjuncts.emplace_back(this->preprocessing_len_formula);
+
+            for (const auto& t : this->aut_ass) {
+                BasicTerm term = t.first;
+                conjuncts.emplace_back(LenFormulaType::LEQ, std::vector<LenNode>{LenNode(0), LenNode(term)});
+                conjuncts.emplace_back(this->aut_ass.get_lengths(term));
+            }
             for (const auto& diseq : diseq_formula.get_predicates()) {
                 conjuncts.push_back(diseq.get_formula_eq()); // produces |lhs| != |rhs|
             }

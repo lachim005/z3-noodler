@@ -11,8 +11,116 @@
 #include "decision_procedure.h"
 #include "formula_preprocess.h"
 #include "formula.h"
+#include "util.h"
 
 namespace smt::noodler {
+
+    class DiseqLengthModelHandler {
+    private:
+        AutAssignment aut_ass{};
+        SubstitutionMap subst_map{};
+        std::map<BasicTerm, zstring> model{};
+        bool computed{false};
+
+        /**
+         * @brief Pick a word for @p var of the exact length given in @p arith_model using its automaton.
+         */
+        zstring assign_aut_ass_var(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) const {
+            const rational& total_length = arith_model.at(var);
+            mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+            auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
+            if (!maybe_word.has_value()) {
+                util::throw_error("empty NFA during the model generation");
+            }
+            return aut_ass.get_alphabet().get_string_from_mata_word(*maybe_word);
+        }
+
+        /**
+         * @brief Expand a substitution-map variable by recursively resolving concats.
+         */
+        zstring assign_subst_map_var(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
+            const Concat& subst = this->subst_map.at(var);
+            zstring res = "";
+            for (const BasicTerm& term : subst) {
+                zstring val = "";
+                if (term.is_literal()) {
+                    val = term.get_name();
+                } else if (this->subst_map.contains(term)) {
+                    val = assign_subst_map_var(term, arith_model);
+                } else {
+                    val = model.at(term);
+                }
+                res = res + val;
+            }
+            model[var] = res;
+            return res;
+        }
+
+        /**
+         * @brief Materialize all substitution-map variables using the arithmetic model.
+         */
+        void assign_subst_map_vars(const std::map<BasicTerm, rational>& arith_model) {
+            for (const auto& [term, subst] : this->subst_map) {
+                (void)subst;
+                if (!term.is_variable()) {
+                    continue;
+                }
+                assign_subst_map_var(term, arith_model);
+            }
+        }
+
+        /**
+         * @brief Assign every variable in the language assignment to some word of 
+         * the required length (according to the arithmetic model).
+         */
+        void assign_aut_ass_vars(const std::map<BasicTerm, rational>& arith_model) {
+            for (const auto& t : this->aut_ass) {
+                const BasicTerm& term = t.first;
+                model[term] = assign_aut_ass_var(term, arith_model);
+            }
+        }
+
+    public:
+        /**
+         * @brief Default construction.
+         */
+        DiseqLengthModelHandler() = default;
+        /**
+         * @brief Construct with initial automata and substitution map.
+         */
+        DiseqLengthModelHandler(AutAssignment aut, SubstitutionMap subst)
+            : aut_ass(std::move(aut)), subst_map(std::move(subst)) {}
+
+        /**
+         * @brief Refresh stored data and drop cached models.
+         */
+        void update_data(AutAssignment aut, SubstitutionMap subst) {
+            this->aut_ass = std::move(aut);
+            this->subst_map = std::move(subst);
+            this->model.clear();
+            this->computed = false;
+        }
+
+        /**
+         * @brief Build all models based on the provided arithmetic model.
+         */
+        void compute_model(const std::map<BasicTerm, rational>& arith_model) {
+            this->model.clear();
+            assign_aut_ass_vars(arith_model);
+            assign_subst_map_vars(arith_model);
+            this->computed = true;
+        }
+
+        /**
+         * @brief Return the cached model for @p var, computing the cache if needed.
+         */
+        zstring get_model(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
+            if (!this->computed) {
+                compute_model(arith_model);
+            }
+            return model.at(var);
+        }
+    };
 
     /**
      * @brief Heuristic decision procedure for instances containing only word disequations
@@ -24,6 +132,8 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> length_sensitive_vars;
         AutAssignment aut_ass;
         const theory_str_noodler_params& m_params;
+        SubstitutionMap subst_map{};
+        DiseqLengthModelHandler model_handler{};
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
@@ -40,6 +150,7 @@ namespace smt::noodler {
             : diseq_formula(std::move(diseq_formula)), aut_ass(std::move(aut_ass)), m_params(params) {
             auto vars = this->diseq_formula.get_vars();
             length_sensitive_vars.insert(vars.begin(), vars.end());
+            model_handler.update_data(this->aut_ass, this->subst_map);
         }
 
         /**
@@ -60,10 +171,13 @@ namespace smt::noodler {
             this->aut_ass = prep_handler.get_aut_assignment();
             this->length_sensitive_vars = prep_handler.get_len_variables();
             this->preprocessing_len_formula = prep_handler.get_len_formula();
+            this->subst_map = prep_handler.get_substitution_map();
             
             if (this->diseq_formula.get_predicates().size() > 0) {
                 this->aut_ass.reduce();
             }
+
+            this->model_handler.update_data(this->aut_ass, this->subst_map);
 
             if (prep_handler.contains_unsat_eqs_or_diseqs()) {
                 return l_false;
@@ -129,15 +243,7 @@ namespace smt::noodler {
          * @return Word of the requested length accepted by the automaton, empty string on failure
          */
         zstring get_model(BasicTerm var, const std::map<BasicTerm, rational>& arith_model) override {
-            const rational& total_length = arith_model.at(var);
-            mata::nfa::Nfa sigma_length 
-            = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
-            auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
-            if (!maybe_word.has_value()) {
-                util::throw_error("empty NFA during the model generation");
-            }
-
-            return aut_ass.get_alphabet().get_string_from_mata_word(*maybe_word);
+            return this->model_handler.get_model(var, arith_model);
         }
 
         /**

@@ -26,6 +26,9 @@ namespace smt::noodler {
          * @brief Pick a word for @p var of the exact length given in @p arith_model using its automaton.
          */
         zstring assign_aut_ass_var(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) const {
+            if(var.is_literal()) {
+                return var.get_name();
+            }
             const rational& total_length = arith_model.at(var);
             mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
             auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
@@ -107,6 +110,7 @@ namespace smt::noodler {
         void compute_model(const std::map<BasicTerm, rational>& arith_model) {
             this->model.clear();
             assign_aut_ass_vars(arith_model);
+            std::cout << "subst vars" << std::endl;
             assign_subst_map_vars(arith_model);
             this->computed = true;
         }
@@ -115,9 +119,12 @@ namespace smt::noodler {
          * @brief Return the cached model for @p var, computing the cache if needed.
          */
         zstring get_model(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
+            std::cout << "here" << std::endl;
             if (!this->computed) {
                 compute_model(arith_model);
             }
+            std::cout << std::to_string(model) << std::endl;
+            std::cout << "here" << std::endl;
             return model.at(var);
         }
     };

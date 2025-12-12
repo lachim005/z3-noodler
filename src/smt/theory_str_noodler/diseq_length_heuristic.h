@@ -110,7 +110,6 @@ namespace smt::noodler {
         void compute_model(const std::map<BasicTerm, rational>& arith_model) {
             this->model.clear();
             assign_aut_ass_vars(arith_model);
-            std::cout << "subst vars" << std::endl;
             assign_subst_map_vars(arith_model);
             this->computed = true;
         }
@@ -119,12 +118,9 @@ namespace smt::noodler {
          * @brief Return the cached model for @p var, computing the cache if needed.
          */
         zstring get_model(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
-            std::cout << "here" << std::endl;
             if (!this->computed) {
                 compute_model(arith_model);
             }
-            std::cout << std::to_string(model) << std::endl;
-            std::cout << "here" << std::endl;
             return model.at(var);
         }
     };

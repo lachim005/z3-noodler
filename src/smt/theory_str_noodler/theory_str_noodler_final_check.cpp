@@ -770,7 +770,7 @@ namespace smt::noodler {
             int_expr_solver solver(get_manager(), get_fparams());
             // do we solve only regular constraints (and we do not want to produce models)? If yes, skip other temporary length constraints (they are not necessary)
             bool include_ass = true;
-            if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0 && !m_params.m_produce_models) {
+            if(this->m_word_diseq_todo_rel.size() == 0 && this->m_word_eq_todo_rel.size() == 0 && this->m_not_contains_todo.size() == 0 && this->m_conversion_todo.size() == 0) {
                 include_ass = false;
             }
 

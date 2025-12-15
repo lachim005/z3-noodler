@@ -746,7 +746,7 @@ namespace smt::noodler {
     }
 
     lbool theory_str_noodler::check_len_sat(expr_ref len_formula, bool check_with_context, expr_ref* unsat_core, bool always_check) {
-        if (!always_check || (len_formula == m.mk_true() && len_vars.empty())) {
+        if (!always_check && len_formula == m.mk_true() && len_vars.empty()) {
             // we assume here that existing length constraints are satisfiable, so adding true will do nothing
             // however, for model generation, we need to always produce models if we have some length vars
             return l_true;

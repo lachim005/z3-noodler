@@ -1062,7 +1062,7 @@ namespace smt::noodler {
 
         auto [len_node, precision] = dec_proc->get_lengths();
         expr_ref lengths = len_node_to_z3_formula(len_node);
-        (void)precision; // precision is always precise here
+        (void)precision; // precision is always underapprox for this procedure
 
         lbool is_lengths_sat = check_len_sat(lengths);
         if (is_lengths_sat == l_true) {

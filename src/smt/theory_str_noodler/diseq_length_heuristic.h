@@ -224,7 +224,7 @@ namespace smt::noodler {
             for (const auto& diseq : diseq_formula.get_predicates()) {
                 conjuncts.push_back(diseq.get_formula_eq()); // produces |lhs| != |rhs|
             }
-            return {LenNode(LenFormulaType::AND, std::move(conjuncts)), LenNodePrecision::PRECISE};
+            return {LenNode(LenFormulaType::AND, std::move(conjuncts)), LenNodePrecision::UNDERAPPROX};
         }
 
         /**
@@ -233,8 +233,7 @@ namespace smt::noodler {
          * @param str_var String variable for which the model is requested
          * @return Vector of variables affecting length constraints
          */
-        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& str_var) override {
-            (void)str_var;
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm&) override {
             return std::vector<BasicTerm>(length_sensitive_vars.begin(), length_sensitive_vars.end());
         }
 

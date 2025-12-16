@@ -38,7 +38,9 @@ jobs:
           sudo make install
 
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+        with: 
+          ref: ${{ github.head_ref }}
 
       - name: Compile Z3-Noodler release
         run: |
@@ -79,7 +81,9 @@ jobs:
           sudo make install
 
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+        with: 
+          ref: ${{ github.head_ref }}
 
       - name: Compile Z3-Noodler release
         run: |

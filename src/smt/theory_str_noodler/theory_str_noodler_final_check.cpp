@@ -1053,22 +1053,29 @@ namespace smt::noodler {
                     len_formula = pr.second.lengths;
                     init_only = init_only && pr.second.initial_length;
                     found = true;
-
-                    /**
-                     * We need to force the SAT solver to find another solution, because adding block_curr_len(len_formula);
-                     * is not sufficient for SAT solver to get another solution. We hence find unsat core of
-                     * the current assignment with the len_formula and add this unsat core as
-                     * a theory lemma.
-                     */
                     STRACE(str, tout << "loop-protection: found " << std::endl;);
-                    expr_ref unsat_core(m.mk_true(), m);
-                    if (check_len_sat(len_formula, true, &unsat_core) == l_false) {
-                        unsat_core = m.mk_not(unsat_core);
-                        ctx.internalize(unsat_core.get(), true);
-                        add_axiom({mk_literal(unsat_core)});
+
+                    // We need to force the LIA solver to find another solution, because adding block_curr_len(len_formula) is not sufficient for SAT solver to get another solution
+
+                    if (len_formula == m.mk_false()) {
+                        // if the length formula is false, we can force the LIA solver by adding something completely wrong (but related to strings) -> all lengths are -1
+                        STRACE(str, tout << "loop-protection: unsat (len false) " << std::endl;);
+                        for (const auto& len_var : len_vars) {
+                            len_formula = m.mk_and(len_formula, m.mk_eq(m_util_s.str.mk_length(len_var), m_util_a.mk_int(-1)));
+                        }
                         block_curr_len(len_formula, false);
-                        STRACE(str, tout << "loop-protection: unsat " << std::endl;);
                         return l_false;
+                    } else {
+                        // otherwise we find unsat core of the current assignment with the len_formula and add this unsat core as a theory lemma.
+                        expr_ref unsat_core(m.mk_true(), m);
+                        if (check_len_sat(len_formula, true, &unsat_core) == l_false) {
+                            unsat_core = m.mk_not(unsat_core);
+                            ctx.internalize(unsat_core.get(), true);
+                            add_axiom({mk_literal(unsat_core)});
+                            block_curr_len(len_formula, false);
+                            STRACE(str, tout << "loop-protection: unsat " << std::endl;);
+                            return l_false;
+                        }
                     }
                 }
             }

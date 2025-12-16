@@ -344,13 +344,11 @@ namespace smt::noodler {
                 // we need to block current assignment
                 STRACE(str, tout << "assignment unsat " << mk_pp(block_len, m) << std::endl;);
 
-                if(m.is_false(block_len)) {
+                if (m.is_false(block_len)) {
                     // there was no possible solution from the decision procedure, we can completely block this string assignment
                     block_curr_len(block_len, false, true);
-                } else if(init_length_sensitive_vars.empty()) {
-                    // if there are no length vars comming from the initial formula (or from axiom saturation),
-                    // we can block the string assignment only, but only if the context is satisfiable, otherwise
-                    // we might confuse Z3 and it will decide the whole formula is UNSAT (even though there is some satisfiable context)
+                } else if (!check_len_sat_with_context) {
+                    // if we were not checking length satisfiability with the context, then the current string assignment must be unsatisfiable on its own => we can block it completely
                     block_curr_len(expr_ref(m.mk_false(), m));
                 } else {
                     block_curr_len(block_len);

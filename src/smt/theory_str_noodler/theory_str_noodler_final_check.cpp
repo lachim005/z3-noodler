@@ -785,16 +785,14 @@ namespace smt::noodler {
         }
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
-        STRACE(str_block, tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
-
+    expr_ref theory_str_noodler::construct_refinement() {
         context& ctx = get_context();
 
         ast_manager& m = get_manager();
         expr *refinement = nullptr;
+        STRACE(str, tout << "[Constructing refinement]\n";);
         for (const auto& we : this->m_word_eq_todo_rel) {
             // we create the equation according to we
-            //expr *const e = m.mk_not(m.mk_eq(we.first, we.second));
             expr *const e = ctx.mk_eq_atom(we.first, we.second);
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
         }
@@ -802,27 +800,37 @@ namespace smt::noodler {
         literal_vector ls;
         for (const auto& wi : this->m_word_diseq_todo_rel) {
             expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
+            // e might not be internalized
+            if(!ctx.e_internalized(e)) {
+                ctx.internalize(e, false);
+            }
             refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
         }
-
         for (const auto& in : this->m_membership_todo_rel) {
             app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
             if(!std::get<2>(in)){
                 in_app = m.mk_not(in_app);
-            }
-            if(!ctx.e_internalized(in_app)) {
-                ctx.internalize(in_app, false);
+                if(!ctx.e_internalized(in_app)) {
+                    ctx.internalize(in_app, false);
+                }
             }
             refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
         }
-
         for(const auto& nc : this->m_not_contains_todo_rel) {
             app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
             refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
         }
 
+        return expr_ref(refinement, m);
+    }
+
+    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
+        STRACE(str_block, tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+
+        expr_ref refinement = construct_refinement();
+
         if(m_params.m_loop_protect && add_axiomatized) {
-            this->axiomatized_instances.push_back({expr_ref(refinement, this->m), stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
+            this->axiomatized_instances.push_back({refinement, stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
         }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));

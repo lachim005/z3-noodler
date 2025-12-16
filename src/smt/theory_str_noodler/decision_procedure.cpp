@@ -882,7 +882,7 @@ namespace smt::noodler {
         set_initial_variables(equations_and_transducers);
 
         SolvingState init_solving_state;
-        init_solving_state.length_sensitive_vars = this->init_length_sensitive_vars; // !!!!!IMPORTANT!!!! cannot be std::move(this->init_length_sensitive_vars) as init_length_sensitive_vars is used in final_check_eh
+        init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
         for (const auto& subs : init_substitution_map) {
             init_solving_state.aut_ass.erase(subs.first);

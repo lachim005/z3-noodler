@@ -587,8 +587,11 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Get the length formula of the equation. For an equation X1 X2 X3 ... = Y1 Y2 Y3 ...
-         * creates a formula |X1|+|X2|+|X3|+ ... = |Y1|+|Y2|+|Y3|+ ...
+         * @brief Get the length formula of the (dis)equation.
+         * For an equation X1 X2 ... Xn = Y1 Y2 ... Ym creates the formula
+         * |X1|+|X2|+...+|Xn| = |Y1|+|Y2|+...+|Ym|
+         * Similarly, for a disequation X1 X2 ... Xn != Y1 Y2 ... Ym creates the formula
+         * |X1|+|X2|+...+|Xn| != |Y1|+|Y2|+...+|Ym|
          *
          * @return LenNode Root of the length formula
          */

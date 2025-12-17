@@ -427,7 +427,7 @@ namespace smt::noodler {
                                                             noodle[i].input_aut, // we assign Ai to new_input_var
                                                             std::string("input_") + std::to_string(noodlification_no),
                                                             new_element.contains_length_var(input_vars_divisions[noodle[i].input_index]),
-                                                            false // we do not want literals in simple transducers
+                                                            true
                                                         ); // xi
                 input_vars_to_new_input_vars[noodle[i].input_index].push_back(new_input_var);
 
@@ -437,7 +437,7 @@ namespace smt::noodler {
                                                             // lengthness must be propagated from input to output too
                                                             new_element.contains_length_var(input_vars_divisions[noodle[i].input_index])
                                                                 || new_element.length_sensitive_vars.contains(output_vars[noodle[i].output_index]),
-                                                            false // we do not want literals in simple transducers
+                                                            true
                                                         ); // xo
                 output_vars_to_new_output_vars[noodle[i].output_index].push_back(new_output_var);
 

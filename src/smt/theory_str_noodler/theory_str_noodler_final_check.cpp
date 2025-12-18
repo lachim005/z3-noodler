@@ -217,7 +217,7 @@ namespace smt::noodler {
         // try a heuristic based procedure for disequations only
         if (contains_word_disequations && this->m_conversion_todo.empty() && this->m_not_contains_todo_rel.empty()
             && DiseqLengthHeuristicProcedure::is_suitable(instance, aut_assignment)) {
-            lbool result = run_diseq_length_heur(instance, aut_assignment);
+            lbool result = run_diseq_length_heur(instance, aut_assignment, init_length_sensitive_vars);
             if (result == l_true) {
                 return FC_DONE;
             } else if(result == l_false) {
@@ -1065,7 +1065,7 @@ namespace smt::noodler {
         return result;
     }
 
-    lbool theory_str_noodler::run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment) {
+    lbool theory_str_noodler::run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
         dec_proc = std::make_shared<DiseqLengthHeuristicProcedure>(instance, aut_assignment, m_params);
         this->statistics.at("diseq-length-heur").num_start++;
 
@@ -1080,7 +1080,7 @@ namespace smt::noodler {
         expr_ref lengths = len_node_to_z3_formula(len_node);
         (void)precision; // precision is always underapprox for this procedure
 
-        lbool is_lengths_sat = check_len_sat(lengths);
+        lbool is_lengths_sat = check_len_sat(lengths, !init_length_sensitive_vars.empty()); // if there are no length vars in the current string formula, we do not need to check with context
         if (is_lengths_sat == l_true) {
             sat_handling(lengths);
             this->statistics.at("diseq-length-heur").num_finish++;

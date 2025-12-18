@@ -546,10 +546,11 @@ namespace smt::noodler {
          * @brief Run heuristic that enforces differing lengths for each disequation.
          *
          * @param instance Current instance converted to Formula
-         * @param aut_assignment Current automata assignment (not used, kept for symmetry)
+         * @param aut_assignment Current automata assignment
+         * @param init_length_sensitive_vars Length sensitive variables
          * @return lbool Outcome of the heuristic
          */
-        lbool run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment);
+        lbool run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         
         /**
          * @brief Wrapper for running the loop protection.

@@ -332,7 +332,7 @@ namespace smt::noodler {
             params(par),
             transducer(trans) {
             assert(type == PredicateType::Transducer);
-            assert(trans->num_of_levels == 2);
+            assert(trans->levels.num_of_levels == 2);
         }
 
 

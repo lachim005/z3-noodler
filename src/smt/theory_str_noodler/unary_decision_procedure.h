@@ -12,8 +12,7 @@ namespace smt::noodler {
      * 
      * The satisfiability of unary system of equations (system of equations over singleton alphabet) is 
      * satisfiable iff the lengths are satisfiable. The model is then constructed as a^n where n is a LIA 
-     * solution for a particular variable. It is assumed that the lenght formulas from equations are already
-     * in the system and after runnnig this procedure, you should check_len_sat with true formula.
+     * solution for a particular variable.
      */
     class UnaryDecisionProcedure : public AbstractDecisionProcedure {
         Formula formula;
@@ -53,16 +52,9 @@ namespace smt::noodler {
                 ln.succ.push_back(this->aut_ass.get_lengths(bt));
             }
             for(const Predicate& pr : this->formula.get_predicates()) {
-                if(pr.is_equation()) {
-                    continue;
-                } else if(pr.is_inequation()) {
-                    // add |LHS| != |RHS| (for equations it is not necessary to add because it was
-                    // already added during the axiom saturation before). 
-                    ln.succ.push_back(pr.get_formula_eq());
-                } else {
-                    UNREACHABLE();
-                }
-                
+                SASSERT(pr.is_eq_or_ineq());
+                // add |LHS| = |RHS| or |LHS| != |RHS| based on whether pr is equation or inequation
+                ln.succ.push_back(pr.get_formula_eq());
             }
             STRACE(str_unary_lengths, tout << ln << "\n";);
             return {ln, LenNodePrecision::PRECISE};

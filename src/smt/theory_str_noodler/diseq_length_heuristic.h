@@ -249,13 +249,6 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Get the length sensitive variables collected during preprocessing
-         */
-        const std::unordered_set<BasicTerm>& get_init_length_sensitive_vars() const override {
-            return length_sensitive_vars;
-        }
-
-        /**
          * Check whether the instance is suitable for this heuristic (contains only disequations).
          *
          * @param instance Formula to check

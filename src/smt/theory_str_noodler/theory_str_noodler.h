@@ -460,12 +460,12 @@ namespace smt::noodler {
                                 std::vector<TermConversion> conversions);
 
         /**
-         * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints.
+         * @brief Check if the length formula @p len_formula is satisfiable with the existing length constraints (the context).
          * 
-         * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of 
-         * the current @p len_formula. If the parameter is nullptr, the unsat core is not computed.
+         * @param check_with_context If false, checks only if the length formula @p len_formula is satisfiable
+         * @param[out] unsat_core If this parameter is NOT nullptr, the LIA solver stores here unsat core of the current @p len_formula.
          */
-        lbool check_len_sat(expr_ref len_formula, expr_ref* unsat_core=nullptr);
+        lbool check_len_sat(expr_ref len_formula, bool check_with_context, expr_ref* unsat_core=nullptr);
 
         /**
          * @brief Blocks current SAT assignment for given @p len_formula
@@ -546,10 +546,11 @@ namespace smt::noodler {
          * @brief Run heuristic that enforces differing lengths for each disequation.
          *
          * @param instance Current instance converted to Formula
-         * @param aut_assignment Current automata assignment (not used, kept for symmetry)
+         * @param aut_assignment Current automata assignment
+         * @param init_length_sensitive_vars Length sensitive variables
          * @return lbool Outcome of the heuristic
          */
-        lbool run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment);
+        lbool run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars);
         
         /**
          * @brief Wrapper for running the loop protection.

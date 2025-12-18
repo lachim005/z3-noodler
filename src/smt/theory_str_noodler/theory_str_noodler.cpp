@@ -2438,45 +2438,6 @@ namespace smt::noodler {
         STRACE(str, ctx.display_literals_verbose(tout << "[Conflict]\n", lv) << '\n';);
     }
 
-    expr_ref theory_str_noodler::construct_refinement() {
-        context& ctx = get_context();
-
-        ast_manager& m = get_manager();
-        expr *refinement = nullptr;
-        STRACE(str, tout << "[Constructing refinement]\n";);
-        for (const auto& we : this->m_word_eq_todo_rel) {
-            // we create the equation according to we
-            expr *const e = ctx.mk_eq_atom(we.first, we.second);
-            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
-        }
-
-        literal_vector ls;
-        for (const auto& wi : this->m_word_diseq_todo_rel) {
-            expr_ref e(m.mk_not(ctx.mk_eq_atom(wi.first, wi.second)), m);
-            // e might not be internalized
-            if(!ctx.e_internalized(e)) {
-                ctx.internalize(e, false);
-            }
-            refinement = refinement == nullptr ? e : m.mk_and(refinement, e);
-        }
-        for (const auto& in : this->m_membership_todo_rel) {
-            app_ref in_app(m_util_s.re.mk_in_re(std::get<0>(in), std::get<1>(in)), m);
-            if(!std::get<2>(in)){
-                in_app = m.mk_not(in_app);
-                if(!ctx.e_internalized(in_app)) {
-                    ctx.internalize(in_app, false);
-                }
-            }
-            refinement = refinement == nullptr ? in_app : m.mk_and(refinement, in_app);
-        }
-        for(const auto& nc : this->m_not_contains_todo_rel) {
-            app_ref nc_app(m.mk_not(m_util_s.str.mk_contains(nc.first, nc.second)), m);
-            refinement = refinement == nullptr ? nc_app : m.mk_and(refinement, nc_app);
-        }
-
-        return expr_ref(refinement, m);
-    }
-
     void theory_str_noodler::mark_expression_as_length(expr *e) {
         if(m_util_s.str.is_string(e)) {
             return;

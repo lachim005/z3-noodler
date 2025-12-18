@@ -5,6 +5,7 @@
 #include "smt/theory_str_noodler/expr_solver.h"
 #include "smt/theory_str_noodler/quant_lia_solver.h"
 #include "memb_heuristics_procedures.h"
+#include "diseq_length_heuristic.h"
 
 namespace smt::noodler {
 
@@ -207,6 +208,17 @@ namespace smt::noodler {
         if(m_params.m_try_unary_proc && symbols_in_formula.size() == 2 && !contains_conversions && !contains_transducers && this->m_not_contains_todo_rel.size() == 0 && UnaryDecisionProcedure::is_suitable(instance, aut_assignment)) { // dummy symbol + 1
             lbool result = run_length_sat(instance, aut_assignment, init_length_sensitive_vars, conversions);
             if(result == l_true) {
+                return FC_DONE;
+            } else if(result == l_false) {
+                return FC_CONTINUE;
+            }
+        }
+
+        // try a heuristic based procedure for disequations only
+        if (contains_word_disequations && this->m_conversion_todo.empty() && this->m_not_contains_todo_rel.empty()
+            && DiseqLengthHeuristicProcedure::is_suitable(instance, aut_assignment)) {
+            lbool result = run_diseq_length_heur(instance, aut_assignment);
+            if (result == l_true) {
                 return FC_DONE;
             } else if(result == l_false) {
                 return FC_CONTINUE;
@@ -1051,6 +1063,30 @@ namespace smt::noodler {
 
         if(result != l_undef) this->statistics.at("multi-memb-heur").num_finish++;
         return result;
+    }
+
+    lbool theory_str_noodler::run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment) {
+        dec_proc = std::make_shared<DiseqLengthHeuristicProcedure>(instance, aut_assignment, m_params);
+        this->statistics.at("diseq-length-heur").num_start++;
+
+        dec_proc->init_computation();
+        if (dec_proc->preprocess() == l_false) {
+            this->statistics.at("diseq-length-heur").num_solved_preprocess++;
+            block_curr_len(expr_ref(m.mk_false(), m));
+            return l_false;
+        }
+
+        auto [len_node, precision] = dec_proc->get_lengths();
+        expr_ref lengths = len_node_to_z3_formula(len_node);
+        (void)precision; // precision is always underapprox for this procedure
+
+        lbool is_lengths_sat = check_len_sat(lengths);
+        if (is_lengths_sat == l_true) {
+            sat_handling(lengths);
+            this->statistics.at("diseq-length-heur").num_finish++;
+            return l_true;
+        }
+        return l_undef;
     }
 
     lbool theory_str_noodler::run_loop_protection() {

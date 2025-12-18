@@ -160,6 +160,7 @@ namespace smt::noodler {
             {"unary", {0 ,0 ,0}}, // unary decision procedure
             {"single-memb-heur", {0 ,0 ,0}}, // membership heuristic
             {"multi-memb-heur", {0 ,0 ,0}}, // multiple memberhip heuritstic
+            {"diseq-length-heur", {0 ,0 ,0}}, // disequation length heuristic
         };
 
         // we need this because part of Z3 is written like C, and statistic takes 'const char*', which has to be kept somewhere
@@ -171,6 +172,7 @@ namespace smt::noodler {
             {"unary", {"str-num-proc-unary-start", "str-num-proc-unary-finish", "str-num-proc-unary-solved-preprocess"}}, // unary decision procedure
             {"single-memb-heur", {"str-num-proc-single-memb-heur-start", "str-num-proc-single-memb-heur-finish", "str-num-proc-single-memb-heur-solved-preprocess"}}, // membership heuristic
             {"multi-memb-heur", {"str-num-proc-multi-memb-heur-start", "str-num-proc-multi-memb-heur-finish", "str-num-proc-multi-memb-heur-solved-preprocess"}}, // multiple memberhip heuritstic
+            {"diseq-length-heur", {"str-num-proc-diseq-length-heur-start", "str-num-proc-diseq-length-heur-finish", "str-num-proc-diseq-length-heur-solved-preprocess"}}, // disequation length heuristic
         };
 
         // Stuff for model generation
@@ -539,6 +541,15 @@ namespace smt::noodler {
          * @return lbool Outcome of the heuristic procedure.
          */
         lbool run_mult_membership_heur();
+
+        /**
+         * @brief Run heuristic that enforces differing lengths for each disequation.
+         *
+         * @param instance Current instance converted to Formula
+         * @param aut_assignment Current automata assignment (not used, kept for symmetry)
+         * @return lbool Outcome of the heuristic
+         */
+        lbool run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment);
         
         /**
          * @brief Wrapper for running the loop protection.

@@ -118,14 +118,14 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Adds all transducers that contain length vars on input and are not simple (they do not have one input and one output var) back to processing.
+         * @brief Adds all transducers that contain length vars on input and are not simple (they do not have one input and one output var, or output is literal) back to processing.
          * 
          * It pushes a transducer only if it is not pushed already.
          * Useful after calling substitute_vars().
          */
         void push_non_simple_transducers_to_processing() {
             for (const Predicate &transducer : transducers) {
-                if (contains_length_var(transducer.get_input()) && (transducer.get_input().size() != 1 || transducer.get_output().size() != 1 || transducer.get_input()[0].is_literal() || transducer.get_input()[1].is_literal())) {
+                if (contains_length_var(transducer.get_input()) && (transducer.get_input().size() != 1 || transducer.get_output().size() != 1 || transducer.get_output()[0].is_literal())) {
                     push_unique(transducer, false);
                 }
             }

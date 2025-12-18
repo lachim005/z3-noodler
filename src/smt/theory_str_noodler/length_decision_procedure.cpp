@@ -516,8 +516,12 @@ namespace smt::noodler {
         
         STRACE(str, tout << " - checking suitability: "; );
         for (const Predicate& pred : this->formula.get_predicates()) {
+            // disequations we underapproximate
+            if(pred.is_inequation()) {
+                continue;
+            }
             if (!pred.is_equation()) {
-                STRACE(str, tout << "False - Inequations\n");
+                STRACE(str, tout << "False - Unsupported predicate\n");
                 return l_undef;
             }
             if (pred.mult_occurr_var_side(Predicate::EquationSideType::Left) || 
@@ -561,6 +565,9 @@ namespace smt::noodler {
         }
 
         for (const Predicate& pred : this->formula.get_predicates()) {
+            if(pred.is_inequation()) {
+                continue;
+            }
             this->pool.add_to_pool(pred);
         }   
 
@@ -592,6 +599,15 @@ namespace smt::noodler {
         // generate length for each batch of equations in the pool
         for (const auto& [var, constr] : pool) {
             computed_len_formula.emplace_back(constr.get_lengths(this->pool));
+        }
+        // for disequations, generate |lhs| != |rhs|
+        for (const Predicate& pred : this->formula.get_predicates()) {
+            if(!pred.is_inequation()) {
+                continue;
+            }
+            this->precision = LenNodePrecision::UNDERAPPROX;
+            STRACE(str, tout << "Disequation: " << pred.to_string() << std::endl;);
+            computed_len_formula.push_back(pred.get_formula_eq());
         }
 
         // there are multiple variable occurrences --> generate LIA formula matching their values

@@ -212,7 +212,7 @@ namespace smt::noodler {
          * @brief Checks if the automaton for @p t contains empty word in its language.
          */
         bool contains_epsilon(const BasicTerm &t) const {
-            return this->at(t)->is_in_lang({});
+            return this->at(t)->is_in_lang(mata::Word{});
         }
 
         // adds all mappings of variables from other to this assignment except those which already exists in this assignment

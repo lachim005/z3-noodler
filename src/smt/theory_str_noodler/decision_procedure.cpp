@@ -339,7 +339,7 @@ namespace smt::noodler {
 
             if (non_literal_side.empty()) {
                 // if the non-literal side is actually empty, then we can just check if the result of application contains epsilon
-                if (application_to_literal.is_in_lang({})) {
+                if (application_to_literal.is_in_lang(mata::Word{})) {
                     // if it does, we can continue with this solving_state, otherwise we keep it out of worklist as it will not lead to solution
                     push_to_worklist(std::move(solving_state), false);
                 }
@@ -608,7 +608,7 @@ namespace smt::noodler {
             // The tapes of combined_transducer represent the vars in vars_on_tapes. We want to encode the length dependencies
             // between these vars. We will do it trought parikh formula.
             auto [combined_transducer, vars_on_tapes] = get_composed_trans_with_tapes(output_var);
-            assert(combined_transducer.num_of_levels == vars_on_tapes.size());
+            assert(combined_transducer.levels.num_of_levels == vars_on_tapes.size());
 
             // We are now going to build a parikh formula for combined_transducer. We firstly simplify combined_transducer
             // to a one that contains only epsilon transitions and transitions with just one specific symbol. This is because

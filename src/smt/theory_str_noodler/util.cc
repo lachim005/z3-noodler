@@ -383,7 +383,7 @@ namespace smt::noodler::util {
         std::set<State> visited_states;
         std::deque<State> queue;
         for(mata::nft::State initial_state : transducer.initial) {
-            queue.emplace_back(initial_state, transducer.num_of_levels);
+            queue.emplace_back(initial_state, transducer.levels.num_of_levels);
         }
         while(!queue.empty()) {
             State current_state = queue.front();
@@ -426,10 +426,10 @@ namespace smt::noodler::util {
                 tout << std::endl;
             }
         );
-        assert(nft.num_of_levels == lengths.size());
+        assert(nft.levels.num_of_levels == lengths.size());
         assert(!nft.contains_jump_transitions());
         if (potentional_initial_states.empty() || nft.final.empty()) { return std::nullopt; }
-        if (nft.initial.intersects_with(nft.final) && std::ranges::all_of(lengths, [](int x) { return x == 0; })) { return std::vector<mata::Word>(nft.num_of_levels, mata::Word()); }
+        if (nft.initial.intersects_with(nft.final) && std::ranges::all_of(lengths, [](int x) { return x == 0; })) { return std::vector<mata::Word>(nft.levels.num_of_levels, mata::Word()); }
         STRACE(str_model_transducer,
             if (is_trace_enabled(TraceTag::str_model_nfa)) {
                 tout << "Transitions with number of times we have to pass them (some number can be shared):\n";

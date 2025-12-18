@@ -1394,7 +1394,7 @@ namespace smt::noodler::parikh {
         LenNode parikhStruct = ParikhImage::compute_parikh_image();
         LenNode len_formula(LenFormulaType::AND);
 
-        std::vector<LenNode> sum_tapes(this->nft.num_of_levels, LenNode(LenFormulaType::PLUS));
+        std::vector<LenNode> sum_tapes(this->nft.levels.num_of_levels, LenNode(LenFormulaType::PLUS));
         std::map<BasicTerm, std::map<mata::Symbol, std::vector<BasicTerm>>> tape_var_symbol_to_transition_vars;
 
         for(const auto& [trans, var] : get_trans_vars()) {

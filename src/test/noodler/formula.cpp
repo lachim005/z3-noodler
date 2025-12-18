@@ -16,9 +16,9 @@ TEST_CASE( "Transducer predicate", "[noodler]" ) {
     mata::nft::Nft nft{2};
     nft.initial = {0};
     nft.final = {1};
-    nft.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
     CHECK(nft.delta.num_of_states() == 3);
-    CHECK(nft.is_tuple_in_lang({ {'a'}, {'b'} }));
+    CHECK(nft.is_in_lang_by_levels({ {'a'}, {'b'} }));
 
     BasicTerm x {BasicTermType::Variable, "x"};
     BasicTerm y {BasicTermType::Variable, "x"};
@@ -26,8 +26,8 @@ TEST_CASE( "Transducer predicate", "[noodler]" ) {
     SECTION("Switched predicate") {
          // transducer implementing inversion relation
         mata::nft::Nft nft_inv = mata::nft::invert_levels(nft);
-        CHECK(nft_inv.is_tuple_in_lang({ {'b'}, {'a'} }));
-        CHECK(!nft_inv.is_tuple_in_lang({ {'a'}, {'b'} }));
+        CHECK(nft_inv.is_in_lang_by_levels({ {'b'}, {'a'} }));
+        CHECK(!nft_inv.is_in_lang_by_levels({ {'a'}, {'b'} }));
 
         Predicate pred_trans { PredicateType::Transducer, { { x }, { y } }, std::make_shared<mata::nft::Nft>(nft) };
         Predicate pred_trans_switch = pred_trans.get_switched_sides_predicate();
@@ -41,7 +41,7 @@ TEST_CASE( "Transducer predicate", "[noodler]" ) {
         mata::nft::Nft nft_other{2};
         nft_other.initial = {0};
         nft_other.final = {1};
-        nft_other.insert_word_by_parts(0, { {'c'}, {'d'} } , 1);
+        nft_other.insert_word_by_levels(0, { {'c'}, {'d'} } , 1);
 
         
         Predicate p1 { PredicateType::Transducer, { { x }, { y } }, std::make_shared<mata::nft::Nft>(nft) };
@@ -72,7 +72,7 @@ TEST_CASE( "Transducer predicate", "[noodler]" ) {
         mata::nft::Nft nft_other{2};
         nft_other.initial = {0};
         nft_other.final = {1};
-        nft_other.insert_word_by_parts(0, { {'c'}, {'d'} } , 1);
+        nft_other.insert_word_by_levels(0, { {'c'}, {'d'} } , 1);
         auto nft_ptr = std::make_shared<mata::nft::Nft>(nft);
 
         

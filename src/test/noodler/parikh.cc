@@ -953,7 +953,7 @@ TEST_CASE("Transducers :: simple lengths", "[noodler]") {
         mata::nft::Nft nft1{2};
         nft1.initial = {0};
         nft1.final = {1};
-        nft1.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+        nft1.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
 
         ParikhImageTransducer pi(nft1, vars_on_tapes);
         LenNode formula = pi.compute_parikh_image();
@@ -966,7 +966,7 @@ TEST_CASE("Transducers :: simple lengths", "[noodler]") {
         mata::nft::Nft nft2{2};
         nft2.initial = {0};
         nft2.final = {1};
-        nft2.insert_word_by_parts(0, { {'a', 'b'}, {'b', 'b'} } , 1);
+        nft2.insert_word_by_levels(0, { {'a', 'b'}, {'b', 'b'} } , 1);
 
         ParikhImageTransducer pi(nft2, vars_on_tapes);
         LenNode formula = pi.compute_parikh_image();
@@ -979,7 +979,7 @@ TEST_CASE("Transducers :: simple lengths", "[noodler]") {
         mata::nft::Nft nft3{2};
         nft3.initial = {0};
         nft3.final = {1};
-        nft3.insert_word_by_parts(0, { {'a', 'b'}, {'b'} } , 1);
+        nft3.insert_word_by_levels(0, { {'a', 'b'}, {'b'} } , 1);
 
         ParikhImageTransducer pi(nft3, vars_on_tapes);
         LenNode formula = pi.compute_parikh_image();

@@ -70,7 +70,7 @@ TEST_CASE("theory_str_noodler::util") {
         auto make_identity_transducer = [](const std::set<mata::Symbol>& alphabet, unsigned length) {
             unsigned num_states = length + 1;
             mata::nft::Nft transducer {num_states};
-            transducer.num_of_levels = 2; // input and output tapes
+            transducer.levels.num_of_levels = 2; // input and output tapes
             transducer.initial.insert(0);
             transducer.final.insert(num_states - 1);
             for (unsigned i = 0; i < length; ++i) {
@@ -93,7 +93,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: transducer with non-identity mapping should return false
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Only non-identity transition
@@ -104,14 +104,14 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: empty transducer (no transitions, no initial/final)
         {
             mata::nft::Nft transducer {1};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             CHECK(util::contains_trans_identity(transducer, 1) == l_false);
         }
 
         // Test: identity for length 0 (initial is final)
         {
             mata::nft::Nft transducer {1};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(0);
             CHECK(util::contains_trans_identity(transducer, 0) == l_true);
@@ -120,7 +120,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: self-loop on initial state with identity symbol, length 1, should not accept unless final is reached
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Self-loop on initial state (identity)
@@ -133,7 +133,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: self-loop on initial state only, no path to final, should not accept
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Only self-loop, no transition to final
@@ -145,7 +145,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: self-loop on initial state, but final is also initial, length 1, should accept for length 0 only
         {
             mata::nft::Nft transducer {1};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(0);
             // Self-loop
@@ -157,7 +157,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: self-loop on initial state with non-identity symbol, should not accept
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Self-loop with non-identity
@@ -167,7 +167,7 @@ TEST_CASE("theory_str_noodler::util") {
             CHECK(util::contains_trans_identity(transducer, 1));
             // If only non-identity self-loop, should not accept
             mata::nft::Nft t2 {2};
-            t2.num_of_levels = 2;
+            t2.levels.num_of_levels = 2;
             t2.initial.insert(0);
             t2.final.insert(1);
             t2.add_transition(0, {'a', 'b'}, 0);
@@ -177,7 +177,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: longer self-loop chain, only identity path should be accepted
         {
             mata::nft::Nft transducer {3};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(2);
             // Self-loop on 0
@@ -191,7 +191,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: l_undef is returned if a tape can exceed the required length (non-identity self-loop)
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Self-loop with identity symbol
@@ -207,7 +207,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: l_undef is returned if there is a path that can produce longer tapes than required (identity self-loop, no final state reachable)
         {
             mata::nft::Nft transducer {2};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(1);
             // Only self-loop with identity
@@ -219,7 +219,7 @@ TEST_CASE("theory_str_noodler::util") {
         // Test: l_undef is returned if there is a cycle with identity transitions and no final state is reachable in exactly the required length
         {
             mata::nft::Nft transducer {3};
-            transducer.num_of_levels = 2;
+            transducer.levels.num_of_levels = 2;
             transducer.initial.insert(0);
             transducer.final.insert(2);
             // Cycle: 0 -> 1 -> 0 with identity transitions

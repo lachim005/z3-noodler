@@ -354,12 +354,12 @@ TEST_CASE("Inclusion graph with transducers", "[noodler]") {
     mata::nft::Nft nft1{2};
     nft1.initial = {0};
     nft1.final = {1};
-    nft1.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft1.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
 
     mata::nft::Nft nft2{2};
     nft2.initial = {0};
     nft2.final = {1};
-    nft2.insert_word_by_parts(0, { {'c'}, {'d'} } , 1);
+    nft2.insert_word_by_levels(0, { {'c'}, {'d'} } , 1);
 
 
     SECTION("T(x,y) && S(zz,yu)") {

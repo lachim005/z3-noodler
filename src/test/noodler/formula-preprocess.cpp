@@ -277,7 +277,7 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
     mata::nft::Nft nft{2};
     nft.initial = {0};
     nft.final = {1};
-    nft.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
     auto nft_ptr = std::make_shared<mata::nft::Nft>(nft);
 
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x2}) })  );
@@ -357,7 +357,7 @@ TEST_CASE( "Remove duplicates", "[noodler]" ) {
     mata::nft::Nft nft{2};
     nft.initial = {0};
     nft.final = {1};
-    nft.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
     auto nft_ptr = std::make_shared<mata::nft::Nft>(nft);
 
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4}), std::vector<BasicTerm>({b, x1, x2}) })  );
@@ -484,7 +484,7 @@ TEST_CASE( "Reduce regular", "[noodler]" ) {
     });
 
     mata::nft::Nft nft{2, {0}, {1}};
-    nft.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
     auto nft_ptr = std::make_shared<mata::nft::Nft>(nft);
 
     Predicate eq1(PredicateType::Inequation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x3, x4, b}), std::vector<BasicTerm>({x1, x1, x2}) })  );
@@ -593,7 +593,7 @@ TEST_CASE( "Propagate eps", "[noodler]" ) {
     });
 
     mata::nft::Nft nft{2, {0}, {1}};
-    nft.insert_word_by_parts(0, { {'a'}, {'b'} } , 1);
+    nft.insert_word_by_levels(0, { {'a'}, {'b'} } , 1);
     auto nft_ptr = std::make_shared<mata::nft::Nft>(nft);
 
     Predicate eq1(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({eps}), std::vector<BasicTerm>({x1, x2}) })  );

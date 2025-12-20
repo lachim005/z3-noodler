@@ -1,12 +1,7 @@
 name: Z3-Noodler Test
 
 on:
-  pull_request:
-    branches: [devel]
-  push: 
-    # branches: [devel]
-  # allows to run the action from GitHub UI
-  workflow_dispatch:
+  push:
 
 permissions:
   contents: read

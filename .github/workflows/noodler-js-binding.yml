@@ -2,8 +2,8 @@ name: JS Binding (build-&-test)
 
 on:
   push:
-    # branches:
-    #   - devel
+    branches:
+      - devel
   pull_request:
     branches:
       - devel

@@ -59,13 +59,8 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
-      - name: Package binaries
-        run: |
-          mkdir -p dist
-          tar -C build -czf dist/z3-noodler-${{ github.sha }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz bin lib
-
-      - name: Upload artifacts
+      - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/*.tar.gz
+          path: build/z3

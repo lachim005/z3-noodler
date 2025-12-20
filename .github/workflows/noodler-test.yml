@@ -35,12 +35,7 @@ jobs:
           name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
           path: build
 
-      - name: Extract binaries
-        run: |
-          mkdir -p build/bin
-          tar -xzf build/*.tar.gz -C build
-
       - name: Run tests
         run: |
-          cd build/bin
-          ./test-noodler
+          cd build/
+          ./z3-noodler-${{ matrix.os }}-${{ matrix.arch }}

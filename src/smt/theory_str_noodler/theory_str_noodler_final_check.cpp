@@ -1066,7 +1066,7 @@ namespace smt::noodler {
     }
 
     lbool theory_str_noodler::run_diseq_length_heur(const Formula& instance, const AutAssignment& aut_assignment, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) {
-        dec_proc = std::make_shared<DiseqLengthHeuristicProcedure>(instance, aut_assignment, m_params);
+        dec_proc = std::make_shared<DiseqLengthHeuristicProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         this->statistics.at("diseq-length-heur").num_start++;
 
         dec_proc->init_computation();

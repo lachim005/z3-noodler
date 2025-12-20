@@ -20,22 +20,24 @@ namespace smt::noodler {
         AutAssignment aut_ass{};
         SubstitutionMap subst_map{};
         std::map<BasicTerm, zstring> model{};
-        bool computed{false};
 
         /**
-         * @brief Pick a word for @p var of the exact length given in @p arith_model using its automaton.
+         * @brief Pick a word for a variable @p var in aut_ass of the exact length (if needed) given in @p arith_model using its automaton.
          */
-        zstring assign_aut_ass_var(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) const {
-            if(var.is_literal()) {
-                return var.get_name();
+        zstring assign_aut_ass_var(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
+            SASSERT(var.is_variable());
+            mata::Word resulting_word;
+            if (arith_model.contains(var)) { // var might not be length sensitive (if it only occurs in regex and was not intially length sensitive)
+                const rational& total_length = arith_model.at(var);
+                if (!total_length.is_int32()) { util::throw_error(std::string("Length of ") + var.to_string() + std::string(" is too large for mata to handle")); }
+                mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
+                resulting_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word().value(); // will throw exception if aut_ass is empty (should not happen)
+            } else {
+                resulting_word = this->aut_ass.at(var)->get_word().value();
             }
-            const rational& total_length = arith_model.at(var);
-            mata::nfa::Nfa sigma_length = this->aut_ass.sigma_automaton_of_length(total_length.get_int32());
-            auto maybe_word = mata::nfa::intersection(sigma_length, *this->aut_ass.at(var)).get_word();
-            if (!maybe_word.has_value()) {
-                util::throw_error("empty NFA during the model generation");
-            }
-            return aut_ass.get_alphabet().get_string_from_mata_word(*maybe_word);
+            zstring res = aut_ass.get_alphabet().get_string_from_mata_word(resulting_word);
+            model[var] = res;
+            return res;
         }
 
         /**
@@ -45,42 +47,10 @@ namespace smt::noodler {
             const Concat& subst = this->subst_map.at(var);
             zstring res = "";
             for (const BasicTerm& term : subst) {
-                zstring val = "";
-                if (term.is_literal()) {
-                    val = term.get_name();
-                } else if (this->subst_map.contains(term)) {
-                    val = assign_subst_map_var(term, arith_model);
-                } else {
-                    val = model.at(term);
-                }
-                res = res + val;
+                res = res + get_model(var, arith_model);
             }
             model[var] = res;
             return res;
-        }
-
-        /**
-         * @brief Materialize all substitution-map variables using the arithmetic model.
-         */
-        void assign_subst_map_vars(const std::map<BasicTerm, rational>& arith_model) {
-            for (const auto& [term, subst] : this->subst_map) {
-                (void)subst;
-                if (!term.is_variable()) {
-                    continue;
-                }
-                assign_subst_map_var(term, arith_model);
-            }
-        }
-
-        /**
-         * @brief Assign every variable in the language assignment to some word of 
-         * the required length (according to the arithmetic model).
-         */
-        void assign_aut_ass_vars(const std::map<BasicTerm, rational>& arith_model) {
-            for (const auto& t : this->aut_ass) {
-                const BasicTerm& term = t.first;
-                model[term] = assign_aut_ass_var(term, arith_model);
-            }
         }
 
     public:
@@ -101,27 +71,21 @@ namespace smt::noodler {
             this->aut_ass = std::move(aut);
             this->subst_map = std::move(subst);
             this->model.clear();
-            this->computed = false;
-        }
-
-        /**
-         * @brief Build all models based on the provided arithmetic model.
-         */
-        void compute_model(const std::map<BasicTerm, rational>& arith_model) {
-            this->model.clear();
-            assign_aut_ass_vars(arith_model);
-            assign_subst_map_vars(arith_model);
-            this->computed = true;
         }
 
         /**
          * @brief Return the cached model for @p var, computing the cache if needed.
          */
         zstring get_model(const BasicTerm& var, const std::map<BasicTerm, rational>& arith_model) {
-            if (!this->computed) {
-                compute_model(arith_model);
+            if(var.is_literal()) {
+                return var.get_name();
+            } else if (model.contains(var)) {
+                return model.at(var);
+            } else if (aut_ass.contains(var)) {
+                return assign_aut_ass_var(var, arith_model);
+            } else {
+                return assign_subst_map_var(var, arith_model);
             }
-            return model.at(var);
         }
     };
 
@@ -132,8 +96,8 @@ namespace smt::noodler {
      */
     class DiseqLengthHeuristicProcedure : public AbstractDecisionProcedure {
         Formula diseq_formula;
-        std::unordered_set<BasicTerm> length_sensitive_vars;
         AutAssignment aut_ass;
+        std::unordered_set<BasicTerm> length_sensitive_vars;
         const theory_str_noodler_params& m_params;
         SubstitutionMap subst_map{};
         DiseqLengthModelHandler model_handler{};
@@ -149,10 +113,10 @@ namespace smt::noodler {
          * @param aut_ass Automaton assignment for variables in the formula
          * @param params Parameters for Noodler string theory
          */
-        DiseqLengthHeuristicProcedure(Formula diseq_formula, AutAssignment aut_ass, const theory_str_noodler_params& params)
-            : diseq_formula(std::move(diseq_formula)), aut_ass(std::move(aut_ass)), m_params(params) {
+        DiseqLengthHeuristicProcedure(Formula diseq_formula, AutAssignment aut_ass, std::unordered_set<BasicTerm> init_length_sensitive_vars, const theory_str_noodler_params& params)
+            : diseq_formula(std::move(diseq_formula)), aut_ass(std::move(aut_ass)), length_sensitive_vars(std::move(init_length_sensitive_vars)), m_params(params) {
             auto vars = this->diseq_formula.get_vars();
-            length_sensitive_vars.insert(vars.begin(), vars.end());
+            this->length_sensitive_vars.insert(vars.begin(), vars.end());
             model_handler.update_data(this->aut_ass, this->subst_map);
         }
 
@@ -166,6 +130,7 @@ namespace smt::noodler {
         lbool preprocess(PreprocessType, const BasicTermEqiv&) override {
             FormulaPreprocessor prep_handler(this->diseq_formula, this->aut_ass, this->length_sensitive_vars, m_params, {});
 
+            // these rules are useful only for equations, but we can have some in diseq_formula, as suitability check runs them too to see if they are all removed
             prep_handler.propagate_eps();
             prep_handler.propagate_variables();
             prep_handler.remove_trivial();
@@ -233,7 +198,7 @@ namespace smt::noodler {
          * @param str_var String variable for which the model is requested
          * @return Vector of variables affecting length constraints
          */
-        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm&) override {
+        std::vector<BasicTerm> get_len_vars_for_model(const BasicTerm& var) override {
             return std::vector<BasicTerm>(length_sensitive_vars.begin(), length_sensitive_vars.end());
         }
 
@@ -256,6 +221,7 @@ namespace smt::noodler {
          * @return True iff the instance contains only disequations after preprocessing
          */
         static bool is_suitable(const Formula& instance, const AutAssignment& aut_assignment) {
+            // these simple preprocessing rules to remove equations will be used in preprocess(), so it might be helpful to check if they leave us only with disequations
             FormulaPreprocessor prep_handler(instance, aut_assignment, {}, theory_str_noodler_params(), {});
             prep_handler.propagate_eps();
             prep_handler.propagate_variables();
@@ -266,7 +232,9 @@ namespace smt::noodler {
             if (pre_f.contains_pred_type(PredicateType::Equation)
                 || pre_f.contains_pred_type(PredicateType::Transducer)
                 || pre_f.contains_pred_type(PredicateType::NotContains)
-                || !pre_f.contains_pred_type(PredicateType::Inequation)) {
+                || !pre_f.contains_pred_type(PredicateType::Inequation)
+                || !prep_handler.get_removed_inclusions_for_model().empty()) // the used preprocessing rules should not add anything to removed_inclusions_for_model, but just to be safe
+            {
                 return false;
             }
 

@@ -7,9 +7,13 @@ permissions:
   contents: read
 
 jobs:
+  call_build:
+    uses: ./.github/workflows/noodler-build.yml
+
   test:
     name: Test (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    needs: call_build
     strategy:
       fail-fast: false
       matrix:
@@ -25,9 +29,6 @@ jobs:
             runner: macos-15
 
     steps:
-      - name: Trigger Build workflow
-        uses: ./.github/workflows/noodler-build.yml
-
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:

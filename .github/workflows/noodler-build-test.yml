@@ -1,12 +1,18 @@
-name: Z3-Noodler Build
+name: Z3-Noodler Build & Test
 
 on:
   push:
-  workflow_dispatch: # Manual trigger
+    branches:
+      - devel
+  pull_request:
+    branches: 
+      - devel
+  # allows to run the action from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }} / ${{ matrix.arch }})
+    name: Build & Test (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
 
     strategy:
@@ -25,7 +31,9 @@ jobs:
 
     steps:
       - name: Checkout Z3-Noodler
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with: 
+          ref: ${{ github.head_ref }}
 
       - name: Clone Mata
         uses: GuillaumeFalourd/clone-github-repo-action@v2.3
@@ -56,7 +64,7 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
-      - name: Run tests
+      - name: Build & Run tests
         run: |
           cd build/
           make -j$(nproc || sysctl -n hw.ncpu) test-noodler

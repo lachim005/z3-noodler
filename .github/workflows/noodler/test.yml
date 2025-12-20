@@ -1,0 +1,55 @@
+name: Z3-Noodler Test
+
+on:
+  pull_request:
+    branches: [devel]
+  push:
+    branches: [devel]
+  # allows to run the action from GitHub UI
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} / ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            arch: x86_64
+            runner: ubuntu-22.04
+          - os: macos
+            arch: x86_64
+            runner: macos-13
+          - os: macos
+            arch: arm64
+            runner: macos-15
+
+    steps:
+      - name: Trigger Build workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: build.yml
+          repo: ${{ github.repository }}
+          ref: ${{ github.head_ref || github.ref_name }}
+          wait-for-completion: true  # Waits for build to finish
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+          path: build
+
+      - name: Extract binaries
+        run: |
+          mkdir -p build/bin
+          tar -xzf build/*.tar.gz -C build
+
+      - name: Run tests
+        run: |
+          cd build/bin
+          ./test-noodler

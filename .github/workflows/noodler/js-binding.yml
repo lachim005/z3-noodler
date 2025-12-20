@@ -2,12 +2,10 @@ name: JS Binding (build-&-test)
 
 on:
   push:
-    branches: 
-      - master 
+    branches:
       - devel
   pull_request:
-    branches: 
-      - master 
+    branches:
       - devel
   # allows to run the action from GitHub UI
   workflow_dispatch:

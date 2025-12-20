@@ -1,0 +1,70 @@
+name: Z3-Noodler Build
+
+on:
+  workflow_dispatch: # Only manual run, or triggered by other workflows
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }} / ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            arch: x86_64
+            runner: ubuntu-22.04
+          - os: macos
+            arch: x86_64
+            runner: macos-13
+          - os: macos
+            arch: arm64
+            runner: macos-15
+
+    steps:
+      - name: Checkout Z3-Noodler
+        uses: actions/checkout@v4
+
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: VeriFIT
+          repository: mata
+          branch: devel
+          depth: 1
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu'
+        run: sudo apt-get update && sudo apt-get install -y catch2 cmake build-essential
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos'
+        run: brew update && brew install catch2 cmake
+
+      - name: Install Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
+
+      - name: Configure & Build Z3-Noodler
+        run: |
+          mkdir build && cd build
+          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc || sysctl -n hw.ncpu)
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          tar -C build -czf dist/z3-noodler-${{ github.sha }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz bin lib
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*.tar.gz

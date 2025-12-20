@@ -1,7 +1,8 @@
 name: Z3-Noodler Build
 
 on:
-  workflow_dispatch: # Only manual run, or triggered by other workflows
+  workflow_call: # So it can be triggered by other workflows
+  workflow_dispatch: # Manual trigger
 
 permissions:
   contents: read

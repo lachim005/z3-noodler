@@ -26,12 +26,7 @@ jobs:
 
     steps:
       - name: Trigger Build workflow
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: build.yml
-          repo: ${{ github.repository }}
-          ref: ${{ github.head_ref || github.ref_name }}
-          wait-for-completion: true  # Waits for build to finish
+        uses: ./.github/workflows/noodler-build.yml
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4

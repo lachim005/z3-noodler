@@ -1,0 +1,82 @@
+name: Z3-Noodler Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-and-publish-binaries:
+    name: Build (${{ matrix.os }} / ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            arch: x86_64
+            runner: ubuntu-latest
+          - os: macos
+            arch: x86_64
+            runner: macos-15-intel
+          - os: macos
+            arch: arm64
+            runner: macos-latest
+
+    steps:
+      - name: Checkout Z3-Noodler
+        uses: actions/checkout@v4
+
+      - name: Clone Mata
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: VeriFIT
+          repository: mata
+          branch: devel
+          depth: 1
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu'
+        run: sudo apt-get update && sudo apt-get install -y catch2 cmake build-essential
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos'
+        run: brew update && brew install catch2 cmake
+
+      - name: Install Mata
+        run: |
+          cd mata
+          make release
+          sudo make install
+
+      - name: Configure & Build Z3-Noodler
+        run: |
+          mkdir build && cd build
+          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc || sysctl -n hw.ncpu)
+        
+      - run: mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build-and-publish-binaries
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

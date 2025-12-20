@@ -18,13 +18,13 @@ jobs:
         include:
           - os: ubuntu
             arch: x86_64
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
           - os: macos
             arch: x86_64
-            runner: macos-13
+            runner: macos-15-intel
           - os: macos
             arch: arm64
-            runner: macos-15
+            runner: macos-latest
 
     steps:
       - name: Checkout Z3-Noodler

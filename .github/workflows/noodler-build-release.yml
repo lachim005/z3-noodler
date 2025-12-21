@@ -30,32 +30,17 @@ jobs:
         with: 
           ref: ${{ github.head_ref }}
 
-      - name: Clone Mata
-        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
-        with:
-          owner: VeriFIT
-          repository: mata
-          branch: devel
-          depth: 1
-
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu'
-        run: sudo apt-get update && sudo apt-get install -y catch2 cmake build-essential
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos'
-        run: brew update && brew install catch2 cmake
-
-      - name: Install Mata
-        run: |
-          cd mata
-          make release
-          sudo make install
+        run: brew update && brew install cmake
 
       - name: Configure & Build Z3-Noodler
         run: |
           mkdir build && cd build
-          export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:+${CPLUS_INCLUDE_PATH}:}/usr/local/include/"
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
         

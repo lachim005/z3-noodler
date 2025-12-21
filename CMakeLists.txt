@@ -313,13 +313,16 @@ else()
   )
 
   FetchContent_MakeAvailable(mata)
+
+  # We need to put mata include directory into Z3_COMPONENT_EXTRA_INCLUDE_DIRS so that the components of Z3 can find them
+  get_target_property(
+    MATA_LIB_INCLUDES
+    libmata
+    INTERFACE_INCLUDE_DIRECTORIES
+  )
+  list(APPEND Z3_COMPONENT_EXTRA_INCLUDE_DIRS "${MATA_LIB_INCLUDES}")
 endif()
 list(APPEND Z3_DEPENDENT_LIBS libmata)
-# We create a "fake" library that will contain the include files of mata, because Z3
-# uses components which are OBJECT targets, and we need to link them to mata includes
-# somehow. We link each component created using add_component to z3_mata_deps.
-add_library(z3_mata_deps INTERFACE)
-target_link_libraries(z3_mata_deps INTERFACE libmata)
 
 ################################################################################
 # Compiler warnings

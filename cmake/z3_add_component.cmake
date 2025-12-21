@@ -242,8 +242,6 @@ macro(z3_add_component component_name)
   foreach (extra_include ${Z3_COMPONENT_EXTRA_INCLUDE_DIRS})
     target_include_directories(${component_name} PRIVATE "${extra_include}")
   endforeach()
-  # Add includes for mata
-  target_link_libraries(${component_name} PRIVATE z3_mata_deps)
 
   if (NOT Z3_MOD_NOT_LIBZ3_COMPONENT)
     # Add this component to the global list of Z3 components for libz3

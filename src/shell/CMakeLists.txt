@@ -41,12 +41,6 @@ set_target_properties(shell PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON)
 
-# target_link_libraries(shell PRIVATE libmata)
-if (NOT EMSCRIPTEN)
-  find_library(LIBMATA mata)
-  target_link_libraries(shell PRIVATE ${LIBMATA})
-endif()
-
 z3_add_install_tactic_rule(${shell_deps})
 z3_add_memory_initializer_rule(${shell_deps})
 z3_add_gparams_register_modules_rule(${shell_deps})

@@ -24,9 +24,6 @@ if (Catch2_FOUND)
             formula.cpp
     )
 
-    find_library(LIBMATA mata)
-    target_link_libraries(test-noodler PRIVATE ${LIBMATA})
-
     z3_add_install_tactic_rule(${z3_test_deps})
     z3_add_memory_initializer_rule(${z3_test_deps})
     z3_add_gparams_register_modules_rule(${z3_test_deps})

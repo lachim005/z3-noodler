@@ -209,9 +209,6 @@ endif()
 list(APPEND Z3_COMPONENT_EXTRA_INCLUDE_DIRS
   "${PROJECT_BINARY_DIR}/src"
   "${PROJECT_SOURCE_DIR}/src"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/include"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/re2"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/simlib/include"
 )
 
 ################################################################################
@@ -299,6 +296,12 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 list(APPEND Z3_DEPENDENT_LIBS Threads::Threads)
+
+################################################################################
+# Mata
+################################################################################
+find_library(LIBMATA mata)
+list(APPEND Z3_DEPENDENT_LIBS ${LIBMATA})
 
 ################################################################################
 # Compiler warnings

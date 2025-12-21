@@ -307,14 +307,19 @@ if(mata_FOUND)
 else()
   message(STATUS "Installed mata was not found, fetching it")
 	FetchContent_Declare(
-        mata
-        GIT_REPOSITORY https://github.com/VeriFIT/mata
-        GIT_TAG        1.28.2
-    )
+    mata
+    GIT_REPOSITORY https://github.com/VeriFIT/mata
+    GIT_TAG        1.28.2
+  )
 
-    FetchContent_MakeAvailable(mata)
+  FetchContent_MakeAvailable(mata)
 endif()
 list(APPEND Z3_DEPENDENT_LIBS libmata)
+# We create a "fake" library that will contain the include files of mata, because Z3
+# uses components which are OBJECT targets, and we need to link them to mata includes
+# somehow. We link each component created using add_component to z3_mata_deps.
+add_library(z3_mata_deps INTERFACE)
+target_link_libraries(z3_mata_deps INTERFACE libmata)
 
 ################################################################################
 # Compiler warnings

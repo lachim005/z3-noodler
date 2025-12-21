@@ -314,7 +314,7 @@ else()
 
     FetchContent_MakeAvailable(mata)
 endif()
-list(APPEND Z3_DEPENDENT_LIBS ${LIBMATA})
+list(APPEND Z3_DEPENDENT_LIBS libmata)
 
 ################################################################################
 # Compiler warnings

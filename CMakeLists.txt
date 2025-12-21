@@ -300,7 +300,20 @@ list(APPEND Z3_DEPENDENT_LIBS Threads::Threads)
 ################################################################################
 # Mata
 ################################################################################
-find_library(LIBMATA mata)
+include (FetchContent)
+find_package(mata QUIET)
+if(mata_FOUND)
+  message(STATUS "Using installed mata library")
+else()
+  message(STATUS "Installed mata was not found, fetching it")
+	FetchContent_Declare(
+        mata
+        GIT_REPOSITORY https://github.com/VeriFIT/mata
+        GIT_TAG        1.28.2
+    )
+
+    FetchContent_MakeAvailable(mata)
+endif()
 list(APPEND Z3_DEPENDENT_LIBS ${LIBMATA})
 
 ################################################################################

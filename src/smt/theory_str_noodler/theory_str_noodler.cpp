@@ -440,7 +440,8 @@ namespace smt::noodler {
         ) {
             handle_conversion(n);
         } else if (util::is_str_variable(n, m_util_s)) {
-            SASSERT(!var_name.contains(util::get_variable_basic_term(n)));
+            BasicTerm var_for_n = util::get_variable_basic_term(n);
+            SASSERT(!var_name.contains(var_for_n) || var_name.at(var_for_n) == n);
             var_name.insert({util::get_variable_basic_term(n), expr_ref(n, m)});
         } else if (
             m_util_s.str.is_concat(n) || // str.++

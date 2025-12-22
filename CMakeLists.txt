@@ -209,9 +209,6 @@ endif()
 list(APPEND Z3_COMPONENT_EXTRA_INCLUDE_DIRS
   "${PROJECT_BINARY_DIR}/src"
   "${PROJECT_SOURCE_DIR}/src"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/include"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/re2"
-  "${PROJECT_SOURCE_DIR}/extern/lib/mata/3rdparty/simlib/include"
 )
 
 ################################################################################
@@ -299,6 +296,30 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
 list(APPEND Z3_DEPENDENT_LIBS Threads::Threads)
+
+################################################################################
+# Mata
+################################################################################
+include (FetchContent)
+find_package(mata QUIET)
+if(mata_FOUND)
+  message(STATUS "Using installed mata library")
+else()
+  message(STATUS "Installed mata was not found, fetching it")
+	FetchContent_Declare(
+    mata
+    GIT_REPOSITORY https://github.com/VeriFIT/mata
+    GIT_TAG        1.28.2 # needs to be updated manually when new mata version is needed
+  )
+
+  FetchContent_MakeAvailable(mata)
+endif()
+list(APPEND Z3_DEPENDENT_LIBS libmata)
+# We create a "fake" library z3_mata_deps that will contain the include files of mata,
+# because Z3 uses components which are OBJECT targets, and we need to link them to mata
+# includes. So, we link each component to z3_mata_deps (see cmake/z3_add_component.cmake).
+add_library(z3_mata_deps INTERFACE)
+target_link_libraries(z3_mata_deps INTERFACE libmata)
 
 ################################################################################
 # Compiler warnings

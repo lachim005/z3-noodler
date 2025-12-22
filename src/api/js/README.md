@@ -26,7 +26,7 @@ Detailed instruction for binding building for Z3-Noodler:
     git clone 'https://github.com/VeriFIT/mata.git'
     cd mata
     mkdir build && cd build
-    emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMATA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF ..
+    emcmake cmake -DCMAKE_BUILD_TYPE=Release -DMATA_BUILD_EXAMPLES:BOOL=OFF -DBUILD_TESTING:BOOL=OFF -DCMAKE_CXX_FLAGS="-pthread" -DCMAKE_EXE_LINKER_FLAGS="-pthread" ..
     emmake make install
     cd ..
     ```

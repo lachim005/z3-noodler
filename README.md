@@ -15,19 +15,32 @@ For a brief overview of the architecture, see [SMT-COMP'24 Z3-Noodler descriptio
 
 ## Building and running
 
-### Dependencies
+### Step 1 (Optional): Install Mata
 
-1) The [Mata](https://github.com/VeriFIT/mata/) library for efficient handling of finite automata. Minimum required version of `mata` is `v1.26.1`.
-    ```shell
-    git clone 'https://github.com/VeriFIT/mata.git'
-    cd mata
-    make release
-    sudo make install
-    ```
+Z3-Noodler depends on the Mata library for efficient handling of finite automata.
 
-    Make sure your system looks for libraries in `/usr/local/include` (where Mata will be installed). For example, MacOS might skip looking for libraries there, so you might need to add these paths by running, for example `xcode-select --install`, as per a [suggestion from StackOverflow](https://stackoverflow.com/a/26265473).
+Installing Mata **is not required** to build or run Z3-Noodler.
+If Mata is not found on your system, it will be **automatically fetched and built** as part of the Z3-Noodler build process.
 
-### Building Z3-Noodler
+However, if you plan to **develop or frequently rebuild Z3-Noodler**, it is recommended to install Mata manually. This avoids repeatedly downloading and rebuilding Mata and significantly speeds up development workflows.
+
+The minimum required Mata version is `v1.28.2`.
+
+To install mata, run:
+```shell
+git clone 'https://github.com/VeriFIT/mata.git'
+cd mata
+make release
+sudo make install
+```
+
+Make sure your system looks for libraries in `/usr/local/include` (where Mata will be installed).
+On macOS, you may [need to install the Xcode command line tools](https://stackoverflow.com/a/26265473):
+```shell
+xcode-select --install
+```
+
+### Step 2: Build Z3-Noodler
 
 ```shell
 git clone 'https://github.com/VeriFIT/z3-noodler.git'
@@ -48,51 +61,48 @@ command.
 make test-noodler
 ```
 
-### Running Z3-Noodler
-To run Z3-Noodler, use:
+### Step 3: Run Z3-Noodler
+To run Z3-Noodler on an SMT-LIB instance:
 ```shell
-cd build/
 ./z3 <instance_file.smt2> 
 ```
 
 If you want to get a model for sat instances (using `get-model` or `get-value`), you need to enable model generation:
 ```shell
-cd build/
 ./z3 model=true <instance_file.smt2> 
 ```
 
-To run tests for Z3-Noodler, execute
+To run tests for Z3-Noodler:
 ```shell
-cd build/
 ./test-noodler
 ```
 
 ## Aditional string functions
 Other than the constraints defined in the [SMT-LIB theory of strings](https://smt-lib.org/theories-UnicodeStrings.shtml), Z3-Noodler can handle the following functions:
 
-`(str.to_real String Real)`  
+**`(str.to_real String Real)`**  
 Converts a string representation of a (positive) real number to the corresponding number. The string representation can either be a positive integer with leading zeros (similarly as in `str.to_int`) or it can contain one decimal separator `.`. It evaluates to `-1.0` otherwise.  
 Examples:
- - `(str.to_real "4562")` evaluates to `4562.0`
- - `(str.to_real "-4562")` evaluates to `-1.0`
- - `(str.to_real "45.62")` evaluates to `45.62`
- - `(str.to_real "00045.620000")` evaluates to `45.62`
- - `(str.to_real "")` evaluates to `-1.0`
- - `(str.to_real ".456")` evaluates to `0.456`
- - `(str.to_real "8494.")` evaluates to `8494.0`
- - `(str.to_real ".")` evaluates to `-1.0`
- - `(str.to_real "4564a")` evaluates to `-1.0`
- - `(str.to_real "4564e3")` evaluates to `-1.0`
+ - `(str.to_real "4562")` → `4562.0`
+ - `(str.to_real "-4562")` → `-1.0`
+ - `(str.to_real "45.62")` → `45.62`
+ - `(str.to_real "00045.620000")` → `45.62`
+ - `(str.to_real "")` → `-1.0`
+ - `(str.to_real ".456")` → `0.456`
+ - `(str.to_real "8494.")` → `8494.0`
+ - `(str.to_real ".")` → `-1.0`
+ - `(str.to_real "4564a")` → `-1.0`
+ - `(str.to_real "4564e3")` → `-1.0`
 
-`(str.from_real Real Int String)`  
+**`(str.from_real Real Int String)`**  
 Transforms a positive real number `r` to a string `s` with a corresponding number of decimal places `n`. If either `n` or `r` is negative, it evaluates to the empty string.  
 Examples:
- - `(str.from_real 4.56 5)` evaluates to `"4.56000"`
- - `(str.from_real 4.56 0)` evaluates to `"4"`
- - `(str.from_real 4.56 1)` evaluates to `"4.5"`
- - `(str.from_real -4.56 -5)` evaluates to `""`
- - `(str.from_real -4.56 5)` evaluates to `""`
- - `(str.from_real 4.56 -5)` evaluates to `""`
+ - `(str.from_real 4.56 5)` → `"4.56000"`
+ - `(str.from_real 4.56 0)` → `"4"`
+ - `(str.from_real 4.56 1)` → `"4.5"`
+ - `(str.from_real -4.56 -5)` → `""`
+ - `(str.from_real -4.56 5)` → `""`
+ - `(str.from_real 4.56 -5)` → `""`
 
 
 ## Publications

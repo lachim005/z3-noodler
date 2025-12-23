@@ -62,8 +62,9 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true # downloads all binaries to artifacts/ instead of putting each one in artifacts/<name>/
+
       - name: Restore executable permissions
-        run: chmod +x dist/z3-noodler-*
+        run: chmod +x artifacts/z3-noodler-*
   
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

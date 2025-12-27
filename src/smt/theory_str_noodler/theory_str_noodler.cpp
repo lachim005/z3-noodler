@@ -2448,6 +2448,9 @@ namespace smt::noodler {
             len_vars.insert(e);
             return;
         }
+        if(is_var(e)) {
+            return;
+        }
 
         SASSERT(is_app(e));
         app* ex_app{ to_app(e) };

@@ -2448,6 +2448,11 @@ namespace smt::noodler {
             len_vars.insert(e);
             return;
         }
+        // quantified variables are handled in a different way (e.g., for quantifier 
+        // instantiation the variable is replaced by a concrete term in final_check)
+        if(is_var(e)) {
+            return;
+        }
 
         SASSERT(is_app(e));
         app* ex_app{ to_app(e) };

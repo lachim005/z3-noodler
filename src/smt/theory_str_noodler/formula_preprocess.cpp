@@ -1895,10 +1895,15 @@ namespace smt::noodler {
                         for(const size_t & i : rem_ids) {
                             this->formula.remove_predicate(i);
                         }
-                        // add 'a' (some literal) to the end of haystacks
-                        haystacks.emplace_back(BasicTermType::Literal, zstring(*this->aut_ass.get_alphabet().begin()));
+                        // add 'a' (we can add any random symbol) to the end of haystacks
+                        haystacks.emplace_back(BasicTermType::Literal, zstring("a"));
                         // add the inclusion u1.u2.u3...uN.'a' ⊆ x to removed_inclusions_for_model
                         this->removed_inclusions_for_model.push_back(Predicate::create_equation(haystacks, {needle_var}));
+                        // update also the language of x, to accept anything containing 'a' ('a' might not be in the alphabet of aut_ass)
+                        mata::EnumAlphabet alph = aut_ass.get_alphabet().get_mata_alphabet();
+                        alph.add_new_symbol(mata::Symbol('a'));
+                        aut_ass[needle_var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&alph));
+
                         something_changed = true;
                         break;
                     }

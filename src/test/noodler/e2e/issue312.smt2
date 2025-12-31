@@ -1,6 +1,6 @@
 (set-logic ALL)
 (set-option :produce-models true)
-(set-option :status sat)
+(set-info :status sat)
 (declare-sort va)
 (declare-sort r4)
 (declare-fun t (va r4) String)

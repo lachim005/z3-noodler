@@ -1867,6 +1867,7 @@ namespace smt::noodler {
     void FormulaPreprocessor::simplify_not_contains_to_equations() {
         STRACE(str_prep, tout << "Preprocessing step - simplify_not_contains_to_equations\n";);
         bool something_changed = true;
+        BasicTerm oasiegj(BasicTermType::Variable);
         while (something_changed) {
             something_changed = false;
             for(const auto& [id, pred] : this->formula.get_predicates()) {
@@ -1902,8 +1903,9 @@ namespace smt::noodler {
                         // update also the language of x, to accept anything containing 'a' ('a' might not be in the alphabet of aut_ass)
                         mata::EnumAlphabet alph = aut_ass.get_alphabet().get_mata_alphabet();
                         alph.add_new_symbol(mata::Symbol('a'));
-                        aut_ass[needle_var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::builder::create_sigma_star_nfa(&alph));
-
+                        mata::nfa::Nfa sigma_star_with_a = mata::nfa::builder::create_sigma_star_nfa(&alph);
+                        sigma_star_with_a.alphabet = nullptr; // remove alphabet because otherwise mata will start to make problems
+                        aut_ass[needle_var] = std::make_shared<mata::nfa::Nfa>(sigma_star_with_a);
                         something_changed = true;
                         break;
                     }

@@ -1,9 +1,6 @@
 name: Z3-Noodler Release
 
 on:
-  pull_request:
-    branches: 
-      - devel
   workflow_dispatch:
   push:
     tags:
@@ -39,7 +36,7 @@ jobs:
       - name: Checkout Z3-Noodler
         uses: actions/checkout@v6
         with: 
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu'

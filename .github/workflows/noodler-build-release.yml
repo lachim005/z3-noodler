@@ -2,6 +2,11 @@ name: Z3-Noodler Release
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to build (branch, tag, or SHA). Example: upd-release-workflow'
+        required: false
+        default: ''
   push:
     tags:
       - "v*.*.*"
@@ -40,7 +45,7 @@ jobs:
       - name: Checkout Z3-Noodler
         uses: actions/checkout@v6
         with: 
-          ref: ${{ github.head_ref }}
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu'

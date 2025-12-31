@@ -1867,7 +1867,6 @@ namespace smt::noodler {
     void FormulaPreprocessor::simplify_not_contains_to_equations() {
         STRACE(str_prep, tout << "Preprocessing step - simplify_not_contains_to_equations\n";);
         bool something_changed = true;
-        BasicTerm oasiegj(BasicTermType::Variable);
         while (something_changed) {
             something_changed = false;
             for(const auto& [id, pred] : this->formula.get_predicates()) {

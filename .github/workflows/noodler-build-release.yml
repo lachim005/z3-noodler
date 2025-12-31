@@ -26,10 +26,6 @@ jobs:
             arch: x86_64
             variant: static
             runner: ubuntu-latest
-          - os: windows
-            arch: x86_64
-            variant: shared
-            runner: windows-latest
           - os: macos
             arch: x86_64
             variant: shared
@@ -49,53 +45,28 @@ jobs:
         if: matrix.os == 'ubuntu'
         run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
-      - name: Install dependencies (Windows)
-        if: matrix.os == 'windows'
-        uses: lukka/get-cmake@latest
-
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos'
         run: brew update && brew install cmake
 
       - name: Configure & Build Z3-Noodler (Unix, shared)
-        if: matrix.os != 'windows' && matrix.variant == 'shared'
+        if: matrix.variant == 'shared'
         run: |
           mkdir build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
       - name: Configure & Build Z3-Noodler (Unix, static)
-        if: matrix.os != 'windows' && matrix.variant == 'static'
+        if: matrix.variant == 'static'
         run: |
           mkdir build && cd build
           cmake -DZ3_BUILD_LIBZ3_SHARED=OFF -DZ3_BUILD_EXECUTABLE=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static" ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
-      - name: Configure & Build Z3-Noodler (Windows)
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path build | Out-Null
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --config Release
-
       - name: Package binary (Unix)
-        if: matrix.os != 'windows'
         run: |
           mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}
           chmod +x build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}
-
-      - name: Package binary (Windows)
-        if: matrix.os == 'windows'
-        shell: pwsh
-        run: |
-          if (Test-Path "build\\Release\\z3.exe") {
-            Move-Item -Force "build\\Release\\z3.exe" "build\\z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}.exe"
-          } elseif (Test-Path "build\\z3.exe") {
-            Move-Item -Force "build\\z3.exe" "build\\z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}.exe"
-          } else {
-            Write-Error "z3.exe not found in build output"
-          }
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4

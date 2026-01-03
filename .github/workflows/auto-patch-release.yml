@@ -72,33 +72,17 @@ jobs:
         run: |
           echo "No PR with label release:patch found; skipping."
 
-      - name: Compute next patch tag
-        id: ver
+      - name: Auto-tag (patch)
+        id: autotag
         if: steps.gate.outputs.release_patch == 'true'
-        run: |
-          set -euo pipefail
-          next_tag=$(python3 scripts/ci/bump_patch_and_tag.py)
-          echo "tag=$next_tag" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push tag
-        if: steps.gate.outputs.release_patch == 'true'
-        run: |
-          set -euo pipefail
-          tag="${{ steps.ver.outputs.tag }}"
-
-          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            echo "Tag $tag already exists; exiting."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "Auto patch release $tag"
-          git push origin "$tag"
+        uses: phish108/autotag-action@1.1.64
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          bump: patch
 
       - name: Create GitHub Release (metadata only)
         if: steps.gate.outputs.release_patch == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
+          tag_name: ${{ steps.autotag.outputs.new-tag }}
           generate_release_notes: true

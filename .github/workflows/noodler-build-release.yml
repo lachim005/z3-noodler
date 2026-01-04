@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-publish-binaries:
-    name: Build binary (${{ matrix.os }} / ${{ matrix.arch }} / ${{ matrix.variant }})
+    name: Build binary (${{ matrix.os }}-${{ matrix.os_version }} / ${{ matrix.arch }} / ${{ matrix.variant }})
     runs-on: ${{ matrix.runner }}
 
     strategy:
@@ -15,18 +15,27 @@ jobs:
       matrix:
         include:
           - os: ubuntu
+            os_version: 24.04
             arch: x86_64
             variant: shared
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - os: ubuntu
+            os_version: 20.04
+            arch: x86_64
+            variant: shared
+            runner: ubuntu-20.04
+          - os: ubuntu
+            os_version: 24.04
             arch: x86_64
             variant: static-libz3
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - os: macos
+            os_version: 15-intel
             arch: x86_64
             variant: shared
             runner: macos-15-intel
           - os: macos
+            os_version: 15
             arch: arm64
             variant: shared
             runner: macos-latest
@@ -61,14 +70,14 @@ jobs:
 
       - name: Package binary (Unix)
         run: |
-          mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}
-          chmod +x build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}
+          mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
+          chmod +x build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}
-          path: build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.variant }}*
+          name: z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
+          path: build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}*
 
 
   release:

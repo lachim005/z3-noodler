@@ -20,7 +20,7 @@ jobs:
             runner: ubuntu-latest
           - os: ubuntu
             arch: x86_64
-            variant: static
+            variant: static-libz3
             runner: ubuntu-latest
           - os: macos
             arch: x86_64
@@ -52,11 +52,11 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
-      - name: Configure & Build Z3-Noodler (Unix, static)
-        if: matrix.variant == 'static'
+      - name: Configure & Build Z3-Noodler (Unix, static libz3)
+        if: matrix.variant == 'static-libz3'
         run: |
           mkdir build && cd build
-          cmake -DZ3_BUILD_LIBZ3_SHARED=OFF -DZ3_BUILD_EXECUTABLE=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static" ..
+          cmake -DZ3_BUILD_LIBZ3_SHARED=OFF -DZ3_BUILD_EXECUTABLE=ON -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
 
       - name: Package binary (Unix)

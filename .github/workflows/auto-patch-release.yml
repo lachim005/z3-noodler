@@ -11,9 +11,13 @@ permissions:
 
 jobs:
   tag-and-release:
-    name: Tag + GitHub Release (patch)
+    name: Auto-tag (patch)
     runs-on: ubuntu-latest
     if: github.repository_owner == 'VeriFIT'
+
+    outputs:
+      do_release: ${{ steps.gate.outputs.do_release }}
+      tag: ${{ steps.autotag.outputs.new-tag }}
 
     steps:
       - name: Checkout
@@ -66,6 +70,7 @@ jobs:
           has_label=$(printf "%s" "$pr" | python3 -c 'import json,sys; pr=json.load(sys.stdin); print("true" if any(l.get("name")=="release:patch" for l in pr.get("labels",[])) else "false")')
 
           echo "release_patch=$has_label" >> "$GITHUB_OUTPUT"
+          echo "do_release=$has_label" >> "$GITHUB_OUTPUT"
 
       - name: Stop (no release requested)
         if: steps.pr.outputs.found != 'true' || steps.gate.outputs.release_patch != 'true'
@@ -79,10 +84,13 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           bump: patch
+          release-branch: devel
+          with-v: true
 
-      - name: Create GitHub Release (metadata only)
-        if: steps.gate.outputs.release_patch == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.autotag.outputs.new-tag }}
-          generate_release_notes: true
+  build-binaries:
+    name: Build binaries (reusable workflow)
+    needs: tag-and-release
+    if: needs.tag-and-release.outputs.do_release == 'true'
+    uses: ./.github/workflows/noodler-build-release.yml
+    with:
+      tag: ${{ needs.tag-and-release.outputs.tag }}

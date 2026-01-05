@@ -314,7 +314,6 @@ namespace smt::noodler {
 
         // len(str) = |str| for explicit string str
         if (m_util_s.str.is_string(a_str)) {
-            STRACE(str_axiom, tout << "[ConstStr Axiom] " << mk_pp(a_str, m) << std::endl);
 
             expr_ref len_str(m_util_s.str.mk_length(a_str), m);
             SASSERT(len_str);
@@ -330,7 +329,6 @@ namespace smt::noodler {
         } else if(!m.is_ite(a_str)) {
             // axiom |t| >= 0 where t is a string term
             { 
-                STRACE(str_axiom, tout << "[Non-Zero Axiom] " << mk_pp(a_str, m) << std::endl);
                 // build LHS
                 expr_ref len_str(m);
                 len_str = m_util_s.str.mk_length(a_str);
@@ -343,15 +341,12 @@ namespace smt::noodler {
                 app_ref lhs_ge_rhs(m_util_a.mk_ge(len_str, zero), m);
                 ctx.internalize(lhs_ge_rhs, false);
                 SASSERT(lhs_ge_rhs);
-                STRACE(str_axiom, tout << "string axiom 1: " << mk_ismt2_pp(lhs_ge_rhs, m) << std::endl;);
 
                 add_axiom({mk_literal(lhs_ge_rhs)});
                 this->axiomatized_len_axioms.push_back(lhs_ge_rhs);
             }
             // axiom |t| <= 0 -> t = eps; if var_lengths is set add also t = eps -> |t| = 0
             {
-                STRACE(str_axiom, tout << "[Zero iff Empty Axiom] " << mk_pp(a_str, m) << std::endl);
-
                 // build LHS of iff
                 expr_ref len_str(m);
                 len_str = m_util_s.str.mk_length(a_str);
@@ -700,7 +695,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::add_axiom(expr *const e) {
-        STRACE(str_axiom, tout << __LINE__ << " " << __FUNCTION__ << mk_pp(e, get_manager()) << std::endl;);
+        STRACE(str_axiom, tout << "add_axiom expr: " << mk_pp(e, get_manager()) << std::endl;);
 
         if (!axiomatized_terms.contains(e)) {
             axiomatized_terms.insert(e);
@@ -718,7 +713,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::add_axiom(std::vector<literal> ls) {
-        STRACE(str, tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
+        STRACE(str_axiom, tout << "add_axiom literals:" << std::endl;);
         context &ctx = get_context();
         literal_vector lv;
         for (const auto &l : ls) {
@@ -728,8 +723,8 @@ namespace smt::noodler {
             }
         }
         ctx.mk_th_axiom(get_id(), lv, lv.size());
-        STRACE(str_axiom, ctx.display_literals_verbose(tout << "[Assert_c]\n", lv) << '\n';);
-        STRACE(str, tout << __LINE__ << " leave " << __FUNCTION__ << std::endl;);
+        STRACE(str_axiom, ctx.display_literals_verbose(tout, lv) << '\n';);
+        STRACE(str_axiom, tout << "-----------------------------" << std::endl;);
     }
 
     /**
@@ -1943,8 +1938,16 @@ namespace smt::noodler {
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
             add_axiom({mk_literal(cont), mk_literal(re)});
-        } else if(m_util_s.str.is_string(x, s) && s.length() == 1) { // special case for not(contains "A" t)
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_to_re(m_util_s.str.mk_string(s)) ), m);
+        } else if(m_util_s.str.is_string(x, s) && s.length() <= 10) { // the number 10 is arbitrary, can be tuned (nneds to be changed also in assign_not_contains)
+            // for small string literals s, we can unroll all possible substrings of s and put that y cannot be any of them
+            expr_ref re(m_util_s.re.mk_to_re(m_util_s.str.mk_string("")), m);
+            for (unsigned i = 0; i < s.length(); i++) {
+                for (unsigned j = i + 1; j <= s.length(); j++) {
+                    expr_ref substr(m_util_s.re.mk_to_re(m_util_s.str.mk_string(s.extract(i, j - i))), m);
+                    re = m_util_s.re.mk_union(re, substr);
+                }
+            }
+            re = expr_ref(m_util_s.re.mk_in_re(y, re), m);
             add_axiom({mk_literal(e), ~mk_literal(re)});
         }
     }
@@ -1962,7 +1965,7 @@ namespace smt::noodler {
 
         zstring s;
         // not(contains) was not axiomatized in handle_not_contains
-        if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() == 1)) {
+        if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() <= 10)) {
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
     }

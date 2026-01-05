@@ -1938,7 +1938,7 @@ namespace smt::noodler {
           
             add_axiom({mk_literal(e), ~mk_literal(re)});
             add_axiom({mk_literal(cont), mk_literal(re)});
-        } else if(m_util_s.str.is_string(x, s) && s.length() <= 10) { // the number 10 is arbitrary, can be tuned (nneds to be changed also in assign_not_contains)
+        } else if(m_util_s.str.is_string(x, s) && s.length() <= 10) { // the number 10 is arbitrary, can be tuned (needs to be changed also in assign_not_contains)
             // for small string literals s, we can unroll all possible substrings of s and put that y cannot be any of them
             expr_ref re(m_util_s.re.mk_to_re(m_util_s.str.mk_string("")), m);
             for (unsigned i = 0; i < s.length(); i++) {

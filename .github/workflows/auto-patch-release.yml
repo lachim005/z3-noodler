@@ -66,7 +66,6 @@ jobs:
           has_label=$(printf "%s" "$pr" | python3 -c 'import json,sys; pr=json.load(sys.stdin); print("true" if any(l.get("name")=="release:patch" for l in pr.get("labels",[])) else "false")')
 
           echo "release_patch=$has_label" >> "$GITHUB_OUTPUT"
-          echo "do_release=$has_label" >> "$GITHUB_OUTPUT"
 
       - name: Stop (no release requested)
         if: steps.pr.outputs.found != 'true' || steps.gate.outputs.release_patch != 'true'

@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-publish-binaries:
-    name: Build binary (${{ matrix.os }} / ${{ matrix.arch }})
+    name: Build binary (${{ matrix.os }}-${{ matrix.os_version }} / ${{ matrix.arch }} / ${{ matrix.variant }})
     runs-on: ${{ matrix.runner }}
 
     strategy:
@@ -15,20 +15,36 @@ jobs:
       matrix:
         include:
           - os: ubuntu
+            os_version: 24.04
             arch: x86_64
-            runner: ubuntu-latest
+            variant: shared
+            runner: ubuntu-24.04
+          - os: ubuntu
+            os_version: 20.04
+            arch: x86_64
+            variant: shared
+            runner: ubuntu-20.04
+          - os: ubuntu
+            os_version: 24.04
+            arch: x86_64
+            variant: static-libz3
+            runner: ubuntu-24.04
           - os: macos
+            os_version: 15-intel
             arch: x86_64
+            variant: shared
             runner: macos-15-intel
           - os: macos
+            os_version: 15
             arch: arm64
+            variant: shared
             runner: macos-latest
 
     steps:
       - name: Checkout Z3-Noodler
         uses: actions/checkout@v6
         with: 
-          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu'
@@ -38,19 +54,30 @@ jobs:
         if: matrix.os == 'macos'
         run: brew update && brew install cmake
 
-      - name: Configure & Build Z3-Noodler
+      - name: Configure & Build Z3-Noodler (Unix, shared)
+        if: matrix.variant == 'shared'
         run: |
           mkdir build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(nproc || sysctl -n hw.ncpu)
-        
-      - run: mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Configure & Build Z3-Noodler (Unix, static libz3)
+        if: matrix.variant == 'static-libz3'
+        run: |
+          mkdir build && cd build
+          cmake -DZ3_BUILD_LIBZ3_SHARED=OFF -DZ3_BUILD_EXECUTABLE=ON -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc || sysctl -n hw.ncpu)
+
+      - name: Package binary (Unix)
+        run: |
+          mv build/z3 build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
+          chmod +x build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
-          path: build/z3-noodler-${{ matrix.os }}-${{ matrix.arch }}
+          name: z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}
+          path: build/z3-noodler-${{ matrix.os }}-${{ matrix.os_version }}-${{ matrix.arch }}-${{ matrix.variant }}*
 
 
   release:

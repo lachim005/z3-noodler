@@ -168,6 +168,14 @@ endif()
 # so that if those are also shared libraries they are referenced by `libz3.so`.
 target_link_libraries(libz3 PRIVATE ${Z3_DEPENDENT_LIBS})
 
+# `libmata` may be built in-tree via FetchContent. In that case, exporting Z3's
+# targets would fail unless Mata is also exported. Since Mata has its own set of
+# internal helper targets, we avoid exporting it and instead hide this
+# dependency from the exported interface.
+if (TARGET libmata)
+  set_property(TARGET libz3 PROPERTY INTERFACE_LINK_LIBRARIES "")
+endif()
+
 # This is currently only for the OpenMP flags. It needs to be set
 # via `target_link_libraries()` rather than `z3_append_linker_flag_list_to_target()`
 # because when building the `libz3` as a static library when the target is exported

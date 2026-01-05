@@ -2124,7 +2124,7 @@ namespace smt::noodler {
         expr *s = nullptr;
         VERIFY(m_util_s.str.is_is_digit(e, s));
         // s \in [0-9]
-        expr *s_in_digit = m_util_s.re.mk_in_re(s, m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9")));
+        expr_ref s_in_digit(m_util_s.re.mk_in_re(s, m_util_s.re.mk_range(m_util_s.str.mk_string("0"), m_util_s.str.mk_string("9"))), m);
         // is_digit(s) -> s \in [0-9]
         add_axiom({~mk_literal(e), mk_literal(s_in_digit)});
         // ~is_digit(s) -> ~(s \in [0-9])

@@ -81,3 +81,16 @@ jobs:
           bump: patch
           release-branch: devel
           with-v: true
+
+      - name: Trigger release workflow
+        if: steps.autotag.outputs.new-tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.autotag.outputs.new-tag }}"
+          owner="${{ github.repository_owner }}"
+          repo="${{ github.event.repository.name }}"
+          
+          gh workflow run noodler-build-release.yml \
+            --repo "${owner}/${repo}" \
+            --ref "${tag}"

@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   tag-and-release:
-    name: Tag + GitHub Release (patch)
+    name: Auto-tag (patch)
     runs-on: ubuntu-latest
     if: github.repository_owner == 'VeriFIT'
 
@@ -79,10 +79,5 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           bump: patch
-
-      - name: Create GitHub Release (metadata only)
-        if: steps.gate.outputs.release_patch == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.autotag.outputs.new-tag }}
-          generate_release_notes: true
+          release-branch: devel
+          with-v: true

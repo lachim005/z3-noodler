@@ -399,7 +399,7 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_lt(n)) { // str.<
             handle_lex_lt(n);
         } else if(m_util_s.str.is_le(n)) { // str.<=
-            handle_lex_leq(n);
+            UNREACHABLE(); // should be rewritten to str.< by the rewriter
         } else if (m_util_s.str.is_at(n)) { // str.at
             handle_char_at(n);
         } else if (m_util_s.str.is_extract(n)) { // str.substr
@@ -1971,35 +1971,6 @@ namespace smt::noodler {
         if(!m_util_s.str.is_string(y) && !(m_util_s.str.is_string(x, s) && s.length() <= 10)) {
             m_not_contains_todo.push_back({{x, m},{y, m}});
         }
-    }
-
-    /**
-     * @brief Handle str.<=
-     * Translates to the following axiom
-     * 
-     * x <= y -> x = y | x < y
-     * not(x <= y) -> y < x
-     * @param e str.<= predicate
-     */
-    void theory_str_noodler::handle_lex_leq(expr *e) {
-        STRACE(str, tout  << "handle str.<= " << mk_pp(e, m) << std::endl;);
-        if(axiomatized_persist_terms.contains(m.mk_not(e)))
-            return;
-        axiomatized_persist_terms.insert(m.mk_not(e));
-
-        expr *x = nullptr, *y = nullptr;
-        VERIFY(m_util_s.str.is_le(e, x, y));
-      
-        expr_ref e_lt(m_util_s.str.mk_lex_lt(x, y), m);
-        expr_ref x_y(m.mk_eq(x,y), m);
-        literal lit_e_lt = mk_literal(e_lt);
-        literal lit_e = mk_literal(e);
-        literal lit_x_y = mk_literal(x_y);
-        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y, x));
-        // x <= y -> x = y | x < y
-        add_axiom({~lit_e, lit_e_lt, lit_x_y});
-        // not(x <= y) -> y < x
-        add_axiom({lit_e, lit_e_switch});
     }
 
     /**

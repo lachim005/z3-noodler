@@ -1,0 +1,6 @@
+(set-logic ALL)
+(set-option :produce-models true)
+(set-option :produce-proofs true)
+(declare-fun s () String)
+(assert (= "" s))
+(check-sat)

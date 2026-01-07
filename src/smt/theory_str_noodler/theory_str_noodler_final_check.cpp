@@ -250,7 +250,7 @@ namespace smt::noodler {
         // to include also length of |u| to propagate the value to |s|
         expr_ref lengths = len_node_to_z3_formula(main_dec_proc->get_initial_lengths(true));
         if(check_len_sat(lengths, check_len_sat_with_context) == l_false) {
-            STRACE(str, tout << "Unsat from initial lengths" << std::endl);
+            STRACE(str, tout << "Unsat from initial lengths (1)" << std::endl);
 
             this->statistics.at("stabilization").num_solved_preprocess++;
             // If the instance is both length unsatisfiable and unsatisfiable from preprocessing,
@@ -302,7 +302,7 @@ namespace smt::noodler {
         lengths = len_node_to_z3_formula(dec_proc->get_initial_lengths());
         if(check_len_sat(lengths, check_len_sat_with_context) == l_false) {
             this->statistics.at("stabilization").num_solved_preprocess++;
-            STRACE(str, tout << "Unsat from initial lengths" << std::endl);
+            STRACE(str, tout << "Unsat from initial lengths (2)" << std::endl);
             block_curr_len(lengths, true, true);
             return FC_CONTINUE;
         }
@@ -1106,7 +1106,10 @@ namespace smt::noodler {
                     len_formula = pr.second.lengths;
                     init_only = init_only && pr.second.initial_length;
                     found = true;
-                    STRACE(str, tout << "loop-protection: found " << std::endl;);
+                    STRACE(str,
+                        tout << "loop-protection: found ";
+                        if (pr.second.initial_length) { tout << "(init) "; }
+                        tout << std::endl;);
 
                     // We need to force the LIA solver to find another solution, because adding block_curr_len(len_formula) is not sufficient for SAT solver to get another solution
 
@@ -1141,6 +1144,7 @@ namespace smt::noodler {
                 return l_true;
             }
         }
+        STRACE(str, tout << "loop-protection: failed " << std::endl;);
         return l_undef;
     }
 

@@ -1978,11 +1978,14 @@ namespace smt::noodler {
      * Translates to the following axiom
      * 
      * x <= y -> x = y | x < y
-     * not(x <= y) -> y > x
+     * not(x <= y) -> y < x
      * @param e str.<= predicate
      */
     void theory_str_noodler::handle_lex_leq(expr *e) {
         STRACE(str, tout  << "handle str.<= " << mk_pp(e, m) << std::endl;);
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
+            return;
+        axiomatized_persist_terms.insert(m.mk_not(e));
 
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_le(e, x, y));
@@ -1995,7 +1998,7 @@ namespace smt::noodler {
         literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y, x));
         // x <= y -> x = y | x < y
         add_axiom({~lit_e, lit_e_lt, lit_x_y});
-        // not(x <= y) -> y > x
+        // not(x <= y) -> y < x
         add_axiom({lit_e, lit_e_switch});
     }
 
@@ -2004,6 +2007,8 @@ namespace smt::noodler {
      * Translates to the following theory axioms.
      * 
      * not(x < y) -> x = y | y < x
+     * x < y -> x != y
+     * x < y -> not(y < x)
      * x < y & x = eps -> y != eps
      * x < y & x != eps -> x = u.v1.w1
      * x < y & x != eps -> y = u.v2.w2
@@ -2014,6 +2019,9 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_lex_lt(expr *e) {
         STRACE(str, tout  << "handle str.< " << mk_pp(e, m) << std::endl;);
+        if(axiomatized_persist_terms.contains(m.mk_not(e)))
+            return;
+        axiomatized_persist_terms.insert(m.mk_not(e));
 
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_lt(e, x, y));
@@ -2055,6 +2063,10 @@ namespace smt::noodler {
 
         // not(x < y) -> x = y | y < x
         add_axiom({lit_e, mk_eq(x,y,false), lit_e_switch});
+        // x < y -> x != y
+        add_axiom({~lit_e, ~mk_eq(x,y,false)});
+        // x < y -> not(y < x)
+        add_axiom({~lit_e, ~lit_e_switch});
 
         // x < y & x = eps -> y != eps
         add_axiom({~lit_e, ~lit_x_eps, ~lit_y_eps});

@@ -730,107 +730,141 @@ namespace smt::noodler {
     /**
      * @brief Handle str.at(s,i)
      *
-     * Translates to the following theory axioms:
+     * We set str.at(s,i) = v where v is fresh. 
+     * Translates to the following theory axioms in the general case:
      * 0 <= i < |s| -> s = xvy
      * 0 <= i < |s| -> v in re.allchar
+     * 0 <= i < |s| -> |v| = 1 (not completely neccessary, helps z3)
      * 0 <= i < |s| -> |x| = i
      * i < 0 -> v = eps
      * i >= |s| -> v = eps
-     *
-     * We store
-     * str.at(s,i) = v
+     * 
+     * Special cases:
+     *  - when s is a one letter string literal
+     *  - when i is some non-negative integer
+     *  - when i = num + |s| where num is some negative integer
      *
      * @param e str.at(s, i)
      */
     void theory_str_noodler::handle_char_at(expr *e) {
-        STRACE(str, tout << "handle-charat: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
+        if (axiomatized_persist_terms.contains(e)) { return; }
 
+        STRACE(str, tout << "handle char_at: " << mk_pp(e, m) << '\n';);
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
-        expr *s = nullptr, *i = nullptr, *res = nullptr;
+
+        expr *s = nullptr, *i = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
 
-        expr_ref fresh = mk_str_var_fresh("at");
-        expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref v = get_fresh_var_for_string_function("at", e);
+        expr_ref v_in_allchar(m_util_s.re.mk_in_re(v, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref zero(m_util_a.mk_int(0), m);
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero));
-        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
+        expr_ref one(m_util_a.mk_int(1), m);
+        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero)); // i >= 0
+        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero)); // i >= |s|
+        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m); // empty string
 
-        rational r;
-        
-        zstring str;
-        // handle the case str.at "A" i
-        if(m_util_s.str.is_string(s, str) && str.length() == 1) {
-            add_axiom({~mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, s, false)});
-            add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, emp, false)});
-            add_axiom({mk_eq(fresh, e, false)});
-            predicate_replace.insert(e, fresh.get());
+        // Special cases optimizations
+
+        // the case where s is one letter string literal, i.e. (str.at "A" i)
+        //   i = 0 -> v = "A"
+        //   i != 0 -> v = eps
+        if(zstring str; m_util_s.str.is_string(s, str) && str.length() == 1) { 
+            // i = 0 -> v = "A"
+            add_axiom({~mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(v, s, false)});
+            // i != 0 -> v = eps
+            add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(v, emp, false)});
             return;
         }
-        if(m_util_a.is_numeral(i, r)) {
-            int val = r.get_int32();
+        
+        // the case where i is some non-negative integer (the case where i is negative, i.e. the result is empty string, is handled by rewriter)
+        //   i < |s| -> s = s[0].s[1]...s[i].at_right
+        //   i < |s| -> v in allchar
+        //   i < |s| -> |v| = 1
+        //   |s| <= i -> v = eps
+        if(rational num; m_util_a.is_numeral(i, num) && num.is_nonneg() && num.is_int32()) { 
+            int val = num.get_int32();
 
+            // y = s[0].s[1]. ... .s[val].at_right
             expr_ref y = mk_str_var_fresh("at_right");
-
             for(int j = val; j >= 0; j--) {
                 y = m_util_s.str.mk_concat(m_util_s.str.mk_at(s, m_util_a.mk_int(j)), y);
             }
             string_theory_propagation(y);
 
+            // i < |s| -> s = y
             add_axiom({i_ge_len_s, mk_eq(s, y, false)});
-            add_axiom({i_ge_len_s, mk_literal(re)});
-            add_axiom({i_ge_len_s, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
-            add_axiom({mk_eq(fresh, e, false)});
-            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
-            add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
+            // i < |s| -> v in allchar
+            add_axiom({i_ge_len_s, mk_literal(v_in_allchar)});
+            // i < |s| -> |v| = 1
+            add_axiom({i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(v), false) });
+            // |s| <= i -> v = eps
+            add_axiom({~i_ge_len_s, mk_eq(v, emp, false)});
 
-            predicate_replace.insert(e, fresh.get());
+            // Even though we use i<|s| above, we do not have to mark s as length expression, because if z3 decides that i<|s| holds,
+            // then from s=s[0]...s[i].at_right we know that length of s is larger than i.
+            // Similarly, if z3 decides that i>=|s| holds, we put s[i] = eps. This is correct, the only way for this to not hold is if
+            // our computed s would be larger than i. Let assume we can compute such s. As we use all s[j], 0<=j<i, in the axioms,
+            // all such s[j] become relevant and this function will be called for them. So for each j, z3 will decide whether j<|s| or j>=|s|.
+            // If it decided j>=|s| for all j, then also for 0 we would have 0>=|s| which would force z3 to put |s|=0 but our computed s should
+            // be larger than i, so this cannot happen. So there will be some j, where j<|s| let it be the largest one. Z3 will realise that |s|=j+1
+            // and furthermore, there will be s=s[0]...s[j].at_right where from |s|=j+1 it will force |at_right|=0. So the computed s must have length
+            // j+1 where i>=j+1.
             return;
         }
-        if(util::is_len_sub(i, s, m, m_util_s, m_util_a, res) && m_util_a.is_numeral(res, r)) {
-            int val = r.get_int32();
 
+        // the case that i = num + |s| where num is some negative integer (the case where num>=0, i.e. the result is empty string, is handled by rewriter)
+        //   0 <= i -> s = at_left.s[|s|+num)].s[|s|+num+1)] ... .s[|s|]
+        //   0 <= i -> v in allchar
+        //   0 <= i -> |v| = 1
+        //   i < 0 -> v = eps
+        if(rational num; util::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num.is_int32()) {
+            int val = num.get_int32();
+
+            // y = at_left.s[|s|+val)].s[|s|+val+1)]. ... .s[|s|]
             expr_ref y = mk_str_var_fresh("at_left");
-
             for(int j = val; j < 0; j++) {
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);
 
+            // 0 <= i -> s = y
             add_axiom({~i_ge_0, mk_eq(s, y, false)});
-            add_axiom({~i_ge_0, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
-            add_axiom({mk_eq(fresh, e, false)});
-            add_axiom({~i_ge_0, mk_literal(re)});
-            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
+            // 0 <= i -> v in allchar
+            add_axiom({~i_ge_0, mk_literal(v_in_allchar)});
+            // 0 <= i -> |v| = 1
+            add_axiom({~i_ge_0, mk_eq(one, m_util_s.str.mk_length(v), false) });
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, emp, false)});
 
-            predicate_replace.insert(e, fresh.get());
+            // We do not have to mark s as length expression, |s| is not used in the axioms above.
             return;
         }
 
-        expr_ref one(m_util_a.mk_int(1), m);
+        // General case
+        // creating concatenation xvy
         expr_ref x = mk_str_var_fresh("at_left");
         expr_ref y = mk_str_var_fresh("at_right");
-        expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(fresh, y)), m);
+        expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(v, y)), m);
         string_theory_propagation(xey);
 
         expr_ref len_x(m_util_s.str.mk_length(x), m);
  
+        // 0 <= i < |s| -> s = xvy
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
-        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(fresh), false)});
-        add_axiom({~i_ge_0, i_ge_len_s, mk_literal(re)});
+        // 0 <= i < |s| -> v in re.allchar
+        add_axiom({~i_ge_0, i_ge_len_s, mk_literal(v_in_allchar)});
+        // 0 <= i < |s| -> |v| = 1
+        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(v), false)});
+        // 0 <= i < |s| -> |x| = i
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(i, len_x, false)});
-        add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
-        add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
-        add_axiom({mk_eq(fresh, e, false)});
+        // i < 0 -> v = eps
+        add_axiom({i_ge_0, mk_eq(v, emp, false)});
+        // i >= |s| -> v = eps
+        add_axiom({~i_ge_len_s, mk_eq(v, emp, false)});
 
-        // add the replacement charat -> v
-        predicate_replace.insert(e, fresh.get());
-        // update length variables
+        // mark s and x as length expressions as |s| and |x| are used in the axioms
         mark_expression_as_length(s);
-        this->len_vars.insert(x);
+        mark_expression_as_length(x);
     }
 
     void theory_str_noodler::handle_substr_int(expr *e) {
@@ -939,10 +973,10 @@ namespace smt::noodler {
             this->var_eqs.add(expr_ref(l, m), v);
             return;
 
-        } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
+        } else if(util::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
+        } else if(m_util_a.is_zero(i) && util::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl.is_minus_one()) {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
             expr_ref ly(m_util_s.str.mk_length(y), m);

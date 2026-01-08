@@ -123,14 +123,14 @@ namespace smt::noodler::util {
      * @brief Check whether the expression @p val is of the form ( @p num_res ) + (len @p s ).
      *
      * @param val Expression to be checked
-     * @param s String term with length
+     * @param s String term
      * @param m ast manager
      * @param m_util_s string ast util
      * @param m_util_a arith ast util
-     * @param[out] num_res expression to be substracked from length term
+     * @param[out] num_res expression added to the length term
      * @return Is of the form.
      */
-    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res);
+    bool is_num_plus_len(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, rational& num_res);
 
     /**
      * @brief Assuming that concatenation of automata in @p automata accepts @p word, returns in @p words splitted @p word, where @p word[i] is accepted by @p automata[i]

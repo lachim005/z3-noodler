@@ -297,6 +297,13 @@ namespace smt::noodler {
          */
         void add_axiom(std::vector<literal> ls);
 
+        expr_ref get_fresh_var_for_string_function(const std::string& var_name, expr* str_func) {
+            expr_ref res = mk_str_var_fresh(var_name);
+            predicate_replace.insert(str_func, res.get());
+            add_axiom({mk_eq(res, str_func, false)});
+            return res;
+        }
+
         // methods for rewriting different predicates into something simpler that we can handle
         void handle_char_at(expr *e);
         void handle_substr(expr *e);

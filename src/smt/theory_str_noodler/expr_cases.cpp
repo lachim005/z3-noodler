@@ -168,6 +168,11 @@ bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util
     return false;
 }
 
+bool is_num_plus_len(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, rational& num_res) {
+    expr *num, *len, *str;
+    return (m_util_a.is_add(val, num, len) && m_util_s.str.is_length(len, str) && str == s && m_util_a.is_numeral(num, num_res));
+}
+
 bool has_quantifier(expr* e, ast_manager& m) {
     if (is_quantifier(e)) {
         return true;

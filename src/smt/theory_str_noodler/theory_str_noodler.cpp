@@ -817,7 +817,7 @@ namespace smt::noodler {
         //   0 <= i -> v in allchar
         //   0 <= i -> |v| = 1
         //   i < 0 -> v = eps
-        if(rational num; util::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num.is_int32()) {
+        if(rational num; expr_cases::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num.is_int32()) {
             int val = num.get_int32();
 
             // y = at_left.s[|s|+val)].s[|s|+val+1)]. ... .s[|s|]
@@ -973,10 +973,10 @@ namespace smt::noodler {
             this->var_eqs.add(expr_ref(l, m), v);
             return;
 
-        } else if(util::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
+        } else if(expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(m_util_a.is_zero(i) && util::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl.is_minus_one()) {
+        } else if(m_util_a.is_zero(i) && expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl.is_minus_one()) {
             expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
             expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
             expr_ref ly(m_util_s.str.mk_length(y), m);

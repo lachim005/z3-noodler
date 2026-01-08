@@ -92,4 +92,4 @@ jobs:
     if: needs.tag-and-release.outputs.new_tag != ''
     uses: ./.github/workflows/noodler-build-release.yml
     with:
-      ref: ${{ needs.tag-and-release.outputs.new_tag }}
+      ref: ${{ startsWith(needs.tag-and-release.outputs.new_tag, 'v') && needs.tag-and-release.outputs.new_tag || format('v{0}', needs.tag-and-release.outputs.new_tag) }}

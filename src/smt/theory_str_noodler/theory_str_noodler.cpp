@@ -763,7 +763,7 @@ namespace smt::noodler {
         literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero)); // i >= |s|
         expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m); // empty string
 
-        // Special cases optimizations
+        // Special cases
 
         // the case where s is one letter string literal, i.e. (str.at "A" i)
         //   i = 0 -> v = "A"

@@ -20,7 +20,7 @@ bool is_contains_index(expr* e, expr*& ind, ast_manager& m, seq_util& m_util_s, 
         if(m_util_s.str.is_extract(subs, str, subb1, subb2)) {
             if(m_util_a.is_zero(subb1) && m_util_a.is_add(subb2, num, ind) && m_util_a.is_numeral(num, num_val) && num_val.get_int32() > 0) { 
                 if(m_util_s.str.is_index(ind, str_ind, val_ind) || (m_util_s.str.is_index(ind, str_ind, val_ind, offset_ind) && m_util_a.is_zero(offset_ind))) {
-                    if(str->hash() != str_ind->hash() || val->hash() != val_ind->hash()) {
+                    if(str != str_ind || val != val_ind) {
                         return false;
                     }
                     return true;
@@ -38,7 +38,7 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
         expr*ind_str = nullptr, *ind_find = nullptr, *ind_start = nullptr, *add = nullptr;
         rational one(1);
         if(m_util_a.is_zero(sub_start) && m_util_a.is_add(sub_len, add, ind) && m_util_a.is_numeral(add, one) && m_util_s.str.is_index(ind, ind_str, ind_find, ind_start) && one.get_int32() == 1) {
-            if(ind_find->hash() != rpl_find->hash() || sub_str->hash() != ind_str->hash() || !m_util_a.is_zero(ind_start)) {
+            if(ind_find != rpl_find || sub_str != ind_str || !m_util_a.is_zero(ind_start)) {
                 return false;
             }
             return true;
@@ -50,7 +50,7 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
 bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& val, expr*& ind_find) {
     expr * ind = nullptr, *ind_str = nullptr, *ind_start = nullptr;
     if(m_util_a.is_add(e, val, ind) && m_util_s.str.is_index(ind, ind_str, ind_find, ind_start)) {
-        if(ind_str->hash() != index_str->hash()) {
+        if(ind_str != index_str) {
             return false;
         }
         return true;
@@ -162,7 +162,7 @@ bool is_len_num_leq_or_geq(expr* e, ast_manager& m, seq_util& m_util_s, arith_ut
 
 bool is_indexof_at(expr * index_param, expr* index_str, ast_manager& m, seq_util& m_util_s) {
     expr *at_str, *at_pos;
-    if (m_util_s.str.is_at(index_param, at_str, at_pos) && index_str->hash() == at_str->hash()) {
+    if (m_util_s.str.is_at(index_param, at_str, at_pos) && index_str == at_str) {
         return true;
     }
     return false;

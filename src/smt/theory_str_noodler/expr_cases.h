@@ -52,7 +52,7 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
 
 /**
  * @brief Check if the given contraint @p e is of the form 
- * (( @p val ) + (str.indexof ( @p index_str ) ( @p ind_find ) n )
+ *    @p val + (str.indexof @p index_str @p ind_find n)
  * 
  * @param e Constraint to be checked
  * @param index_str Required index of parameter

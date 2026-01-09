@@ -927,18 +927,17 @@ namespace smt::noodler {
         expr_ref x(m_util_s.str.mk_string(""), m);
         expr_ref v = mk_str_var_fresh("substr");
 
-        int val = r.get_int32();
-        for(int v = 0; v < val; v++) {
-            expr_ref var = mk_str_var_fresh("pre_substr");
-            expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
-            x = m_util_s.str.mk_concat(x, var);
+        unsigned val = r.get_unsigned();
+        if (val > 0) {
+            x = mk_str_var_fresh("pre_substr");
+            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(m_util_s.re.mk_full_char(nullptr), val, val)), m);
             add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
             // strenghtening the axiom to equivalence
             // for multiple substrs, the SAT solver keeps guessing re and ~re until all possibilities are covered. 
             // Now the choice of re is bound together with the substr axiom
             add_axiom({~mk_literal(re), i_ge_0});
             add_axiom({~mk_literal(re), ls_le_i});
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
+            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);

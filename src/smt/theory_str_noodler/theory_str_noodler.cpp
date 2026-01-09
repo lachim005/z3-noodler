@@ -708,13 +708,20 @@ namespace smt::noodler {
             literal l{ctx.get_literal(e)};
             ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
-            STRACE(str, ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         }
     }
 
     void theory_str_noodler::add_axiom(std::vector<literal> ls) {
-        STRACE(str_axiom, tout << "add_axiom literals:" << std::endl;);
-        context &ctx = get_context();
+        STRACE(str_axiom,
+            tout << "add_axiom literals:" << std::endl;
+            literal_vector lv;
+            for (const auto &l : ls) {
+                if (l != null_literal && l != false_literal) {
+                    lv.push_back(l);
+                }
+            }
+            ctx.display_literals_verbose(tout, lv) << "\n-----------------------------\n";
+        );
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
@@ -723,8 +730,6 @@ namespace smt::noodler {
             }
         }
         ctx.mk_th_axiom(get_id(), lv, lv.size());
-        STRACE(str_axiom, ctx.display_literals_verbose(tout, lv) << '\n';);
-        STRACE(str_axiom, tout << "-----------------------------" << std::endl;);
     }
 
     /**

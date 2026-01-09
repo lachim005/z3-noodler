@@ -887,6 +887,34 @@ namespace smt::noodler {
         literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
+        // the case (str.substr s 0 (1 + (str.indexof s t n))) with t a nonempty string literal
+        //    - this case is very useful for pyex, try for example on QF_SLIA/20180523-Reynolds/pyex/peterc-pyex-doc-cav17-zz/httplib2/httplib2-entry-disposition/39783579d992a26f238877df4ca2ead6571ddafc66bf1b6d7fd58db0.smt2
+        //    - if (str.indexof s t n) != -1 (i.e. t is is somewhere in s starting from position n), then we can rewrite
+        //           (str.substr s 0 (1 + (str.indexof s t n)))   to   (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+        //    - we add axiom
+        //         (str.indexof s t n) != -1 -> (str.substr s 0 (1 + (str.indexof s t n))) = (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+        if(zstring indexof_find_string; m_util_a.is_zero(i) && expr_cases::is_one_add_indexof_string(l, s, m, m_util_s, m_util_a, indexof_find_string) && !indexof_find_string.empty()) {
+            literal indexof_did_not_find = mk_eq(l, zero, false); // if (1 + (str.indexof s t n))==0, then t was not found in s from position n
+            // we get the indexof expr by substracting 1 from l
+            expr_ref indexof(m_util_a.mk_add(l, m_util_a.mk_int(-1)), m);
+            m_rewrite(indexof);
+            // (str.substr s 0 (str.indexof s t n))
+            expr_ref new_substr(m_util_s.str.mk_substr(s, i, indexof), m);
+            // t[0]
+            expr_ref first_char_of_t(m_util_s.str.mk_string(indexof_find_string.extract(0,1)), m);
+            // (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+            expr_ref conc = mk_concat(new_substr, first_char_of_t);
+            string_theory_propagation(conc);
+
+            // (str.indexof s t n) != -1 -> (str.substr s 0 (1 + (str.indexof s t n))) = (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+            add_axiom({indexof_did_not_find, mk_eq(e, conc, false)});
+
+            expr_ref v = mk_str_var_fresh("substr");
+            add_axiom({mk_eq(v, e, false)});
+            this->predicate_replace.insert(e, v.get());
+            return;
+        }
+
         expr_ref x(m_util_s.str.mk_string(""), m);
         expr_ref v = mk_str_var_fresh("substr");
 

@@ -58,6 +58,12 @@ bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s
     return false;
 }
 
+bool is_one_add_indexof_string(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, zstring& ind_find) {
+    expr* val, *ind_find_expr;
+    rational r;
+    return (is_indexof_add(e, index_str, m, m_util_s, m_util_a, val, ind_find_expr) && m_util_a.is_one(val) && m_util_s.str.is_string(ind_find_expr, ind_find));
+}
+
 bool is_to_int_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& to_int_arg, rational& num) {
     expr* left = nullptr, *right = nullptr;
     if(m.is_eq(e, left, right)) {

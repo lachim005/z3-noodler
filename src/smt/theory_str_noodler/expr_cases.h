@@ -66,6 +66,21 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
 bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& val, expr*& ind_find);
 
 /**
+ * @brief Check if the given contraint @p e is of the form 
+ *    1 + (str.indexof @p index_str @p ind_find n)
+ * where @p ind_find is string literal
+ * 
+ * @param e Constraint to be checked
+ * @param index_str Required index of parameter
+ * @param m Ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] ind_find Extracted string literal in indexof find 
+ * @return true <-> if of the particular form.
+ */
+bool is_one_add_indexof_string(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, zstring& ind_find);
+
+/**
  * @brief Check if the constraint is of the form (indexof ( @p index_param ) ( @p index_str )). 
  * 
  */

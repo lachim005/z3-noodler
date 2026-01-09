@@ -741,8 +741,8 @@ namespace smt::noodler {
      * 
      * Special cases:
      *  - when s is a one letter string literal
-     *  - when i is some non-negative integer
-     *  - when i = num + |s| where num is some negative integer
+     *  - when i is some small non-negative integer
+     *  - when i = num + |s| where num is some small negative integer
      *
      * @param e str.at(s, i)
      */
@@ -775,18 +775,21 @@ namespace smt::noodler {
             add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(v, emp, false)});
             return;
         }
+
+        const int MAX_SMALL_INT = 10; // threshold for small integers used in the next two cases
         
-        // the case where i is some non-negative integer (the case where i is negative, i.e. the result is empty string, is handled by rewriter)
+        // the case where i is some small non-negative integer (the case where i is negative, i.e. the result is empty string, is handled by rewriter)
         //   i < |s| -> s = s[0].s[1]...s[i].at_right
         //   i < |s| -> v in allchar
         //   i < |s| -> |v| = 1
         //   |s| <= i -> v = eps
-        if(rational num; m_util_a.is_numeral(i, num) && num.is_nonneg() && num.is_int32()) { 
+        if(rational num; m_util_a.is_numeral(i, num) && num.is_nonneg() && num < MAX_SMALL_INT) { // we want small integer, because otherwise we will create a lot of equations
             int val = num.get_int32();
 
             // y = s[0].s[1]. ... .s[val].at_right
             expr_ref y = mk_str_var_fresh("at_right");
             for(int j = val; j >= 0; j--) {
+                // note that because we add s[j], handle_char_at will be called for each such j creating similar axioms for them
                 y = m_util_s.str.mk_concat(m_util_s.str.mk_at(s, m_util_a.mk_int(j)), y);
             }
             string_theory_propagation(y);
@@ -812,17 +815,18 @@ namespace smt::noodler {
             return;
         }
 
-        // the case that i = num + |s| where num is some negative integer (the case where num>=0, i.e. the result is empty string, is handled by rewriter)
-        //   0 <= i -> s = at_left.s[|s|+num)].s[|s|+num+1)] ... .s[|s|]
+        // the case that i = num + |s| where num is some small negative integer (the case where num>=0, i.e. the result is empty string, is handled by rewriter)
+        //   0 <= i -> s = at_left.s[num+|s|)].s[num+1+|s|)] ... .s[-1+|s|]
         //   0 <= i -> v in allchar
         //   0 <= i -> |v| = 1
         //   i < 0 -> v = eps
-        if(rational num; expr_cases::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num.is_int32()) {
+        if(rational num; expr_cases::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num >-MAX_SMALL_INT) { // we want small integer, because otherwise we will create a lot of equations
             int val = num.get_int32();
 
-            // y = at_left.s[|s|+val)].s[|s|+val+1)]. ... .s[|s|]
+            // y = at_left.s[val+|s|)].s[val+1+|s|]. ... .s[-1+|s|]
             expr_ref y = mk_str_var_fresh("at_left");
             for(int j = val; j < 0; j++) {
+                // note that because we add s[j+|s|s], handle_char_at will be called for each such j creating similar axioms for them
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);

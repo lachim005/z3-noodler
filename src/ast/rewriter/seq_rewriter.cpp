@@ -1236,14 +1236,14 @@ br_status seq_rewriter::mk_seq_extract(expr* a, expr* b, expr* c, expr_ref& resu
         result = str().mk_empty(a_sort);
         return BR_DONE;
     }
-    
-    constantPos &= pos.is_unsigned();
-    constantLen &= len.is_unsigned();
 
-    if (constantPos && constantLen && len == 1) {
+    if (constantLen && len == 1) {
         result = str().mk_at(a, b);
         return BR_REWRITE1;
     }
+
+    constantPos &= pos.is_unsigned();
+    constantLen &= len.is_unsigned();
 
     if (constantPos && constantLen && constantBase) {
         unsigned _pos = pos.get_unsigned();

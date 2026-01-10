@@ -781,7 +781,7 @@ namespace smt::noodler {
             return;
         }
 
-        const int MAX_SMALL_INT = 10; // threshold for small integers used in the next two cases
+        const int MAX_SMALL_INT = 20; // threshold for small integers used in the next two cases (experimentally chosen)
         
         // the case where i is some small non-negative integer (the case where i is negative, i.e. the result is empty string, is handled by rewriter)
         //   i < |s| -> s = s[0].s[1]...s[i].at_right

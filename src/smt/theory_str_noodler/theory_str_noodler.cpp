@@ -931,30 +931,10 @@ namespace smt::noodler {
             }
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
-            string_theory_propagation(xey);
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
-            // 0 <= i <= |s| && l < 0 -> v = eps
-            add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
-            // 0 <= i <= |s| -> xey = s (e = v in fact)
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
-            // i < 0 -> v = eps
-            add_axiom({i_ge_0, mk_eq(v, eps, false)});
-            // |s| < 0 -> v = eps
-            add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-            // i > |s| -> v = eps
-            add_axiom({ls_le_i, mk_eq(v, eps, false)});
-            // update length variables
-            mark_expression_as_length(s);
-            // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
-            // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
-            // after that)
-            this->var_eqs.add(expr_ref(l, m), v);
-            return;
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
+            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
 
         } else if(expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
@@ -966,8 +946,6 @@ namespace smt::noodler {
             if(m.is_true(post_bound)) {
                 y = expr_ref(m_util_s.str.mk_string(""), m);
             }
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
              // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
              add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
              this->len_vars.insert(v);
@@ -987,6 +965,7 @@ namespace smt::noodler {
         add_axiom({ls_le_i, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
+
         // update length variables
         mark_expression_as_length(s);
         // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 

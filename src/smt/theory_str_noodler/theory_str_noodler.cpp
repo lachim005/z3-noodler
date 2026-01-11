@@ -1007,6 +1007,7 @@ namespace smt::noodler {
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref one(m_util_a.mk_int(1), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
+        expr_ref re_allchar(m_util_s.re.mk_full_char(nullptr), m);
 
         expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref ls(m_util_s.str.mk_length(s), m);
@@ -1086,30 +1087,37 @@ namespace smt::noodler {
             return;
         }
 
-        expr* num = nullptr;
-        expr* pred = nullptr;
-        rational r;
         if(m_util_a.is_numeral(i)) {
             handle_substr_int(e, v);
             return;
         }
 
+        const unsigned MAX_LOOPING = 50;
+
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
 
-        // if i is of the form i = n + ...., create pre_substr . in_substr1 ... in_substrn to be x
-        if(m_util_a.is_add(i, num, pred) && m_util_a.is_numeral(num, r)) {
-            for(int i = 0; i < r.get_int32(); i++) {
-                expr_ref fv = mk_str_var_fresh("in_substr");
-                x = m_util_s.str.mk_concat(x, fv);
+        // optimization: if i = t+n for some numeral n and expression t we can split x to two parts x = x1.x2 where |x1|=t and |x2| = n
+        //   0 <= i <= |s| && t>=0 -> x2 in re.allchar^num
+        //   0 <= i <= |s| && t>=0 -> |x2| = num
+        if(expr *num, *rest; m_util_a.is_add(i, num, rest)) {
+            if (rational num_value; m_util_a.is_numeral(num, num_value) && num_value.is_pos() && num_value < MAX_LOOPING) {
+                unsigned num_value_unsigned = num_value.get_unsigned();
+
+                expr_ref x1 = xvar;
+                expr_ref x2 = mk_str_var_fresh("in_substr");
+                x = m_util_s.str.mk_concat(x1, x2);
 
                 // create axioms in_substri is Sigma
-                expr_ref re(m_util_s.re.mk_in_re(fv, m_util_s.re.mk_full_char(nullptr)), m);
-                literal pred_ge = mk_literal(m_util_a.mk_ge(pred, zero));
-                add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
-                add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(fv), one, false)});
+                expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
+                literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
+                // 0 <= i <= |s| && t>=0 -> x2 in re.allchar^num
+                add_axiom({~i_ge_0, ~ls_le_i, ~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
+                // 0 <= i <= |s| && t>=0 -> |x2| = num
+                add_axiom({~i_ge_0, ~ls_le_i, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
+                // |x1| = t (we do not need to put it in an axiom, we will put that |x| = i later)
+                this->var_eqs.add(expr_ref(rest, m), x1);
             }
-            this->var_eqs.add(expr_ref(pred, m), xvar);
         }
 
         expr_ref y = mk_str_var_fresh("post_substr");

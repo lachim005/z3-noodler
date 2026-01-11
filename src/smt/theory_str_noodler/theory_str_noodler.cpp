@@ -1083,12 +1083,12 @@ namespace smt::noodler {
             expr_ref vy(m_util_s.str.mk_concat(v, y), m);
             string_theory_propagation(vy);
 
-            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-            add_axiom({~l_ge_zero, mk_eq(vy, s, false)});
-            add_axiom({~l_ge_zero, mk_literal(y_in_allchar)});
-            add_axiom({~l_ge_zero, mk_eq(ly, one, false)});
-            add_axiom({~l_ge_zero, mk_eq(le, l, false)});
-            add_axiom({l_ge_zero, mk_eq(v, eps, false)});
+            literal s_is_empty = mk_eq(s, eps, false);
+            add_axiom({~s_is_empty, mk_eq(vy, s, false)});
+            add_axiom({~s_is_empty, mk_literal(y_in_allchar)});
+            add_axiom({~s_is_empty, mk_eq(ly, one, false)});
+            add_axiom({~s_is_empty, mk_eq(le, l, false)});
+            add_axiom({s_is_empty, mk_eq(v, eps, false)});
             // update length variables
             mark_expression_as_length(s);
             this->var_eqs.add(expr_ref(l, m), v);

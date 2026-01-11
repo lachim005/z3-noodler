@@ -959,22 +959,6 @@ namespace smt::noodler {
         } else if(expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(m_util_a.is_zero(i) && expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl.is_minus_one()) {
-            expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
-            expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
-            expr_ref ly(m_util_s.str.mk_length(y), m);
-
-            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-            string_theory_propagation(xey);
-            add_axiom({~l_ge_zero, mk_literal(substr_in)});
-            add_axiom({~l_ge_zero, mk_eq(ly, m_util_a.mk_int(1), false)});
-            add_axiom({~l_ge_zero, mk_eq(xey, s, false)});
-            add_axiom({~l_ge_zero, mk_eq(le, l, false)});
-            add_axiom({l_ge_zero, mk_eq(v, eps, false)});
-            // update length variables
-            mark_expression_as_length(s);
-            this->var_eqs.add(expr_ref(l, m), v);
-            return;
         } else {
             expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
             m_rewrite(post_bound); // simplify
@@ -1044,6 +1028,8 @@ namespace smt::noodler {
         expr_ref one(m_util_a.mk_int(1), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
+        expr_ref le(m_util_s.str.mk_length(v), m);
+
         // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
         //   i != 0 -> v = eps
         //   l < 1 -> v = eps
@@ -1085,6 +1071,31 @@ namespace smt::noodler {
             return;
         }
 
+        // the case (str.substr s 0 (|s|-1))
+        //   s != eps -> s = vy
+        //   s != eps -> y in re.allchar
+        //   s != eps -> |y| = 1 (not completely neccessary, helps z3)
+        //   s = eps -> v = eps
+        if(rational num; m_util_a.is_zero(i) && expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, num) && num.is_minus_one()) {
+            expr_ref y = mk_str_var_fresh("post_substr");
+            expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
+            expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
+            expr_ref ly(m_util_s.str.mk_length(y), m);
+            expr_ref vy(m_util_s.str.mk_concat(v, y), m);
+            string_theory_propagation(vy);
+
+            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
+            add_axiom({~l_ge_zero, mk_literal(substr_in)});
+            add_axiom({~l_ge_zero, mk_eq(ly, m_util_a.mk_int(1), false)});
+            add_axiom({~l_ge_zero, mk_eq(vy, s, false)});
+            add_axiom({~l_ge_zero, mk_eq(le, l, false)});
+            add_axiom({l_ge_zero, mk_eq(v, eps, false)});
+            // update length variables
+            mark_expression_as_length(s);
+            this->var_eqs.add(expr_ref(l, m), v);
+            return;
+        }
+
         expr* num = nullptr;
         expr* pred = nullptr;
         rational r;
@@ -1119,7 +1130,6 @@ namespace smt::noodler {
        
         expr_ref ls(m_util_s.str.mk_length(s), m);
         expr_ref lx(m_util_s.str.mk_length(x), m);
-        expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));

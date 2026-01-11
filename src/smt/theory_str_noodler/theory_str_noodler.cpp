@@ -1147,10 +1147,10 @@ namespace smt::noodler {
 
         // update length variables
         mark_expression_as_length(s);
-        this->len_vars.insert(v);
-        this->len_vars.insert(xvar);
+        mark_expression_as_length(v);
+        mark_expression_as_length(x);
         this->var_eqs.add(expr_ref(l, m), v); 
-        this->var_eqs.add(expr_ref(i, m), xvar);
+        this->var_eqs.add(expr_ref(i, m), x);
     }
 
     /**

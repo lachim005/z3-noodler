@@ -1117,7 +1117,12 @@ namespace smt::noodler {
                 add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
                 // |x1| = t (we do not need to put it in an axiom, we will put that |x| = i later)
                 this->var_eqs.add(expr_ref(rest, m), x1);
+                this->var_eqs.add(expr_ref(l, m), v);
+            } else {
+                this->var_eqs.add(expr_ref(i, m), x);
             }
+        } else {
+            this->var_eqs.add(expr_ref(i, m), x);
         }
 
         expr_ref y = mk_str_var_fresh("post_substr");
@@ -1130,8 +1135,8 @@ namespace smt::noodler {
         }
 
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        string_theory_propagation(xe);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xe);
         string_theory_propagation(xey);
 
         expr_ref lx(m_util_s.str.mk_length(x), m);
@@ -1148,17 +1153,15 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({i_le_ls, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
+        // |s| <= 0 -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
 
         // update length variables
         mark_expression_as_length(s);
         mark_expression_as_length(v);
         mark_expression_as_length(x);
-        this->var_eqs.add(expr_ref(l, m), v); 
-        this->var_eqs.add(expr_ref(i, m), x);
     }
 
     /**

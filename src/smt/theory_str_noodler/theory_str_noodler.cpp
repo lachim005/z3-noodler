@@ -876,7 +876,7 @@ namespace smt::noodler {
         mark_expression_as_length(x);
     }
 
-    void theory_str_noodler::handle_substr_int(expr *e) {
+    void theory_str_noodler::handle_substr_int(expr *e, const expr_ref& v) {
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
@@ -918,14 +918,10 @@ namespace smt::noodler {
             // (str.indexof s t n) != -1 -> (str.substr s 0 (1 + (str.indexof s t n))) = (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
             add_axiom({indexof_did_not_find, mk_eq(e, conc, false)});
 
-            expr_ref v = mk_str_var_fresh("substr");
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
             return;
         }
 
         expr_ref x(m_util_s.str.mk_string(""), m);
-        expr_ref v = mk_str_var_fresh("substr");
 
         unsigned val = r.get_unsigned();
         if (val > 0) {
@@ -977,10 +973,6 @@ namespace smt::noodler {
             add_axiom({~ls_le_0, mk_eq(v, eps, false)});
             // i > |s| -> v = eps
             add_axiom({ls_le_i, mk_eq(v, eps, false)});
-                // substr(s, i, n) = v
-            add_axiom({mk_eq(v, e, false)});
-             // add the replacement substr -> v
-            this->predicate_replace.insert(e, v.get());
             // update length variables
             mark_expression_as_length(s);
             // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
@@ -1004,8 +996,6 @@ namespace smt::noodler {
             add_axiom({~l_ge_zero, mk_eq(xey, s, false)});
             add_axiom({~l_ge_zero, mk_eq(le, l, false)});
             add_axiom({l_ge_zero, mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
             // update length variables
             mark_expression_as_length(s);
             this->var_eqs.add(expr_ref(l, m), v);
@@ -1038,11 +1028,6 @@ namespace smt::noodler {
         add_axiom({ls_le_i, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-        // substr(s, i, n) = v
-        add_axiom({mk_eq(v, e, false)});
-
-        // add the replacement substr -> v
-        this->predicate_replace.insert(e, v.get());
         // update length variables
         mark_expression_as_length(s);
         // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
@@ -1070,28 +1055,24 @@ namespace smt::noodler {
      * @param e str.substr(s, i, l)
      */
     void theory_str_noodler::handle_substr(expr *e) {
-        STRACE(str, tout << "handle-substr: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
+        if (axiomatized_persist_terms.contains(e)) { return; }
 
+        STRACE(str, tout << "handle substr: " << mk_pp(e, m) << '\n';);
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("substr");
+        expr_ref v = get_fresh_var_for_string_function("substr", e);
 
         // Check if the substring is of the form str.substr x k 1 and rewrite to str.at x k
         rational num_l;
         if(m_util_a.is_numeral(l, num_l) && num_l == 1) {
             expr_ref at(m_util_s.str.mk_at(s, i), m);
-            add_axiom({mk_eq(v, e, false)});
             add_axiom({mk_eq(v, at, false)});
             // set an additional constraint that v in eps union sigma
             expr_ref re(m_util_s.re.mk_in_re(v, m_util_s.re.mk_union( m_util_s.re.mk_to_re(m_util_s.str.mk_string("")),  m_util_s.re.mk_full_char(nullptr))) , m);
             add_axiom({mk_literal(re)});
-            this->predicate_replace.insert(e, v.get());
             return;
         }
 
@@ -1119,17 +1100,12 @@ namespace smt::noodler {
             add_axiom({~l_ge_0, ~i_ge_1, mk_eq(v, eps, false)});
             // l >= 0 && i = 0 && l < 1 -> v = eps
             add_axiom({~l_ge_0, ~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
-            // substr(s, i, l) = v
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
             return;
         }
         // check the form str.substr "" x y --> str.substr "" x y == ""
         if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
             expr_ref eps(m_util_s.str.mk_string(""), m);
             add_axiom({mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
             return;
         }
 
@@ -1137,7 +1113,7 @@ namespace smt::noodler {
         expr* pred = nullptr;
         rational r;
         if(m_util_a.is_numeral(i)) {
-            handle_substr_int(e);
+            handle_substr_int(e, v);
             return;
         }
 
@@ -1204,11 +1180,7 @@ namespace smt::noodler {
         add_axiom({ls_le_i, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-        // substr(s, i, n) = v
-        add_axiom({mk_eq(v, e, false)});
 
-        // add the replacement substr -> v
-        this->predicate_replace.insert(e, v.get());
         // update length variables
         mark_expression_as_length(s);
         this->len_vars.insert(v);

@@ -1008,6 +1008,14 @@ namespace smt::noodler {
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
         expr_ref le(m_util_s.str.mk_length(v), m);
+        expr_ref ls(m_util_s.str.mk_length(s), m);
+        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
+
+        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
+        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
+        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
+        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
+        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
         // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
         //   i != 0 -> v = eps
@@ -1108,16 +1116,7 @@ namespace smt::noodler {
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
-       
-        expr_ref ls(m_util_s.str.mk_length(s), m);
         expr_ref lx(m_util_s.str.mk_length(x), m);
-        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
-
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
         string_theory_propagation(xe);
         string_theory_propagation(xey);

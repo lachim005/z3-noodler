@@ -957,13 +957,13 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~i_le_ls, l_ge_0, mk_eq(v, eps, false)});
+        // l < 0 -> v = eps
+        add_axiom({l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({i_le_ls, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
+        // |s| <= 0 -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
 
         // update length variables
@@ -1149,8 +1149,8 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
         add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
-        // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~i_le_ls, l_ge_0, mk_eq(v, eps, false)});
+        // l < 0 -> v = eps
+        add_axiom({l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
         // i > |s| -> v = eps

@@ -1065,17 +1065,6 @@ namespace smt::noodler {
 
         expr_ref v = get_fresh_var_for_string_function("substr", e);
 
-        // Check if the substring is of the form str.substr x k 1 and rewrite to str.at x k
-        rational num_l;
-        if(m_util_a.is_numeral(l, num_l) && num_l == 1) {
-            expr_ref at(m_util_s.str.mk_at(s, i), m);
-            add_axiom({mk_eq(v, at, false)});
-            // set an additional constraint that v in eps union sigma
-            expr_ref re(m_util_s.re.mk_in_re(v, m_util_s.re.mk_union( m_util_s.re.mk_to_re(m_util_s.str.mk_string("")),  m_util_s.re.mk_full_char(nullptr))) , m);
-            add_axiom({mk_literal(re)});
-            return;
-        }
-
         // check the form str.substr "B" i l
         zstring str_s;
         if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {

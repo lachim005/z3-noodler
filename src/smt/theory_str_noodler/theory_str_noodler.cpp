@@ -886,14 +886,14 @@ namespace smt::noodler {
         }
 
         expr_ref ls(m_util_s.str.mk_length(s), m);
-        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
+        expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
+        literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
+        literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
+        literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
         expr_ref x(m_util_s.str.mk_string(""), m);
@@ -902,13 +902,13 @@ namespace smt::noodler {
         if (val > 0) {
             x = mk_str_var_fresh("pre_substr");
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(m_util_s.re.mk_full_char(nullptr), val, val)), m);
-            add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
+            add_axiom({~i_ge_0, ~i_le_ls, mk_literal(re)});
             // strenghtening the axiom to equivalence
             // for multiple substrs, the SAT solver keeps guessing re and ~re until all possibilities are covered. 
             // Now the choice of re is bound together with the substr axiom
             add_axiom({~mk_literal(re), i_ge_0});
-            add_axiom({~mk_literal(re), ls_le_i});
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
+            add_axiom({~mk_literal(re), i_le_ls});
+            add_axiom({~i_ge_0, ~i_le_ls, mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -932,9 +932,9 @@ namespace smt::noodler {
             expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
 
             // 0 <= i <= |s| && |s| < l + i  -> s = x.v
-            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
+            add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
+            add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
 
         } else if(expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
@@ -947,22 +947,22 @@ namespace smt::noodler {
                 y = expr_ref(m_util_s.str.mk_string(""), m);
             }
              // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
+             add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
              this->len_vars.insert(v);
         }
 
         string_theory_propagation(xe);
         string_theory_propagation(xey);
         // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
         // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({ls_le_i, mk_eq(v, eps, false)});
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
 
@@ -1011,12 +1011,12 @@ namespace smt::noodler {
 
         expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref ls(m_util_s.str.mk_length(s), m);
-        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
+        expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
+        literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
+        literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
+        literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
         // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
@@ -1112,9 +1112,9 @@ namespace smt::noodler {
                 expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
                 literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
                 // 0 <= i <= |s| && t>=0 -> x2 in re.allchar^num
-                add_axiom({~i_ge_0, ~ls_le_i, ~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
+                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
                 // 0 <= i <= |s| && t>=0 -> |x2| = num
-                add_axiom({~i_ge_0, ~ls_le_i, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
+                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
                 // |x1| = t (we do not need to put it in an axiom, we will put that |x| = i later)
                 this->var_eqs.add(expr_ref(rest, m), x1);
             }
@@ -1137,19 +1137,19 @@ namespace smt::noodler {
         expr_ref lx(m_util_s.str.mk_length(x), m);
 
         // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
         // 0 <= i <= |s| -> |x| = i
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(lx, i, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(lx, i, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-        add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
+        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
         // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
         // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({ls_le_i, mk_eq(v, eps, false)});
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)});
 

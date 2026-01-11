@@ -1086,14 +1086,6 @@ namespace smt::noodler {
             return;
         }
 
-        zstring str_s;
-        // check the form str.substr "" x y --> str.substr "" x y == ""
-        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
-            expr_ref eps(m_util_s.str.mk_string(""), m);
-            add_axiom({mk_eq(v, eps, false)});
-            return;
-        }
-
         expr* num = nullptr;
         expr* pred = nullptr;
         rational r;

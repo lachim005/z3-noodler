@@ -1078,16 +1078,15 @@ namespace smt::noodler {
         //   s = eps -> v = eps
         if(rational num; m_util_a.is_zero(i) && expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, num) && num.is_minus_one()) {
             expr_ref y = mk_str_var_fresh("post_substr");
-            expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
-            expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
+            expr_ref y_in_allchar(m_util_s.re.mk_in_re(y, m_util_s.re.mk_full_char(nullptr)), m);
             expr_ref ly(m_util_s.str.mk_length(y), m);
             expr_ref vy(m_util_s.str.mk_concat(v, y), m);
             string_theory_propagation(vy);
 
             literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-            add_axiom({~l_ge_zero, mk_literal(substr_in)});
-            add_axiom({~l_ge_zero, mk_eq(ly, m_util_a.mk_int(1), false)});
             add_axiom({~l_ge_zero, mk_eq(vy, s, false)});
+            add_axiom({~l_ge_zero, mk_literal(y_in_allchar)});
+            add_axiom({~l_ge_zero, mk_eq(ly, one, false)});
             add_axiom({~l_ge_zero, mk_eq(le, l, false)});
             add_axiom({l_ge_zero, mk_eq(v, eps, false)});
             // update length variables

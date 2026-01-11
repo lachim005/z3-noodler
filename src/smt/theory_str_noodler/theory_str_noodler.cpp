@@ -1084,11 +1084,14 @@ namespace smt::noodler {
             string_theory_propagation(vy);
 
             literal s_is_empty = mk_eq(s, eps, false);
-            add_axiom({~s_is_empty, mk_eq(vy, s, false)});
-            add_axiom({~s_is_empty, mk_literal(y_in_allchar)});
-            add_axiom({~s_is_empty, mk_eq(ly, one, false)});
-            add_axiom({~s_is_empty, mk_eq(le, l, false)});
-            add_axiom({s_is_empty, mk_eq(v, eps, false)});
+            // s != eps -> s = vy
+            add_axiom({s_is_empty, mk_eq(s, vy, false)});
+            // s != eps -> y in re.allchar
+            add_axiom({s_is_empty, mk_literal(y_in_allchar)});
+            // s != eps -> |y| = 1
+            add_axiom({s_is_empty, mk_eq(ly, one, false)});
+            // s = eps -> v = eps
+            add_axiom({~s_is_empty, mk_eq(v, eps, false)});
             // update length variables
             mark_expression_as_length(s);
             this->var_eqs.add(expr_ref(l, m), v);

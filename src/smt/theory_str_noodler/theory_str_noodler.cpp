@@ -1065,32 +1065,28 @@ namespace smt::noodler {
 
         expr_ref v = get_fresh_var_for_string_function("substr", e);
 
-        // check the form str.substr "B" i l
-        zstring str_s;
-        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
-            expr_ref zero(m_util_a.mk_int(0), m);
-            expr_ref one(m_util_a.mk_int(1), m);
-            expr_ref eps(m_util_s.str.mk_string(""), m);
+        expr_ref zero(m_util_a.mk_int(0), m);
+        expr_ref one(m_util_a.mk_int(1), m);
+        expr_ref eps(m_util_s.str.mk_string(""), m);
 
+        // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
+        //   i != 0 -> v = eps
+        //   l < 1 -> v = eps
+        //   i = 0 && l >= 1 -> v = "A"
+        if(zstring str_s; m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
             literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
-            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-            literal l_eq_0 = mk_literal(m_util_a.mk_eq(l, zero));
-            literal i_ge_1 = mk_literal(m_util_a.mk_ge(i, one));
             literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
-            literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
 
-            // i < 0 -> v = eps
-            add_axiom({i_ge_0, mk_eq(v, eps, false)});
-            // l < 0 -> v = eps
-            add_axiom({l_ge_0, mk_eq(v, eps, false)});
-            // l >= 0 && i = 0 && i >= 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
-            // l >= 0 && i >= 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_ge_1, mk_eq(v, eps, false)});
-            // l >= 0 && i = 0 && l < 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
+            // i != 0 -> v = eps
+            add_axiom({i_eq_0, mk_eq(v, eps, false)});
+            // l < 1 -> v = eps
+            add_axiom({l_ge_1, mk_eq(v, eps, false)});
+            // i = 0 && l >= 1 -> v = s
+            add_axiom({~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
             return;
         }
+
+        zstring str_s;
         // check the form str.substr "" x y --> str.substr "" x y == ""
         if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
             expr_ref eps(m_util_s.str.mk_string(""), m);
@@ -1134,8 +1130,6 @@ namespace smt::noodler {
         expr_ref lx(m_util_s.str.mk_length(x), m);
         expr_ref le(m_util_s.str.mk_length(v), m);
         expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
-        expr_ref zero(m_util_a.mk_int(0), m);
-        expr_ref eps(m_util_s.str.mk_string(""), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));

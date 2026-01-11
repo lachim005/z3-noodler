@@ -977,6 +977,7 @@ namespace smt::noodler {
     /**
      * @brief Handle str.substr(s,i,l)
      *
+     * We set str.substr(s,i,l) = v where v is fresh.
      * Translates to the following theory axioms:
      * 0 <= i <= |s| -> x.v.y = s
      * 0 <= i <= |s| -> |x| = i
@@ -1093,41 +1094,40 @@ namespace smt::noodler {
             return;
         }
 
-        expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
-        m_rewrite(post_bound); // simplify
-
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
-        expr_ref y = mk_str_var_fresh("post_substr");
 
-        // if i + l >= |s|, we can set post_substr to eps
-        if(m.is_true(post_bound)) {
-            y = expr_ref(m_util_s.str.mk_string(""), m);
-        }
-        std::vector<expr_ref> vars;
         // if i is of the form i = n + ...., create pre_substr . in_substr1 ... in_substrn to be x
         if(m_util_a.is_add(i, num, pred) && m_util_a.is_numeral(num, r)) {
             for(int i = 0; i < r.get_int32(); i++) {
                 expr_ref fv = mk_str_var_fresh("in_substr");
                 x = m_util_s.str.mk_concat(x, fv);
-                vars.push_back(fv);
-            }    
+
+                // create axioms in_substri is Sigma
+                expr_ref re(m_util_s.re.mk_in_re(fv, m_util_s.re.mk_full_char(nullptr)), m);
+                literal pred_ge = mk_literal(m_util_a.mk_ge(pred, zero));
+                add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
+                add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(fv), one, false)});
+            }
+            this->var_eqs.add(expr_ref(pred, m), xvar);
         }
+
+        expr_ref y = mk_str_var_fresh("post_substr");
+
+        // if i + l >= |s|, we can set post_substr to eps
+        expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
+        m_rewrite(post_bound); // simplify
+        if(m.is_true(post_bound)) {
+            y = expr_ref(m_util_s.str.mk_string(""), m);
+        }
+
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
+        string_theory_propagation(xe);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xey);
 
         expr_ref lx(m_util_s.str.mk_length(x), m);
 
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
-
-        // create axioms in_substri is Sigma
-        for(const expr_ref& val : vars) {
-            expr_ref re(m_util_s.re.mk_in_re(val, m_util_s.re.mk_full_char(nullptr)), m);
-            literal pred_ge = mk_literal(m_util_a.mk_ge(pred, m_util_a.mk_int(0)));
-            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
-            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(val), m_util_a.mk_int(1), false)});
-        }
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
         // 0 <= i <= |s| -> |x| = i
@@ -1151,9 +1151,6 @@ namespace smt::noodler {
         this->len_vars.insert(xvar);
         this->var_eqs.add(expr_ref(l, m), v); 
         this->var_eqs.add(expr_ref(i, m), xvar);
-        if(vars.size() > 0) {
-            this->var_eqs.add(expr_ref(pred, m), xvar);
-        }        
     }
 
     /**

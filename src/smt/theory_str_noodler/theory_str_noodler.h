@@ -307,7 +307,7 @@ namespace smt::noodler {
         // methods for rewriting different predicates into something simpler that we can handle
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
-        void handle_substr_int(expr *e, const expr_ref& v);
+        void handle_substr_int(expr *e);
         void handle_index_of(expr *e);
         void handle_replace(expr *e);
         void handle_replace_re(expr *e);

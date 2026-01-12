@@ -889,6 +889,7 @@ namespace smt::noodler {
         expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
         expr_ref zero(m_util_a.mk_int(0), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
+        expr_ref re_allchar(m_util_s.re.mk_full_char(nullptr), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
         literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
@@ -917,22 +918,16 @@ namespace smt::noodler {
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
 
         if(m_util_a.is_numeral(l, rl)) {
-            int lval = rl.get_int32();
-            expr_ref substr_re(m);
-            for(int i = 0; i < lval; i++) {
-                if(substr_re == nullptr) {
-                    substr_re = m_util_s.re.mk_full_char(nullptr);
-                } else {
-                    substr_re = m_util_s.re.mk_concat(substr_re, m_util_s.re.mk_full_char(nullptr));
-                }  
-            }
-            expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
+            unsigned lval = rl.get_unsigned();
+            expr_ref substr_in(m_util_s.re.mk_in_re(v, m_util_s.re.mk_loop_proper(re_allchar, lval, lval)), m);
 
-            // 0 <= i <= |s| && |s| < l + i  -> s = x.v
+            // 0 <= i <= |s| && |s| < l + i  -> y = eps
             add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
+            // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
+            add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
+            // 0 <= i <= |s| && 0 <= l <= |s| - i -> v in re.allchar^l
             add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
-
+            mark_expression_as_length(v);
         } else if(expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, rl) && rl == r) {
             xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
             xey = expr_ref(m_util_s.str.mk_concat(x, v), m);

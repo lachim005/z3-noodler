@@ -1097,9 +1097,9 @@ namespace smt::noodler {
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
 
-        // optimization: if i = t+n for some numeral n and expression t we can split x to two parts x = x1.x2 where |x1|=t and |x2| = n
-        //   0 <= i <= |s| && t>=0 -> x2 in re.allchar^num
-        //   0 <= i <= |s| && t>=0 -> |x2| = num
+        // optimization: if i = t+n for some numeral n and expression t we can split x to two parts x = x1.x2 where |x1|=t and |x2|=n
+        //   0 <= i <= |s| && t>=0 -> x2 in re.allchar^n
+        //   0 <= i <= |s| && t>=0 -> |x2| = n
         if(expr *num, *rest; m_util_a.is_add(i, num, rest)) {
             if (rational num_value; m_util_a.is_numeral(num, num_value) && num_value.is_pos() && num_value < MAX_LOOPING) {
                 unsigned num_value_unsigned = num_value.get_unsigned();
@@ -1111,11 +1111,11 @@ namespace smt::noodler {
                 // create axioms in_substri is Sigma
                 expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
                 literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
-                // 0 <= i <= |s| && t>=0 -> x2 in re.allchar^num
+                // 0 <= i <= |s| && t>=0 -> x2 in re.allchar^n
                 add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
-                // 0 <= i <= |s| && t>=0 -> |x2| = num
-                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
-                // |x1| = t (we do not need to put it in an axiom, we will put that |x| = i later)
+                // 0 <= i <= |s| && t>=0 -> |x2| = n
+                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), num, false)});
+                // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
                 this->var_eqs.add(expr_ref(rest, m), x1);
                 this->var_eqs.add(expr_ref(l, m), v);
             } else {

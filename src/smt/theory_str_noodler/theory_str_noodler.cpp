@@ -902,13 +902,9 @@ namespace smt::noodler {
         if (val > 0) {
             x = mk_str_var_fresh("pre_substr");
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(m_util_s.re.mk_full_char(nullptr), val, val)), m);
-            add_axiom({~i_ge_0, ~i_le_ls, mk_literal(re)});
-            // strenghtening the axiom to equivalence
-            // for multiple substrs, the SAT solver keeps guessing re and ~re until all possibilities are covered. 
-            // Now the choice of re is bound together with the substr axiom
-            add_axiom({~mk_literal(re), i_ge_0});
-            add_axiom({~mk_literal(re), i_le_ls});
-            add_axiom({~i_ge_0, ~i_le_ls, mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
+            add_axiom({~i_le_ls, mk_literal(re)});
+            // i <= |s| -> |x| = val
+            add_axiom({~i_le_ls, mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);

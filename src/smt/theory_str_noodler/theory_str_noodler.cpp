@@ -968,6 +968,10 @@ namespace smt::noodler {
 
         // update length variables
         mark_expression_as_length(s);
+        // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
+        // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
+        // after that)
+        this->var_eqs.add(expr_ref(l, m), v);
     }
 
     /**
@@ -1077,6 +1081,9 @@ namespace smt::noodler {
             add_axiom({s_is_empty, mk_eq(ly, one, false)});
             // s = eps -> v = eps
             add_axiom({~s_is_empty, mk_eq(v, eps, false)});
+            // update length variables
+            mark_expression_as_length(s);
+            this->var_eqs.add(expr_ref(l, m), v);
             return;
         }
 
@@ -1110,6 +1117,7 @@ namespace smt::noodler {
                 add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), one, false)});
                 // |x1| = t (we do not need to put it in an axiom, we will put that |x| = i later)
                 this->var_eqs.add(expr_ref(rest, m), x1);
+                this->var_eqs.add(expr_ref(l, m), v);
             } else {
                 this->var_eqs.add(expr_ref(i, m), x);
             }

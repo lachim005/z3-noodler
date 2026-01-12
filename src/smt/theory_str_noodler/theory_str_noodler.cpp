@@ -969,6 +969,7 @@ namespace smt::noodler {
         // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
         // after that)
         this->var_eqs.add(expr_ref(l, m), v);
+        this->var_eqs.add(expr_ref(i, m), x);
     }
 
     /**
@@ -1115,11 +1116,7 @@ namespace smt::noodler {
                 // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
                 this->var_eqs.add(expr_ref(rest, m), x1);
                 this->var_eqs.add(expr_ref(l, m), v);
-            } else {
-                this->var_eqs.add(expr_ref(i, m), x);
             }
-        } else {
-            this->var_eqs.add(expr_ref(i, m), x);
         }
 
         expr_ref y = mk_str_var_fresh("post_substr");
@@ -1159,6 +1156,7 @@ namespace smt::noodler {
         mark_expression_as_length(s);
         mark_expression_as_length(v);
         mark_expression_as_length(x);
+        this->var_eqs.add(expr_ref(i, m), x);
     }
 
     /**

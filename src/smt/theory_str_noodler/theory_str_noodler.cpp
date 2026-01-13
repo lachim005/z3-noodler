@@ -1151,15 +1151,48 @@ namespace smt::noodler {
             }
         }
 
-        expr_ref y = mk_str_var_fresh("post_substr");
+        // We now want to set the length of v. It should either be |v|=l,
+        // if 0 <= l <= |s|-i, or |v|=|s|-i, if |s|-i < l.
 
-        // if i + l >= |s|, we can set post_substr to eps
+        // 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
+        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
+        // 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
+        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
+
+        this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
+
+        // We also need to put v in length variables, but this will dependind on y.
+        // We therefore create y first.
+
+        expr_ref y(m);
+        // i+l >= |s|
         expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
         m_rewrite(post_bound); // simplify
         if(m.is_true(post_bound)) {
+            // If i + l >= |s|, we can set y to eps and we do not have to put v in length vars
+            // as s=xv and the length of x is already handled by previous axioms (so v will be
+            // automatically the rest of s).
             y = expr_ref(m_util_s.str.mk_string(""), m);
+        } else {
+            y = mk_str_var_fresh("post_substr");
+            // If l is some (reasonably small) numeral, we can put
+            //   - v in re.allchar^l, for the case 0 <= l <= |s|-i,
+            //   - y=eps, for the case |s|-i < l.
+            // Then we do not have to put v in length vars.
+            if(rational l_val; m_util_a.is_numeral(l, l_val) && l_val.is_pos() && l_val <= MAX_LOOPING) {
+                unsigned l_val_unsigned = l_val.get_unsigned();
+                expr_ref substr_in(m_util_s.re.mk_in_re(v, m_util_s.re.mk_loop_proper(re_allchar, l_val_unsigned, l_val_unsigned)), m);
+    
+                // 0 <= i <= |s| && |s| < l + i  -> y = eps
+                add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
+                // 0 <= i <= |s| && 0 <= l <= |s| - i -> v in re.allchar^l
+                add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
+            } else {
+                 mark_expression_as_length(v);
+            }
         }
 
+        // We now create concatenation xvy and the main axiom
         expr_ref xe(m_util_s.str.mk_concat(x, v), m);
         expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
         string_theory_propagation(xe);
@@ -1167,15 +1200,9 @@ namespace smt::noodler {
 
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
-        // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
 
-        // update length variables
+        // mark s as length, as |s| is used in the axioms
         mark_expression_as_length(s);
-        mark_expression_as_length(v);
-        this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
     }
 
     /**

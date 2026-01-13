@@ -920,9 +920,6 @@ namespace smt::noodler {
             // y is eps and we have s = xv and the length of x is given by i, so
             // length of v will be correctly set in the decision procedure and
             // in the second case, we set the length of x trough regex
-        } else if(rational num; expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, num) && num == i_val) {
-            // we have l = i + |s|
-            y = expr_ref(m_util_s.str.mk_string(""), m);
         } else {
             expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
             m_rewrite(post_bound); // simplify

@@ -1118,7 +1118,6 @@ namespace smt::noodler {
                 add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), num, false)});
                 // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
                 this->var_eqs.add(expr_ref(rest, m), x1);
-                this->var_eqs.add(expr_ref(l, m), v);
             }
         }
 
@@ -1151,7 +1150,8 @@ namespace smt::noodler {
         mark_expression_as_length(s);
         mark_expression_as_length(v);
         mark_expression_as_length(x);
-        this->var_eqs.add(expr_ref(i, m), x);
+        this->var_eqs.add(expr_ref(i, m), x); // |x| = i, might not be always true, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case |x|=i holds
+        this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
     }
 
     /**

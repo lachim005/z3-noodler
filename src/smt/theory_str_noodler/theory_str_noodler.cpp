@@ -905,8 +905,6 @@ namespace smt::noodler {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(m_util_s.re.mk_full_char(nullptr), val, val)), m);
             // x in re.allchar^val
             add_axiom({mk_literal(re)});
-            // |x| = val
-            add_axiom({mk_eq(m_util_s.str.mk_length(x), m_util_a.mk_int(val), false)});
         }
 
         expr_ref le(m_util_s.str.mk_length(v), m);
@@ -943,6 +941,8 @@ namespace smt::noodler {
         string_theory_propagation(xey);
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
+        // 0 <= i <= |s| -> |x| = i
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(m_util_s.str.mk_length(x), i, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i

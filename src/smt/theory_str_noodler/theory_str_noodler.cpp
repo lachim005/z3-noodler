@@ -877,90 +877,6 @@ namespace smt::noodler {
         mark_expression_as_length(x);
     }
 
-    void theory_str_noodler::handle_substr_int(expr *e, const expr_ref& v) {
-        expr *s = nullptr, *i = nullptr, *l = nullptr;
-        VERIFY(m_util_s.str.is_extract(e, s, i, l));
-
-        rational i_val;
-        VERIFY(m_util_a.is_numeral(i, i_val));
-
-        expr_ref ls(m_util_s.str.mk_length(s), m);
-        expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
-        expr_ref zero(m_util_a.mk_int(0), m);
-        expr_ref eps(m_util_s.str.mk_string(""), m);
-        expr_ref re_allchar(m_util_s.re.mk_full_char(nullptr), m);
-
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
-        literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
-        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
-
-        expr_ref x(m_util_s.str.mk_string(""), m);
-
-        unsigned i_val_unsigned = i_val.get_unsigned();
-        if (i_val_unsigned > 0) {
-            x = mk_str_var_fresh("pre_substr");
-            expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(m_util_s.re.mk_full_char(nullptr), i_val_unsigned, i_val_unsigned)), m);
-            // x in re.allchar^val
-            add_axiom({mk_literal(re)});
-        }
-
-        expr_ref le(m_util_s.str.mk_length(v), m);
-        expr_ref y = mk_str_var_fresh("post_substr");
-
-        if(rational l_val; m_util_a.is_numeral(l, l_val)) {
-            unsigned l_val_unsigned = l_val.get_unsigned();
-            expr_ref substr_in(m_util_s.re.mk_in_re(v, m_util_s.re.mk_loop_proper(re_allchar, l_val_unsigned, l_val_unsigned)), m);
-
-            // 0 <= i <= |s| && |s| < l + i  -> y = eps
-            add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> v in re.allchar^l
-            add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
-            // v does not have to be marked as legnth, because in the first case,
-            // y is eps and we have s = xv and the length of x is given by i, so
-            // length of v will be correctly set in the decision procedure and
-            // in the second case, we set the length of v trough regex
-        } else {
-            expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
-            m_rewrite(post_bound); // simplify
-            // if i + l >= |s|, we can set post_substr to eps
-            if(m.is_true(post_bound)) {
-                y = eps;
-            }
-             mark_expression_as_length(v);
-        }
-
-        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
-        // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
-        // 0 <= i <= |s| -> |x| = i
-        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(m_util_s.str.mk_length(x), i, false)});
-        // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
-        // l < 0 -> v = eps
-        add_axiom({l_ge_0, mk_eq(v, eps, false)});
-        // i < 0 -> v = eps
-        add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // i > |s| -> v = eps
-        add_axiom({i_le_ls, mk_eq(v, eps, false)});
-        // |s| <= 0 -> v = eps
-        add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-
-        // update length variables
-        mark_expression_as_length(s);
-        // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
-        // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
-        // after that)
-        this->var_eqs.add(expr_ref(l, m), v);
-        this->var_eqs.add(expr_ref(i, m), x);
-    }
-
     /**
      * @brief Handle str.substr(s,i,l)
      *
@@ -1075,11 +991,6 @@ namespace smt::noodler {
             // update length variables
             mark_expression_as_length(s);
             this->var_eqs.add(expr_ref(l, m), v);
-            return;
-        }
-
-        if(m_util_a.is_numeral(i)) {
-            handle_substr_int(e, v);
             return;
         }
 

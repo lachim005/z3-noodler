@@ -882,17 +882,23 @@ namespace smt::noodler {
      *
      * We set str.substr(s,i,l) = v where v is fresh.
      * Translates to the following theory axioms:
+     * l < 0 -> v = eps
+     * i < 0 -> v = eps
+     * i > |s| -> v = eps
+     * s = eps -> v = eps
      * 0 <= i <= |s| -> x.v.y = s
      * 0 <= i <= |s| -> |x| = i
-     * 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-     * 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-     * 0 <= i <= |s| && l < 0 -> v = eps
-     * i < 0 -> v = eps
-     * not(0 <= l <= |s| - i) -> v = eps
-     * i > |s| -> v = eps
+     * 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
+     * 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
      *
-     * We store
-     * substr(s, i, n) = v
+     * Special cases:
+     *  - when s is a one letter string literal
+     *  - the case (str.substr s 0 (1 + (str.indexof s t n))) with t a nonempty string literal
+     *  - the case (str.substr s 0 (|s|-1))
+     * 
+     * There is also some special handling of x when i is either a numeral
+     * or of the form (num + |s|) where num is numeral.
+     * Furthermore, the axioms for |v| are also handled specially if l is numeral.
      *
      * @param e str.substr(s, i, l)
      */

@@ -920,13 +920,13 @@ namespace smt::noodler {
             // v does not have to be marked as legnth, because in the first case,
             // y is eps and we have s = xv and the length of x is given by i, so
             // length of v will be correctly set in the decision procedure and
-            // in the second case, we set the length of x trough regex
+            // in the second case, we set the length of v trough regex
         } else {
             expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
             m_rewrite(post_bound); // simplify
             // if i + l >= |s|, we can set post_substr to eps
             if(m.is_true(post_bound)) {
-                y = expr_ref(m_util_s.str.mk_string(""), m);
+                y = eps;
             }
              mark_expression_as_length(v);
         }
@@ -1005,6 +1005,8 @@ namespace smt::noodler {
         literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
         literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+
+        const unsigned MAX_LOOPING = 50; // maximal looping allowed in regexes (if too large, the automata get too large)
 
         // SPECIAL CASES
 
@@ -1092,8 +1094,6 @@ namespace smt::noodler {
         add_axiom({i_le_ls, mk_eq(v, eps, false)});
         // |s| <= 0 -> v = eps
         add_axiom({~ls_le_0, mk_eq(v, eps, false)}); // TODO try s=eps instead of |s|<=0
-
-        const unsigned MAX_LOOPING = 50;
 
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;

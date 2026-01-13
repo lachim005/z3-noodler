@@ -768,7 +768,7 @@ namespace smt::noodler {
         literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero)); // i >= |s|
         expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m); // empty string
 
-        // Special cases
+        // SPECIAL CASES
 
         // the case where s is one letter string literal, i.e. (str.at "A" i)
         //   i = 0 -> v = "A"
@@ -849,7 +849,8 @@ namespace smt::noodler {
             return;
         }
 
-        // General case
+        // GENERAL CASE
+
         // creating concatenation xvy
         expr_ref x = mk_str_var_fresh("at_left");
         expr_ref y = mk_str_var_fresh("at_right");
@@ -1005,6 +1006,8 @@ namespace smt::noodler {
         literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
         literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
 
+        // SPECIAL CASES
+
         // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
         //   i != 0 -> v = eps
         //   l < 1 -> v = eps
@@ -1078,6 +1081,18 @@ namespace smt::noodler {
             return;
         }
 
+        // GENERAL CASE
+
+        // First the invalid cases
+        // l < 0 -> v = eps
+        add_axiom({l_ge_0, mk_eq(v, eps, false)});
+        // i < 0 -> v = eps
+        add_axiom({i_ge_0, mk_eq(v, eps, false)});
+        // i > |s| -> v = eps
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
+        // |s| <= 0 -> v = eps
+        add_axiom({~ls_le_0, mk_eq(v, eps, false)}); // TODO try s=eps instead of |s|<=0
+
         const unsigned MAX_LOOPING = 50;
 
         expr_ref xvar = mk_str_var_fresh("pre_substr");
@@ -1131,14 +1146,6 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
         add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
-        // l < 0 -> v = eps
-        add_axiom({l_ge_0, mk_eq(v, eps, false)});
-        // i < 0 -> v = eps
-        add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // i > |s| -> v = eps
-        add_axiom({i_le_ls, mk_eq(v, eps, false)});
-        // |s| <= 0 -> v = eps
-        add_axiom({~ls_le_0, mk_eq(v, eps, false)});
 
         // update length variables
         mark_expression_as_length(s);

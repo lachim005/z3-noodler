@@ -926,7 +926,7 @@ namespace smt::noodler {
         literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
         literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
         literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
-        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+        literal s_is_empty = mk_eq(s, eps, false);
 
         const unsigned MAX_LOOPING = 50; // maximal looping allowed in regexes (if too large, the automata get too large)
 
@@ -985,7 +985,6 @@ namespace smt::noodler {
             expr_ref vy(m_util_s.str.mk_concat(v, y), m);
             string_theory_propagation(vy);
 
-            literal s_is_empty = mk_eq(s, eps, false);
             // s != eps -> s = vy
             add_axiom({s_is_empty, mk_eq(s, vy, false)});
             // s != eps -> y in re.allchar
@@ -1009,11 +1008,8 @@ namespace smt::noodler {
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
         add_axiom({i_le_ls, mk_eq(v, eps, false)});
-        // |s| <= 0 -> v = eps
-        add_axiom({~ls_le_0, mk_eq(v, eps, false)}); // TODO try s=eps instead of |s|<=0
-
-        expr_ref xvar = mk_str_var_fresh("pre_substr");
-        expr_ref x = xvar;
+        // s = eps -> v = eps
+        add_axiom({~s_is_empty, mk_eq(v, eps, false)});
 
         // We will now create concatenation s=xvy for the valid case where v is the result of substr,
         // |x|=i and either |v|=l (if 0 <= l <= |s|-i) or |v|=|s|-i (if |s|-i < l)

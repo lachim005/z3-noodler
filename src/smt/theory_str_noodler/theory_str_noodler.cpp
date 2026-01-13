@@ -923,8 +923,6 @@ namespace smt::noodler {
 
             // 0 <= i <= |s| && |s| < l + i  -> y = eps
             add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
-            // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-            add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
             // 0 <= i <= |s| && 0 <= l <= |s| - i -> v in re.allchar^l
             add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
             mark_expression_as_length(v);
@@ -938,9 +936,7 @@ namespace smt::noodler {
             if(m.is_true(post_bound)) {
                 y = expr_ref(m_util_s.str.mk_string(""), m);
             }
-             // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-             add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
-             this->len_vars.insert(v);
+             mark_expression_as_length(v);
         }
 
         string_theory_propagation(xe);
@@ -949,6 +945,8 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
+        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
+        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
         // l < 0 -> v = eps
         add_axiom({l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps

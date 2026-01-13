@@ -1098,26 +1098,56 @@ namespace smt::noodler {
         expr_ref xvar = mk_str_var_fresh("pre_substr");
         expr_ref x = xvar;
 
-        // optimization: if i = t+n for some numeral n and expression t we can split x to two parts x = x1.x2 where |x1|=t and |x2|=n
-        //   0 <= i <= |s| && t>=0 -> x2 in re.allchar^n
-        //   0 <= i <= |s| && t>=0 -> |x2| = n
-        if(expr *num, *rest; m_util_a.is_add(i, num, rest)) {
-            if (rational num_value; m_util_a.is_numeral(num, num_value) && num_value.is_pos() && num_value < MAX_LOOPING) {
-                unsigned num_value_unsigned = num_value.get_unsigned();
+        // We will now create concatenation s=xvy for the valid case where v is the result of substr,
+        // |x|=i and either |v|=l (if 0 <= l <= |s|-i) or |v|=|s|-i (if |s|-i < l)
 
-                expr_ref x1 = xvar;
-                expr_ref x2 = mk_str_var_fresh("in_substr");
-                x = m_util_s.str.mk_concat(x1, x2);
+        // Starting with x, we want to have |x| = i (but only if i >= 0) and put x in len vars.
+        // Note that for i >= |s| (invalid case), we do not care about x, so it can still be equal to i.
+        // We can also handle some special cases in a better way.
+        expr_ref x(m);
+        if (m_util_a.is_zero(i)) {
+            // if i=0 there is nothing before v in the concatenation, so x=eps
+            x = eps;
+        } else {
+            expr_ref x = mk_str_var_fresh("pre_substr");
 
-                // create axioms in_substri is Sigma
-                expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
-                literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
-                // 0 <= i <= |s| && t>=0 -> x2 in re.allchar^n
-                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
-                // 0 <= i <= |s| && t>=0 -> |x2| = n
-                add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), num, false)});
-                // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
-                this->var_eqs.add(expr_ref(rest, m), x1);
+            // stronger axioms: if i = t+n for some (positive) numeral n and expression t, then, if t>=0, we can split x to two parts x = x1.x2 where |x1|=t and |x2|=n
+            //   t>=0 -> x2 in re.allchar^n
+            //   t>=0 -> |x2| = n (not completely needed, helps z3)
+            // these axioms are needed for pyex/full_str_int so x1 is in var_eqs with t
+            if(expr *num, *rest; m_util_a.is_add(i, num, rest)) {
+                if (rational num_value; m_util_a.is_numeral(num, num_value) && num_value.is_pos() && num_value <= MAX_LOOPING) {
+                    unsigned num_value_unsigned = num_value.get_unsigned();
+
+                    expr_ref x1 = x;
+                    expr_ref x2 = mk_str_var_fresh("in_substr");
+                    x = m_util_s.str.mk_concat(x1, x2);
+
+                    // x2 in re.allchar^n
+                    expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
+                    literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
+                    // t>=0 -> x2 in re.allchar^n
+                    add_axiom({~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
+                    // t>=0 -> |x2| = n (not completely needed, helps z3)
+                    add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), num, false)});
+                    // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
+                    this->var_eqs.add(expr_ref(rest, m), x1); // TODO: PROBABLY NOT CORRECT, in case where t<0, needs checking, I am unable to create a formula where this shows up
+                }
+            }
+
+            // 0 <= i -> |x| = i
+            add_axiom({~i_ge_0, mk_eq(m_util_s.str.mk_length(x), i, false)});
+            this->var_eqs.add(expr_ref(i, m), x); // |x| = i, is not treu for i <0, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case i>=0
+
+            // Because we use |x| in the axiom, we should put it in length vars, however, if i is a (reasonably small) numeral
+            // we can put x in re.allchar^i and then we do not have to add x to len vars as the length is restricted by the regex
+            if (rational i_val; m_util_a.is_numeral(i, i_val) && i_val.is_pos() && i_val <= MAX_LOOPING) {
+                unsigned i_val_unsigned = i_val.get_unsigned();
+                expr_ref x_in_sigma_time_i(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(re_allchar, i_val_unsigned, i_val_unsigned)), m);
+                // x in re.allchar^i
+                add_axiom({mk_literal(x_in_sigma_time_i)});
+            } else {
+                mark_expression_as_length(x);
             }
         }
 
@@ -1135,12 +1165,8 @@ namespace smt::noodler {
         string_theory_propagation(xe);
         string_theory_propagation(xey);
 
-        expr_ref lx(m_util_s.str.mk_length(x), m);
-
         // 0 <= i <= |s| -> xvy = s
         add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
-        // 0 <= i <= |s| -> |x| = i
-        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(lx, i, false)});
         // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
@@ -1149,8 +1175,6 @@ namespace smt::noodler {
         // update length variables
         mark_expression_as_length(s);
         mark_expression_as_length(v);
-        mark_expression_as_length(x);
-        this->var_eqs.add(expr_ref(i, m), x); // |x| = i, might not be always true, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case |x|=i holds
         this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
     }
 

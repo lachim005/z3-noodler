@@ -854,13 +854,13 @@ namespace smt::noodler {
         // creating concatenation xvy
         expr_ref x = mk_str_var_fresh("at_left");
         expr_ref y = mk_str_var_fresh("at_right");
-        expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(v, y)), m);
-        string_theory_propagation(xey);
+        expr_ref xvy(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xvy);
 
         expr_ref len_x(m_util_s.str.mk_length(x), m);
  
         // 0 <= i < |s| -> s = xvy
-        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
+        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xvy, false)});
         // 0 <= i < |s| -> v in re.allchar
         add_axiom({~i_ge_0, i_ge_len_s, mk_literal(v_in_allchar)});
         // 0 <= i < |s| -> |v| = 1
@@ -918,7 +918,7 @@ namespace smt::noodler {
         expr_ref eps(m_util_s.str.mk_string(""), m);
         expr_ref re_allchar(m_util_s.re.mk_full_char(nullptr), m);
 
-        expr_ref le(m_util_s.str.mk_length(v), m);
+        expr_ref lv(m_util_s.str.mk_length(v), m);
         expr_ref ls(m_util_s.str.mk_length(s), m);
         expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
 
@@ -1066,9 +1066,9 @@ namespace smt::noodler {
 
         // We now set the length of v:
         // 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
-        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(lv, l, false)});
         // 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
-        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
+        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(lv, mk_sub(ls, i), false)});
         // remember l=|v|
         this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
 
@@ -1103,13 +1103,11 @@ namespace smt::noodler {
         }
 
         // We now create concatenation xvy and the main axiom
-        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
+        expr_ref xvy(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xvy);
 
         // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xey, s, false)});
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xvy, s, false)});
 
         // mark s as length, as |s| is used in the axioms
         mark_expression_as_length(s);

@@ -1990,7 +1990,7 @@ namespace smt::noodler {
      * @param e str.< predicate
      */
     void theory_str_noodler::handle_lex_lt(expr *e) {
-        STRACE(str, tout  << "handle str.< " << mk_pp(e, m) << std::endl;);
+        STRACE(str, tout  << "handle lessthan: " << mk_pp(e, m) << std::endl;);
 
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_lt(e, x, y));

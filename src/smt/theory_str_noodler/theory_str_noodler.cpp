@@ -1459,21 +1459,15 @@ namespace smt::noodler {
      * @param e replace_all
      */
     void theory_str_noodler::handle_replace_all(expr *e) {
-        STRACE(str, tout << "handle-replace-all: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
+        STRACE(str, tout << "handle replace_all: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_replace_all(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("replace_all");
-        // create equation for propagating length constraints
-        // tmp = replace_all(...) => |tmp| = |replace_all(...)|
-        add_axiom({mk_eq(v, e, false)});
-        this->predicate_replace.insert(e, v.get());  
+        expr_ref v = get_fresh_var_for_string_function("replace_all", e);
     }
 
     /**
@@ -1483,21 +1477,15 @@ namespace smt::noodler {
      * @param e replace_re_all
      */
     void theory_str_noodler::handle_replace_re_all(expr *e) {
-        STRACE(str, tout << "handle-replace-re-all: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
+        STRACE(str, tout << "handle replace_re_all: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_replace_re_all(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("replace_all");
-        // create equation for propagating length constraints
-        // tmp = replace_all(...) => |tmp| = |replace_all(...)|
-        add_axiom({mk_eq(v, e, false)});
-        this->predicate_replace.insert(e, v.get());  
+        expr_ref v = get_fresh_var_for_string_function("replace_re_all", e);
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {

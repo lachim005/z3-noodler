@@ -887,7 +887,7 @@ namespace smt::noodler {
      * i > |s| -> v = eps
      * s = eps -> v = eps
      * 0 <= i <= |s| -> x.v.y = s
-     * 0 <= i <= |s| -> |x| = i
+     * 0 <= i -> |x| = i (as x is fresh, we do not need i <= |s|, for larger i, x will be ignored)
      * 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
      * 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
      *
@@ -1015,7 +1015,7 @@ namespace smt::noodler {
         // |x|=i and either |v|=l (if 0 <= l <= |s|-i) or |v|=|s|-i (if |s|-i < l)
 
         // Starting with x, we want to have |x| = i (but only if i >= 0) and put x in len vars.
-        // Note that for i >= |s| (invalid case), we do not care about x, so it can still be equal to i.
+        // Note that for i > |s| (invalid case), we do not care about x, so it can still be equal to i.
         // We can also handle some special cases in a better way.
         expr_ref x(m);
         if (m_util_a.is_zero(i)) {
@@ -1050,7 +1050,7 @@ namespace smt::noodler {
 
             // 0 <= i -> |x| = i
             add_axiom({~i_ge_0, mk_eq(m_util_s.str.mk_length(x), i, false)});
-            this->var_eqs.add(expr_ref(i, m), x); // |x| = i, is not treu for i <0, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case i>=0
+            this->var_eqs.add(expr_ref(i, m), x); // |x| = i, is not true for i <0, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case i>=0
 
             // Because we use |x| in the axiom, we should put it in length vars, however, if i is a (reasonably small) numeral
             // we can put x in re.allchar^i and then we do not have to add x to len vars as the length is restricted by the regex
@@ -1064,18 +1064,15 @@ namespace smt::noodler {
             }
         }
 
-        // We now want to set the length of v. It should either be |v|=l,
-        // if 0 <= l <= |s|-i, or |v|=|s|-i, if |s|-i < l.
-
+        // We now set the length of v:
         // 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
         add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(le, l, false)});
         // 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
         add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(le, mk_sub(ls, i), false)});
-
+        // remember l=|v|
         this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
 
-        // We also need to put v in length variables, but this will dependind on y.
-        // We therefore create y first.
+        // We also need to put v in length variables, but not always. For this we nned to have y created.
 
         expr_ref y(m);
         // i+l >= |s|

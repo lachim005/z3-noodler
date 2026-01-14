@@ -896,9 +896,9 @@ namespace smt::noodler {
      *  - the case (str.substr s 0 (1 + (str.indexof s t n))) with t a nonempty string literal
      *  - the case (str.substr s 0 (|s|-1))
      * 
-     * There is also some special handling of x when i is either a numeral
-     * or of the form (num + |s|) where num is numeral.
-     * Furthermore, the axioms for |v| are also handled specially if l is numeral.
+     * There is also some special handling of x when i is either a numeral or of the form n+|s|
+     * where n is a numeral. Furthermore, for l a numeral, there is special handlings of the
+     * axioms for |v|.
      *
      * @param e str.substr(s, i, l)
      */

@@ -1022,7 +1022,7 @@ namespace smt::noodler {
             // if i=0 there is nothing before v in the concatenation, so x=eps
             x = eps;
         } else {
-            expr_ref x = mk_str_var_fresh("pre_substr");
+            x = mk_str_var_fresh("pre_substr");
 
             // stronger axioms: if i = t+n for some (positive) numeral n and expression t, then, if t>=0, we can split x to two parts x = x1.x2 where |x1|=t and |x2|=n
             //   t>=0 -> x2 in re.allchar^n

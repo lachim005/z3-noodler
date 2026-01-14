@@ -1525,12 +1525,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
-        STRACE(str, tout << "handle-prefix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle prefix: " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
@@ -1564,12 +1563,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        STRACE(str, tout << "handle-not-prefx: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(m.mk_not(e)))
-            return;
-
+        if(axiomatized_persist_terms.contains(m.mk_not(e))) { return; }
         axiomatized_persist_terms.insert(m.mk_not(e));
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle not(prefx): " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
@@ -1672,12 +1670,11 @@ namespace smt::noodler {
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
-        STRACE(str, tout << "handle-suffix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle suffix: " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
@@ -1700,12 +1697,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        STRACE(str, tout << "handle-not-suffix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(m.mk_not(e)))
-            return;
-
+        if(axiomatized_persist_terms.contains(m.mk_not(e))) { return; }
         axiomatized_persist_terms.insert(m.mk_not(e));
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle not(suffix): " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
@@ -1783,12 +1779,11 @@ namespace smt::noodler {
      * @param e str.contains(x,y)
      */
     void theory_str_noodler::handle_contains(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        STRACE(str, tout  << "handle contains " << mk_pp(e, m) << std::endl;);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout  << "handle contains: " << mk_pp(e, m) << std::endl;);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
@@ -1832,11 +1827,12 @@ namespace smt::noodler {
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
+        STRACE(str, tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
+
         expr* cont = this->m.mk_not(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
-        STRACE(str, tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
@@ -1865,10 +1861,11 @@ namespace smt::noodler {
      * @param e Not contains predicate
      */
     void theory_str_noodler::assign_not_contains(expr *e) {
+        STRACE(str, tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
+
         expr* cont = this->m.mk_not(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
-        STRACE(str, tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
 
         zstring s;
         // not(contains) was not axiomatized in handle_not_contains
@@ -1975,10 +1972,10 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
+        STRACE(str, tout  << "handle in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
+
         expr *s = nullptr, *re = nullptr;
         VERIFY(m_util_s.str.is_in_re(e, s, re));
-        ast_manager& m = get_manager();
-        STRACE(str, tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
         app_ref re_constr(to_app(s), m);
         expr_ref re_atom(e, m);
@@ -2026,10 +2023,10 @@ namespace smt::noodler {
      * TODO: This probably makes is_digit always relevant.
      */
     void theory_str_noodler::handle_is_digit(expr *e) {
-        STRACE(str, tout << "handle-is-digit: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
+
+        STRACE(str, tout << "handle is_digit: " << mk_pp(e, m) << '\n';);
 
         expr *s = nullptr;
         VERIFY(m_util_s.str.is_is_digit(e, s));

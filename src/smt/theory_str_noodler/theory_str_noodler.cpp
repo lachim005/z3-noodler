@@ -753,9 +753,9 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_char_at(expr *e) {
         if (axiomatized_persist_terms.contains(e)) { return; }
+        axiomatized_persist_terms.insert(e);
 
         STRACE(str, tout << "handle char_at: " << mk_pp(e, m) << '\n';);
-        axiomatized_persist_terms.insert(e);
 
         expr *s = nullptr, *i = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
@@ -904,9 +904,9 @@ namespace smt::noodler {
      */
     void theory_str_noodler::handle_substr(expr *e) {
         if (axiomatized_persist_terms.contains(e)) { return; }
+        axiomatized_persist_terms.insert(e);
 
         STRACE(str, tout << "handle substr: " << mk_pp(e, m) << '\n';);
-        axiomatized_persist_terms.insert(e);
 
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
@@ -1127,17 +1127,16 @@ namespace smt::noodler {
      * @param r replace term
      */
     void theory_str_noodler::handle_replace(expr *r) {
-        STRACE(str, tout << "handle-replace: " << mk_pp(r, m) << '\n';);
-
-        if(axiomatized_persist_terms.contains(r))
-            return;
-
+        if (axiomatized_persist_terms.contains(r)) { return; }
         axiomatized_persist_terms.insert(r);
-        context& ctx = get_context();
+
+        STRACE(str, tout << "handle replace: " << mk_pp(r, m) << '\n';);
+
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
 
-        expr_ref v = mk_str_var_fresh("replace");
+        expr_ref v = get_fresh_var_for_string_function("replace", r);
+
         expr_ref x = mk_str_var_fresh("replace_left");
         expr_ref y = mk_str_var_fresh("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
@@ -1162,27 +1161,21 @@ namespace smt::noodler {
                 add_axiom({mk_eq_empty(t1), mk_eq(v, a,false)});
             }
 
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
         expr* indexof = nullptr;
         if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
             expr_ref minus_one(m_util_a.mk_int(-1), m);
-            expr_ref v = mk_str_var_fresh("replace");
             expr_ref eps(m_util_s.str.mk_string(""), m);
             literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
             expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
             expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
 
-
             // s = eps -> v = t.a
             add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
             add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
             add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
@@ -1209,9 +1202,6 @@ namespace smt::noodler {
             add_axiom({cnt, s_emp, mk_eq(v, a,false)});
             ctx.force_phase(cnt);
 
-            // replace(a,s,t) = v
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         // str.replace "" s t where a = ""
         } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
@@ -1219,15 +1209,10 @@ namespace smt::noodler {
             add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v,t,false)});
             // s = emp -> v = t.a
             add_axiom({s_emp, mk_eq_empty(v)});
-            // replace(a,s,t) = v
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
-        // replace(a,s,t) = v
-        add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
         add_axiom({~a_emp, s_emp, mk_eq(v, a, false)});
         // (not(contains(a,s))) -> v = a
@@ -1247,8 +1232,6 @@ namespace smt::noodler {
         ctx.force_phase(cnt);
         // tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
         tightest_prefix(s, x, {~cnt, a_emp, s_emp});
-
-        predicate_replace.insert(r, v.get());
     }
 
     /**

@@ -128,12 +128,17 @@ namespace smt::noodler::regex {
             SASSERT(ex_app->get_num_args() == 2);
             const auto range_begin{ ex_app->get_arg(0) };
             const auto range_end{ ex_app->get_arg(1) };
-            SASSERT(is_app(range_begin));
-            SASSERT(is_app(range_end));
-            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
 
-            auto current_value{ range_begin_value };
+            zstring range_begin_string;
+            zstring range_end_string;
+            if (!m_util_s.str.is_string(range_begin, range_begin_string) || !m_util_s.str.is_string(range_end, range_end_string)) {
+                util::throw_error("We can extract symbols from range only if both range endpoints are string literals");
+            }
+            SASSERT(range_begin_string.length() == 1 && range_end_string.length() == 1);
+            const unsigned range_begin_value = range_begin_string[0];
+            const unsigned range_end_value = range_end_string[0];
+
+            unsigned current_value{ range_begin_value };
             while (current_value <= range_end_value) {
                 alphabet.insert(current_value);
                 ++current_value;
@@ -375,10 +380,15 @@ namespace smt::noodler::regex {
                     SASSERT(cur_expr->get_num_args() == 2);
                     const auto range_begin{ cur_expr->get_arg(0) };
                     const auto range_end{ cur_expr->get_arg(1) };
-                    SASSERT(is_app(range_begin));
-                    SASSERT(is_app(range_end));
-                    const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-                    const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
+
+                    zstring range_begin_string;
+                    zstring range_end_string;
+                    if (!m_util_s.str.is_string(range_begin, range_begin_string) || !m_util_s.str.is_string(range_end, range_end_string)) {
+                        util::throw_error("We can extract symbols from range only if both range endpoints are string literals");
+                    }
+                    SASSERT(range_begin_string.length() == 1 && range_end_string.length() == 1);
+                    const unsigned range_begin_value = range_begin_string[0];
+                    const unsigned range_end_value = range_end_string[0];
 
                     result.initial.insert(0);
                     result.final.insert(1);
@@ -595,10 +605,15 @@ namespace smt::noodler::regex {
             SASSERT(expression->get_num_args() == 2);
             const auto range_begin{ expression->get_arg(0) };
             const auto range_end{ expression->get_arg(1) };
-            SASSERT(is_app(range_begin));
-            SASSERT(is_app(range_end));
-            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
+
+            zstring range_begin_string;
+            zstring range_end_string;
+            if (!m_util_s.str.is_string(range_begin, range_begin_string) || !m_util_s.str.is_string(range_end, range_end_string)) {
+                util::throw_error("We can extract symbols from range only if both range endpoints are string literals");
+            }
+            SASSERT(range_begin_string.length() == 1 && range_end_string.length() == 1);
+            const unsigned range_begin_value = range_begin_string[0];
+            const unsigned range_end_value = range_end_string[0];
 
             // min_length: if there is some symbol in range --> min_length = 1; otherwise min_length = 0 (empty)
             // empty:  if there is some symbol in range --> false; otherwise true
@@ -778,10 +793,16 @@ namespace smt::noodler::regex {
             SASSERT(regex->get_num_args() == 2);
             const auto range_begin{ regex->get_arg(0) };
             const auto range_end{ regex->get_arg(1) };
-            SASSERT(is_app(range_begin));
-            SASSERT(is_app(range_end));
-            const auto range_begin_value{ to_app(range_begin)->get_parameter(0).get_zstring()[0] };
-            const auto range_end_value{ to_app(range_end)->get_parameter(0).get_zstring()[0] };
+
+            zstring range_begin_string;
+            zstring range_end_string;
+            if (!m_util_s.str.is_string(range_begin, range_begin_string) || !m_util_s.str.is_string(range_end, range_end_string)) {
+                util::throw_error("We can extract symbols from range only if both range endpoints are string literals");
+            }
+            SASSERT(range_begin_string.length() == 1 && range_end_string.length() == 1);
+            const unsigned range_begin_value = range_begin_string[0];
+            const unsigned range_end_value = range_end_string[0];
+
             if (range_begin_value > range_end_value) {
                 return zstring(); // if range is invalid, it means empty string
             } else {

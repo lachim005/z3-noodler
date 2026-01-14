@@ -391,11 +391,20 @@ namespace smt::noodler {
         if (m_util_s.str.is_length(n)) { // str.len
             add_length_axiom(n);
 
-            // FIXME what is this? is it important? can we delete this?
             expr *arg;
-            if (m_util_s.str.is_length(n, arg) && !has_length(arg) && get_context().e_internalized(arg)) {
+            VERIFY(m_util_s.str.is_length(n, arg));
+            // FIXME what is this? is it important? can we delete this?
+            if (!has_length(arg) && get_context().e_internalized(arg)) {
                 enforce_length(arg);
             }
+
+            // Small hack for issue #327
+            // It seems when there are bitvectors (even if unrelated to strings), relevant_eh is not called for string variables/uninterpreted functions.
+            // However, relevant_eh still called for (str.len f) where f is the string variable/uninterpreted function.
+            // By doing the following, we will therefore mark the string variable as relevant for us.
+            // Note that ctx.mark_as_relevant is not enough, we need to call relevant_eh directly.
+            relevant_eh(to_app(arg));
+
         } else if(m_util_s.str.is_lt(n)) { // str.<
             handle_lex_lt(n);
         } else if(m_util_s.str.is_le(n)) { // str.<=

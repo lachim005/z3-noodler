@@ -1314,14 +1314,12 @@ namespace smt::noodler {
      * @param i indexof term
      */
     void theory_str_noodler::handle_index_of(expr *i) {
-        STRACE(str, tout << "handle-indexof: " << mk_pp(i, m) << '\n';);
-        if(axiomatized_persist_terms.contains(i))
-            return;
-
+        if (axiomatized_persist_terms.contains(i)) { return; }
         axiomatized_persist_terms.insert(i);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle indexof: " << mk_pp(i, m) << '\n';);
+
         expr *s = nullptr, *t = nullptr, *offset = nullptr;
-        rational r;
         VERIFY(m_util_s.str.is_index(i, t, s) || m_util_s.str.is_index(i, t, s, offset));
 
         expr_ref minus_one(m_util_a.mk_int(-1), m);
@@ -1338,7 +1336,7 @@ namespace smt::noodler {
         // t = eps && s != eps -> indexof = -1
         add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
 
-        if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
+        if (!offset || m_util_a.is_zero(offset)) {
             expr_ref x = mk_str_var_fresh("index_left");
             expr_ref y = mk_str_var_fresh("index_right");
             expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);

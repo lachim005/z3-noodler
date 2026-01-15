@@ -834,7 +834,7 @@ namespace smt::noodler {
             // y = at_left.s[val+|s|)].s[val+1+|s|]. ... .s[-1+|s|]
             expr_ref y = mk_str_var_fresh("at_left");
             for(int j = val; j < 0; j++) {
-                // note that because we add s[j+|s|s], handle_char_at will be called for each such j creating similar axioms for them
+                // note that because we add s[j+|s|], handle_char_at will be called for each such j creating similar axioms for them
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);

@@ -729,7 +729,10 @@ namespace smt::noodler {
                 lv.push_back(l);
             }
         }
-        ctx.mk_th_axiom(get_id(), lv, lv.size());
+        if (lv.empty()) {
+            return;
+        }
+        ctx.mk_th_axiom(get_id(), lv);
     }
 
     /**

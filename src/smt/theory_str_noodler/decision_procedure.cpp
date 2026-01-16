@@ -141,15 +141,18 @@ namespace smt::noodler {
 
         unsigned subcount = 0;
         prev_aut = nullptr;
+        bool prev_was_len_sensitive = false;
         for (auto var : right_side) {
             auto aut = this->aut_ass.at(var);
-            if (this->length_sensitive_vars.contains(var)) {
+            if (this->length_sensitive_vars.contains(var) || prev_was_len_sensitive) {
+                prev_was_len_sensitive = true;
                 if (prev_aut != nullptr) {
                     right_transition_coefficients.push_back(aut->initial.size() * prev_aut->final.size());
                 }
                 if (subcount != 0) right_states.push_back(subcount);
                 subcount = aut->num_of_states();
             } else {
+                prev_was_len_sensitive = false;
                 subcount += aut->num_of_states();
             }
             prev_aut = aut;

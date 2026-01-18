@@ -30,10 +30,10 @@ jobs:
             variant: shared
             runner: ubuntu-24.04
           - os: ubuntu
-            os_version: 20.04
+            os_version: 22.04
             arch: x86_64
             variant: shared
-            runner: ubuntu-20.04
+            runner: ubuntu-22.04
           - os: ubuntu
             os_version: 24.04
             arch: x86_64

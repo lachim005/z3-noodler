@@ -192,8 +192,9 @@ namespace smt::noodler {
                 m_util_s.str.is_prefix(ex) ||
                 m_util_s.str.is_suffix(ex) ||
                 m_util_s.str.is_contains(ex) ||
-                m_util_s.str.is_is_digit(ex)
-                // we cannot do it for conversions (and for string inequalities which lead to to_code conversions) because otherwise all conversions become relevant and there is a degradation on benchmarks
+                m_util_s.str.is_is_digit(ex) ||
+                m_util_s.str.is_lt(ex)
+                // we cannot do it for conversions because otherwise all conversions become relevant and there is a degradation on benchmarks
                 // (this degradation should not happen for other predicates, because they are transformed into simpler atoms such as equation, regular membership... whose relevancy we can check when it is needed)
             )) {
             if(neg) ctx.mark_as_relevant(m.mk_not(ex));
@@ -399,7 +400,7 @@ namespace smt::noodler {
         } else if(m_util_s.str.is_lt(n)) { // str.<
             handle_lex_lt(n);
         } else if(m_util_s.str.is_le(n)) { // str.<=
-            handle_lex_leq(n);
+            UNREACHABLE(); // should be rewritten to str.< by the rewriter
         } else if (m_util_s.str.is_at(n)) { // str.at
             handle_char_at(n);
         } else if (m_util_s.str.is_extract(n)) { // str.substr
@@ -1974,36 +1975,12 @@ namespace smt::noodler {
     }
 
     /**
-     * @brief Handle str.<=
-     * Translates to the following axiom
-     * 
-     * x <= y -> x = y | x < y
-     * not(x <= y) -> y > x
-     * @param e str.<= predicate
-     */
-    void theory_str_noodler::handle_lex_leq(expr *e) {
-        STRACE(str, tout  << "handle str.<= " << mk_pp(e, m) << std::endl;);
-
-        expr *x = nullptr, *y = nullptr;
-        VERIFY(m_util_s.str.is_le(e, x, y));
-      
-        expr_ref e_lt(m_util_s.str.mk_lex_lt(x, y), m);
-        expr_ref x_y(m.mk_eq(x,y), m);
-        literal lit_e_lt = mk_literal(e_lt);
-        literal lit_e = mk_literal(e);
-        literal lit_x_y = mk_literal(x_y);
-        literal lit_e_switch = mk_literal(m_util_s.str.mk_lex_lt(y, x));
-        // x <= y -> x = y | x < y
-        add_axiom({~lit_e, lit_e_lt, lit_x_y});
-        // not(x <= y) -> y > x
-        add_axiom({lit_e, lit_e_switch});
-    }
-
-    /**
      * @brief Handle str.<
      * Translates to the following theory axioms.
      * 
      * not(x < y) -> x = y | y < x
+     * x < y -> x != y
+     * x < y -> not(y < x)
      * x < y & x = eps -> y != eps
      * x < y & x != eps -> x = u.v1.w1
      * x < y & x != eps -> y = u.v2.w2
@@ -2013,7 +1990,7 @@ namespace smt::noodler {
      * @param e str.< predicate
      */
     void theory_str_noodler::handle_lex_lt(expr *e) {
-        STRACE(str, tout  << "handle str.< " << mk_pp(e, m) << std::endl;);
+        STRACE(str, tout  << "handle lessthan: " << mk_pp(e, m) << std::endl;);
 
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_lt(e, x, y));
@@ -2055,6 +2032,10 @@ namespace smt::noodler {
 
         // not(x < y) -> x = y | y < x
         add_axiom({lit_e, mk_eq(x,y,false), lit_e_switch});
+        // x < y -> x != y
+        add_axiom({~lit_e, ~mk_eq(x,y,false)});
+        // x < y -> not(y < x)
+        add_axiom({~lit_e, ~lit_e_switch});
 
         // x < y & x = eps -> y != eps
         add_axiom({~lit_e, ~lit_x_eps, ~lit_y_eps});

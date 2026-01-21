@@ -351,6 +351,7 @@ namespace smt::noodler {
                 // and we can add Y -> X to subst map (+ propagate that X is also conversion var)
                 this->conversion_vars.insert(left_var);
                 this->substitution_map[pr.second.get_right_side()[0]] = {left_var};
+                this->aut_ass.erase(pr.second.get_right_side()[0]);
             } else {
                 // otherwise we do not need to put anything in substitution map and we just need to remember the inclusion for model generation
                 removed_inclusions_for_model.push_back(pr.second);
@@ -415,6 +416,7 @@ namespace smt::noodler {
                 this->formula.remove_predicate(index);
                 this->add_to_len_formula(eq.get_formula_eq());
                 substitution_map[v_left] = {eq.get_right_side()[0]};
+                aut_ass.erase(v_left);
                 continue;
             }
 
@@ -434,6 +436,7 @@ namespace smt::noodler {
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
             substitution_map[v_right] = {v_left}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
+            aut_ass.erase(v_right);
             this->formula.remove_predicate(index);
 
             // update dependencies (overapproximation). Each remaining predicat depends on the removed one.

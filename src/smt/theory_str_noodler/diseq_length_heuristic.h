@@ -81,11 +81,11 @@ namespace smt::noodler {
                 return var.get_name();
             } else if (model.contains(var)) {
                 return model.at(var);
-            } else if (aut_ass.contains(var)) {
-                return assign_aut_ass_var(var, arith_model);
-            } else {
-                SASSERT(subst_map.contains(var));
+            else if (subst_map.contains(var)) {
                 return assign_subst_map_var(var, arith_model);
+            } else {
+                SASSERT(aut_ass.contains(var));
+                return assign_aut_ass_var(var, arith_model);
             }
         }
     };

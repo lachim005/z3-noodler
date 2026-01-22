@@ -317,6 +317,8 @@ namespace smt::noodler {
         void clean_varmap();
         void clean_predicates();
 
+        void remove_var_from_varmap(const BasicTerm& var) { SASSERT(!var_occurs(var)); varmap.erase(var); };
+
         /**
          * @brief Increment index pointing to a side (taking into account that left side has negative numbers
          * from 1 and right side positive numbers from 1).
@@ -379,6 +381,7 @@ namespace smt::noodler {
         bool can_unify(const Concat& con1, const Concat& con2, const std::function<bool(const Concat&, const Concat&)> &check) const;
         TermReplaceMap construct_replace_map() const;
 
+        void substitute_var(const BasicTerm& var, const Concat& replace);
 
     public:
         FormulaPreprocessor(Formula conj, AutAssignment ass, std::unordered_set<BasicTerm> lv, const theory_str_noodler_params &par, std::set<BasicTerm> conversion_vars) :

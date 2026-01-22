@@ -346,20 +346,18 @@ namespace smt::noodler {
                 this->add_to_len_formula(pr.second.get_formula_eq());
             }
 
+            this->formula.remove_predicate(pr.first);
+            removed.insert(pr.first);
+
             if(is_right_side_conv) {
                 // if we also have that Y is conversion var, then there cannot be any literals around
                 // and we can add Y -> X to subst map (+ propagate that X is also conversion var)
                 this->conversion_vars.insert(left_var);
-                this->substitution_map[pr.second.get_right_side()[0]] = {left_var};
-                this->aut_ass.erase(pr.second.get_right_side()[0]);
+                substitute_var(pr.second.get_right_side()[0], {left_var});
             } else {
                 // otherwise we do not need to put anything in substitution map and we just need to remember the inclusion for model generation
                 removed_inclusions_for_model.push_back(pr.second);
             }
-
-            this->formula.remove_predicate(pr.first);
-            removed.insert(pr.first);
-            STRACE(str_prep_remove_regular, tout << "removed" << std::endl;);
 
             // check if by removing the regular equation, some other equations did not become regular
             // we only need to check this for left_var, as the variables from the right side do not occur
@@ -415,8 +413,7 @@ namespace smt::noodler {
                 this->formula.replace(eq.get_left_side(), eq.get_right_side());
                 this->formula.remove_predicate(index);
                 this->add_to_len_formula(eq.get_formula_eq());
-                substitution_map[v_left] = {eq.get_right_side()[0]};
-                aut_ass.erase(v_left);
+                substitute_var(v_left, {eq.get_right_side()[0]});
                 continue;
             }
 
@@ -435,9 +432,8 @@ namespace smt::noodler {
             }
 
             this->formula.replace(eq.get_right_side(), eq.get_left_side()); // find Y, replace for X
-            substitution_map[v_right] = {v_left}; // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
-            aut_ass.erase(v_right);
             this->formula.remove_predicate(index);
+            substitute_var(v_right, {v_left}); // subst_map[Y] = X (the length constraint |X| = |Y| is already there)
 
             // update dependencies (overapproximation). Each remaining predicat depends on the removed one.
             for(const auto& pr : this->formula.get_predicates()) {
@@ -1953,6 +1949,23 @@ namespace smt::noodler {
         return false;
     }
 
+    void FormulaPreprocessor::substitute_var(const BasicTerm& var, const Concat& replace) {
+        for (auto& [subst_var, subst_replace] : substitution_map) {
+            Concat new_replace;
+            for (const BasicTerm& bt : subst_replace) {
+                if (bt == var) {
+                    new_replace.insert(new_replace.end(), replace.begin(), replace.end());
+                } else {
+                    new_replace.push_back(bt);
+                }
+            }
+            subst_replace = std::move(new_replace);
+        }
+        substitution_map[var] = replace;
+        aut_ass.erase(var);
+        formula.remove_var_from_varmap(var);
+    }
+
     std::string FormulaPreprocessor::print_info(bool print_nfas) {
         std::stringstream res;
         res << "Current formula:\n";
@@ -1968,7 +1981,7 @@ namespace smt::noodler {
                 res << "NFA\n";
             }
         }
-        res << "Current substition map:\n";
+        res << "Current substitution map:\n";
         for (const auto& [var, subst] : substitution_map) {
             res << var << " ->";
             for (const auto& subst_var : subst) {

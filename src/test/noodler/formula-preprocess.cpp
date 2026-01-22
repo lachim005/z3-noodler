@@ -298,6 +298,7 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
         prep.propagate_variables();
         prep.clean_varmap();
         INFO(prep.to_string());
+        INFO(prep.print_info());
 
         Formula res_conj;
         res_conj.add_predicate(Predicate(PredicateType::Equation, std::vector<std::vector<BasicTerm>>({ std::vector<BasicTerm>({a, x1, x4}), std::vector<BasicTerm>({b, x1, x1}) })));
@@ -305,9 +306,12 @@ TEST_CASE( "Propagate variables", "[noodler]" ) {
         FormulaPreprocessor prep_res(res_conj, aut_ass, {}, {}, {});
 
         AutAssignment ret = prep.get_aut_assignment();
+        SubstitutionMap sm = prep.get_substitution_map();
         CHECK(mata::nfa::are_equivalent(*ret.at(x1), regex_to_nfa("")));
-        CHECK(mata::nfa::are_equivalent(*ret.at(x2), regex_to_nfa("(a|b)*")));
-        CHECK(mata::nfa::are_equivalent(*ret.at(x3), regex_to_nfa("(b|c)*")));
+        CHECK(sm.at(x2).size() == 1);
+        CHECK(sm.at(x2).at(0) == x1);
+        CHECK(sm.at(x3).size() == 1);
+        CHECK(sm.at(x3).at(0) == x1);
         CHECK(prep.get_formula().get_varmap() == prep_res.get_formula().get_varmap());
         CHECK(prep.get_formula().get_predicates_set() == prep_res.get_formula().get_predicates_set());
         CHECK(prep.get_dependency() == Dependency({{0, {2,3}}, {1, {2,3}}, {3, {2}}}));

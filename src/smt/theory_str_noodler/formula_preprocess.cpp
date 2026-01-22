@@ -1718,22 +1718,35 @@ namespace smt::noodler {
     /**
      * @brief Adds restrictions from conversions to the len_formula, so that (underapproximating) unsat check can be better
      * 
-     * Specifically, it checks if for to_code(x)/to_int(x) there is any valid word in the language of automaton for x, i.e,
-     * some one-symbol word for to_code(x) or some word containing only digits for to_int(x).
+     * Specifically, it checks if for to_code(x)/to_int(x)/to_real(x) there is any valid word in the language of automaton
+     * for x, i.e, some one-symbol word for to_code(x) or some word containing only digits for to_int(x) or some word
+     * containing only digits with possibly one decimal for to_real(x).
      * 
-     * @param conversions 
+     * @param conversions
      */
     void FormulaPreprocessor::conversions_validity(const std::vector<TermConversion>& conversions) {
         STRACE(str_prep, tout << "Preprocessing step - conversions_validity\n";);
         mata::nfa::Nfa sigma_aut = aut_ass.sigma_automaton();
         mata::nfa::Nfa only_digits_aut = AutAssignment::digit_automaton();
+        mata::nfa::Nfa only_digits_or_with_decimal_aut = AutAssignment::decimal_automaton();
+        only_digits_or_with_decimal_aut.final.insert(0);
+        
 
         for (const auto& conv : conversions) {
-            if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,       *aut_ass.at(conv.string_var))).is_lang_empty()) ||
-                (conv.type == ConversionType::TO_INT  && mata::nfa::reduce(mata::nfa::intersection(only_digits_aut, *aut_ass.at(conv.string_var))).is_lang_empty()))
+            Concat substituted_vars = (substitution_map.contains(conv.string_var) ? substitution_map.at(conv.string_var) : Concat{conv.string_var});
+            bool all_substituted_valid = true;
+            for (const BasicTerm& subst_var : substituted_vars) {
+                if ((conv.type == ConversionType::TO_CODE && !mata::nfa::reduce(mata::nfa::intersection(sigma_aut,                       *aut_ass.at(subst_var))).is_lang_empty()) ||
+                    (conv.type == ConversionType::TO_INT  && !mata::nfa::reduce(mata::nfa::intersection(only_digits_aut,                 *aut_ass.at(subst_var))).is_lang_empty()) ||
+                    (conv.type == ConversionType::TO_REAL && !mata::nfa::reduce(mata::nfa::intersection(only_digits_or_with_decimal_aut, *aut_ass.at(subst_var))).is_lang_empty()))
                 {
-                    len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.number_var, -1});
+                    all_substituted_valid = false;
+                    break;
                 }
+            }
+            if (all_substituted_valid) {
+                len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.number_var, -1});
+            }
         }
         STRACE(str_prep, tout << print_info(is_trace_enabled(TraceTag::str_nfa)));
     }

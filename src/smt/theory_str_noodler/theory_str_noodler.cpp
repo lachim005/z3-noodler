@@ -1031,7 +1031,7 @@ namespace smt::noodler {
             //   t>=0 -> x2 in re.allchar^n
             //   t>=0 -> |x2| = n (not completely needed, helps z3)
             // these axioms are needed for pyex/full_str_int so x1 is in var_eqs with t
-            if(expr *n, *t; m_util_a.is_add(i, n, t)) { // rest=t, num=n
+            if(expr *n, *t; m_util_a.is_add(i, n, t)) { // is i of the form t+n?
                 if (rational n_value; m_util_a.is_numeral(n, n_value) && n_value.is_pos() && n_value <= MAX_LOOPING) {
                     unsigned n_value_unsigned = n_value.get_unsigned();
 

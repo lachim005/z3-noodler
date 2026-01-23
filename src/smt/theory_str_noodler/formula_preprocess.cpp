@@ -1974,7 +1974,7 @@ namespace smt::noodler {
         }
         substitution_map[var] = replace;
         /* TODO: It makes sense to delete aut_ass[var] as it is substituted, but we cannot do it, as aut_ass[var] can
-         * be empty (meaning that preprocessing decided unsat). We should be checkin for unsat after every step instead.
+         * be empty (meaning that preprocessing decided unsat). We should be checking for unsat after every step instead.
          */
         // aut_ass.erase(var);
         formula.remove_var_from_varmap(var);

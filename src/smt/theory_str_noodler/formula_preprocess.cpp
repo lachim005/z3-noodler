@@ -1733,18 +1733,16 @@ namespace smt::noodler {
         
 
         for (const auto& conv : conversions) {
-            Concat substituted_vars = (substitution_map.contains(conv.string_var) ? substitution_map.at(conv.string_var) : Concat{conv.string_var});
-            bool all_substituted_valid = true;
-            for (const BasicTerm& subst_var : substituted_vars) {
-                if ((conv.type == ConversionType::TO_CODE && !mata::nfa::reduce(mata::nfa::intersection(sigma_aut,                       *aut_ass.at(subst_var))).is_lang_empty()) ||
-                    (conv.type == ConversionType::TO_INT  && !mata::nfa::reduce(mata::nfa::intersection(only_digits_aut,                 *aut_ass.at(subst_var))).is_lang_empty()) ||
-                    (conv.type == ConversionType::TO_REAL && !mata::nfa::reduce(mata::nfa::intersection(only_digits_or_with_decimal_aut, *aut_ass.at(subst_var))).is_lang_empty()))
-                {
-                    all_substituted_valid = false;
-                    break;
-                }
+            BasicTerm subst_var = conv.string_var;
+            if (substitution_map.contains(conv.string_var)) {
+                const Concat& substituted_vars = substitution_map.at(conv.string_var);
+                if (substituted_vars.size() != 1) { continue; }
+                else { subst_var = substituted_vars.at(0); }
             }
-            if (all_substituted_valid) {
+            if ((conv.type == ConversionType::TO_CODE && mata::nfa::reduce(mata::nfa::intersection(sigma_aut,                       *aut_ass.at(subst_var))).is_lang_empty()) ||
+                (conv.type == ConversionType::TO_INT  && mata::nfa::reduce(mata::nfa::intersection(only_digits_aut,                 *aut_ass.at(subst_var))).is_lang_empty()) ||
+                (conv.type == ConversionType::TO_REAL && mata::nfa::reduce(mata::nfa::intersection(only_digits_or_with_decimal_aut, *aut_ass.at(subst_var))).is_lang_empty()))
+            {
                 len_formula.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conv.number_var, -1});
             }
         }

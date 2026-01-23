@@ -1031,23 +1031,23 @@ namespace smt::noodler {
             //   t>=0 -> x2 in re.allchar^n
             //   t>=0 -> |x2| = n (not completely needed, helps z3)
             // these axioms are needed for pyex/full_str_int so x1 is in var_eqs with t
-            if(expr *num, *rest; m_util_a.is_add(i, num, rest)) {
-                if (rational num_value; m_util_a.is_numeral(num, num_value) && num_value.is_pos() && num_value <= MAX_LOOPING) {
-                    unsigned num_value_unsigned = num_value.get_unsigned();
+            if(expr *n, *t; m_util_a.is_add(i, n, t)) { // rest=t, num=n
+                if (rational n_value; m_util_a.is_numeral(n, n_value) && n_value.is_pos() && n_value <= MAX_LOOPING) {
+                    unsigned n_value_unsigned = n_value.get_unsigned();
 
                     expr_ref x1 = x;
                     expr_ref x2 = mk_str_var_fresh("in_substr");
                     x = m_util_s.str.mk_concat(x1, x2);
 
                     // x2 in re.allchar^n
-                    expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, num_value_unsigned, num_value_unsigned)), m);
-                    literal rest_ge_0 = mk_literal(m_util_a.mk_ge(rest, zero)); // t>=0
+                    expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, n_value_unsigned, n_value_unsigned)), m);
+                    literal t_ge_0 = mk_literal(m_util_a.mk_ge(t, zero)); // t>=0
                     // t>=0 -> x2 in re.allchar^n
-                    add_axiom({~rest_ge_0, mk_literal(x2_in_sigma_times_num)});
+                    add_axiom({~t_ge_0, mk_literal(x2_in_sigma_times_num)});
                     // t>=0 -> |x2| = n (not completely needed, helps z3)
-                    add_axiom({~i_ge_0, ~i_le_ls, ~rest_ge_0, mk_eq(m_util_s.str.mk_length(x2), num, false)});
+                    add_axiom({~i_ge_0, ~i_le_ls, ~t_ge_0, mk_eq(m_util_s.str.mk_length(x2), n, false)});
                     // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
-                    this->var_eqs.add(expr_ref(rest, m), x1); // TODO: PROBABLY NOT CORRECT, in case where t<0, needs checking, I am unable to create a formula where this shows up
+                    this->var_eqs.add(expr_ref(t, m), x1); // TODO: PROBABLY NOT CORRECT, in case where t<0, needs checking, I am unable to create a formula where this shows up
                 }
             }
 

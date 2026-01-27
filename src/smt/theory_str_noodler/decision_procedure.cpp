@@ -477,14 +477,16 @@ namespace smt::noodler {
         // start from length formula from preprocessing
         std::vector<LenNode> conjuncts = {preprocessing_len_formula};
 
-        // for each initial length variable get the lengths of all its possible words for automaton in init_aut_ass
+        SolvingState temp_state; // temporary solving state to get lengths
+        temp_state.aut_ass = init_aut_ass;
+        temp_state.substitution_map = init_substitution_map;
         if(all_vars) {
             for (const BasicTerm &var : this->formula.get_vars()) {
-                conjuncts.push_back(init_aut_ass.get_lengths(var));
+                conjuncts.push_back(temp_state.get_lengths(var));
             }
         } else {
             for (const BasicTerm &var : this->init_length_sensitive_vars) {
-                conjuncts.push_back(init_aut_ass.get_lengths(var));
+                conjuncts.push_back(temp_state.get_lengths(var));
             }
         }
 

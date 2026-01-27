@@ -1069,10 +1069,13 @@ namespace smt::noodler {
         dec_proc = std::make_shared<DiseqLengthHeuristicProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params);
         this->statistics.at("diseq-length-heur").num_start++;
 
+        STRACE(str, tout << "Trying diseq-length heuristic" << std::endl;);
+
         dec_proc->init_computation();
         if (dec_proc->preprocess() == l_false) {
             this->statistics.at("diseq-length-heur").num_solved_preprocess++;
             block_curr_len(expr_ref(m.mk_false(), m));
+            STRACE(str, tout << "Solved by preprocessing: UNSAT" << std::endl;);
             return l_false;
         }
 
@@ -1084,6 +1087,7 @@ namespace smt::noodler {
         if (is_lengths_sat == l_true) {
             sat_handling(lengths);
             this->statistics.at("diseq-length-heur").num_finish++;
+            STRACE(str, tout << "Solved by diseq-length heuristic: SAT" << std::endl;);
             return l_true;
         }
         return l_undef;

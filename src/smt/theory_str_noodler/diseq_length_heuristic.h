@@ -47,7 +47,7 @@ namespace smt::noodler {
             const Concat& subst = this->subst_map.at(var);
             zstring res = "";
             for (const BasicTerm& term : subst) {
-                res = res + get_model(var, arith_model);
+                res = res + get_model(term, arith_model);
             }
             model[var] = res;
             return res;
@@ -81,10 +81,11 @@ namespace smt::noodler {
                 return var.get_name();
             } else if (model.contains(var)) {
                 return model.at(var);
-            } else if (aut_ass.contains(var)) {
-                return assign_aut_ass_var(var, arith_model);
-            } else {
+            } else if (subst_map.contains(var)) {
                 return assign_subst_map_var(var, arith_model);
+            } else {
+                SASSERT(aut_ass.contains(var));
+                return assign_aut_ass_var(var, arith_model);
             }
         }
     };

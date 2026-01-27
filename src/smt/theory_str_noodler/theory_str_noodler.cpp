@@ -718,13 +718,20 @@ namespace smt::noodler {
             literal l{ctx.get_literal(e)};
             ctx.mark_as_relevant(l);
             ctx.mk_th_axiom(get_id(), 1, &l);
-            STRACE(str, ctx.display_literal_verbose(tout << "[Assert_e]\n", l) << '\n';);
         }
     }
 
     void theory_str_noodler::add_axiom(std::vector<literal> ls) {
-        STRACE(str_axiom, tout << "add_axiom literals:" << std::endl;);
-        context &ctx = get_context();
+        STRACE(str_axiom,
+            tout << "add_axiom literals:" << std::endl;
+            literal_vector lv;
+            for (const auto &l : ls) {
+                if (l != null_literal && l != false_literal) {
+                    lv.push_back(l);
+                }
+            }
+            ctx.display_literals_verbose(tout, lv) << "\n-----------------------------\n";
+        );
         literal_vector lv;
         for (const auto &l : ls) {
             if (l != null_literal && l != false_literal) {
@@ -736,453 +743,387 @@ namespace smt::noodler {
             return;
         }
         ctx.mk_th_axiom(get_id(), lv);
-        STRACE(str_axiom, ctx.display_literals_verbose(tout, lv) << '\n';);
-        STRACE(str_axiom, tout << "-----------------------------" << std::endl;);
     }
 
     /**
      * @brief Handle str.at(s,i)
      *
-     * Translates to the following theory axioms:
+     * We set str.at(s,i) = v where v is fresh. 
+     * Translates to the following theory axioms in the general case:
      * 0 <= i < |s| -> s = xvy
      * 0 <= i < |s| -> v in re.allchar
+     * 0 <= i < |s| -> |v| = 1 (not completely neccessary, helps z3)
      * 0 <= i < |s| -> |x| = i
      * i < 0 -> v = eps
      * i >= |s| -> v = eps
-     *
-     * We store
-     * str.at(s,i) = v
+     * 
+     * Special cases:
+     *  - when s is a one letter string literal
+     *  - when i is some small non-negative integer
+     *  - when i = num + |s| where num is some small negative integer
      *
      * @param e str.at(s, i)
      */
     void theory_str_noodler::handle_char_at(expr *e) {
-        STRACE(str, tout << "handle-charat: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
-        expr *s = nullptr, *i = nullptr, *res = nullptr;
+
+        STRACE(str, tout << "handle char_at: " << mk_pp(e, m) << '\n';);
+
+        expr *s = nullptr, *i = nullptr;
         VERIFY(m_util_s.str.is_at(e, s, i));
 
-        expr_ref fresh = mk_str_var_fresh("at");
-        expr_ref re(m_util_s.re.mk_in_re(fresh, m_util_s.re.mk_full_char(nullptr)), m);
+        expr_ref v = get_fresh_var_for_string_function("at", e);
+        expr_ref v_in_allchar(m_util_s.re.mk_in_re(v, m_util_s.re.mk_full_char(nullptr)), m);
         expr_ref zero(m_util_a.mk_int(0), m);
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero));
-        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m);
+        expr_ref one(m_util_a.mk_int(1), m);
+        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero)); // i >= 0
+        literal i_ge_len_s = mk_literal(m_util_a.mk_ge(mk_sub(i, m_util_s.str.mk_length(s)), zero)); // i >= |s|
+        expr_ref emp(m_util_s.str.mk_empty(e->get_sort()), m); // empty string
 
-        rational r;
-        
-        zstring str;
-        // handle the case str.at "A" i
-        if(m_util_s.str.is_string(s, str) && str.length() == 1) {
-            add_axiom({~mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, s, false)});
-            add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(fresh, emp, false)});
-            add_axiom({mk_eq(fresh, e, false)});
-            predicate_replace.insert(e, fresh.get());
+        // SPECIAL CASES
+
+        // the case where s is one letter string literal, i.e. (str.at "A" i)
+        //   i = 0 -> v = "A"
+        //   i != 0 -> v = eps
+        if(zstring str; m_util_s.str.is_string(s, str) && str.length() == 1) { 
+            // i = 0 -> v = "A"
+            add_axiom({~mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(v, s, false)});
+            // i != 0 -> v = eps
+            add_axiom({mk_literal(m.mk_eq(i, m_util_a.mk_int(0))), mk_eq(v, emp, false)});
             return;
         }
-        if(m_util_a.is_numeral(i, r)) {
-            int val = r.get_int32();
 
+        const int MAX_SMALL_INT = 20; // threshold for small integers used in the next two cases (experimentally chosen)
+        
+        // the case where i is some small non-negative integer (the case where i is negative, i.e. the result is empty string, is handled by rewriter)
+        //   i < |s| -> s = s[0].s[1]...s[i].at_right
+        //   i < |s| -> v in allchar
+        //   i < |s| -> |v| = 1
+        //   |s| <= i -> v = eps
+        if(rational num; m_util_a.is_numeral(i, num) && num.is_nonneg() && num < MAX_SMALL_INT) { // we want small integer, because otherwise we will create a lot of equations
+            int val = num.get_int32();
+
+            // y = s[0].s[1]. ... .s[val].at_right
             expr_ref y = mk_str_var_fresh("at_right");
-
             for(int j = val; j >= 0; j--) {
+                // note that because we add s[j], handle_char_at will be called for each such j creating similar axioms for them
                 y = m_util_s.str.mk_concat(m_util_s.str.mk_at(s, m_util_a.mk_int(j)), y);
             }
             string_theory_propagation(y);
 
+            // i < |s| -> s = y
             add_axiom({i_ge_len_s, mk_eq(s, y, false)});
-            add_axiom({i_ge_len_s, mk_literal(re)});
-            add_axiom({i_ge_len_s, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
-            add_axiom({mk_eq(fresh, e, false)});
-            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
-            add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
+            // i < |s| -> v in allchar
+            add_axiom({i_ge_len_s, mk_literal(v_in_allchar)});
+            // i < |s| -> |v| = 1
+            add_axiom({i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(v), false) });
+            // |s| <= i -> v = eps
+            add_axiom({~i_ge_len_s, mk_eq(v, emp, false)});
 
-            predicate_replace.insert(e, fresh.get());
+            // Even though we use i<|s| above, we do not have to mark s as length expression, because if z3 decides that i<|s| holds,
+            // then from s=s[0]...s[i].at_right we know that length of s is larger than i.
+            // Similarly, if z3 decides that i>=|s| holds, we put s[i] = eps. This is correct, the only way for this to not hold is if
+            // our computed s would be larger than i. Let assume we can compute such s. As we use all s[j], 0<=j<i, in the axioms,
+            // all such s[j] become relevant and this function will be called for them. So for each j, z3 will decide whether j<|s| or j>=|s|.
+            // If it decided j>=|s| for all j, then also for 0 we would have 0>=|s| which would force z3 to put |s|=0 but our computed s should
+            // be larger than i, so this cannot happen. So there will be some j, where j<|s| let it be the largest one. Z3 will realise that |s|=j+1
+            // and furthermore, there will be s=s[0]...s[j].at_right where from |s|=j+1 it will force |at_right|=0. So the computed s must have length
+            // j+1 where i>=j+1.
             return;
         }
-        if(util::is_len_sub(i, s, m, m_util_s, m_util_a, res) && m_util_a.is_numeral(res, r)) {
-            int val = r.get_int32();
 
+        // the case that i = num + |s| where num is some small negative integer (the case where num>=0, i.e. the result is empty string, is handled by rewriter)
+        //   0 <= i -> s = at_left.s[num+|s|)].s[num+1+|s|)] ... .s[-1+|s|]
+        //   0 <= i -> v in allchar
+        //   0 <= i -> |v| = 1
+        //   i < 0 -> v = eps
+        if(rational num; expr_cases::is_num_plus_len(i, s, m, m_util_s, m_util_a, num) && num.is_neg() && num >-MAX_SMALL_INT) { // we want small integer, because otherwise we will create a lot of equations
+            int val = num.get_int32();
+
+            // y = at_left.s[val+|s|)].s[val+1+|s|]. ... .s[-1+|s|]
             expr_ref y = mk_str_var_fresh("at_left");
-
             for(int j = val; j < 0; j++) {
+                // note that because we add s[j+|s|], handle_char_at will be called for each such j creating similar axioms for them
                 y = m_util_s.str.mk_concat(y, m_util_s.str.mk_at(s, m_util_a.mk_add(m_util_a.mk_int(j), m_util_s.str.mk_length(s))));
             }
             string_theory_propagation(y);
 
+            // 0 <= i -> s = y
             add_axiom({~i_ge_0, mk_eq(s, y, false)});
-            add_axiom({~i_ge_0, mk_eq(m_util_a.mk_int(1), m_util_s.str.mk_length(fresh), false) });
-            add_axiom({mk_eq(fresh, e, false)});
-            add_axiom({~i_ge_0, mk_literal(re)});
-            add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
+            // 0 <= i -> v in allchar
+            add_axiom({~i_ge_0, mk_literal(v_in_allchar)});
+            // 0 <= i -> |v| = 1
+            add_axiom({~i_ge_0, mk_eq(one, m_util_s.str.mk_length(v), false) });
+            // i < 0 -> v = eps
+            add_axiom({i_ge_0, mk_eq(v, emp, false)});
 
-            predicate_replace.insert(e, fresh.get());
+            // We do not have to mark s as length expression, |s| is not used in the axioms above.
             return;
         }
 
-        expr_ref one(m_util_a.mk_int(1), m);
+        // GENERAL CASE
+
+        // creating concatenation xvy
         expr_ref x = mk_str_var_fresh("at_left");
         expr_ref y = mk_str_var_fresh("at_right");
-        expr_ref xey(m_util_s.str.mk_concat(x, m_util_s.str.mk_concat(fresh, y)), m);
-        string_theory_propagation(xey);
+        expr_ref xvy(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xvy);
 
         expr_ref len_x(m_util_s.str.mk_length(x), m);
  
-        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xey, false)});
-        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(fresh), false)});
-        add_axiom({~i_ge_0, i_ge_len_s, mk_literal(re)});
+        // 0 <= i < |s| -> s = xvy
+        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(s, xvy, false)});
+        // 0 <= i < |s| -> v in re.allchar
+        add_axiom({~i_ge_0, i_ge_len_s, mk_literal(v_in_allchar)});
+        // 0 <= i < |s| -> |v| = 1
+        add_axiom({~i_ge_0, i_ge_len_s, mk_eq(one, m_util_s.str.mk_length(v), false)});
+        // 0 <= i < |s| -> |x| = i
         add_axiom({~i_ge_0, i_ge_len_s, mk_eq(i, len_x, false)});
-        add_axiom({i_ge_0, mk_eq(fresh, emp, false)});
-        add_axiom({~i_ge_len_s, mk_eq(fresh, emp, false)});
-        add_axiom({mk_eq(fresh, e, false)});
-
-        // add the replacement charat -> v
-        predicate_replace.insert(e, fresh.get());
-        // update length variables
-        mark_expression_as_length(s);
-        this->len_vars.insert(x);
-    }
-
-    void theory_str_noodler::handle_substr_int(expr *e) {
-        expr *s = nullptr, *i = nullptr, *l = nullptr;
-        VERIFY(m_util_s.str.is_extract(e, s, i, l));
-
-        rational r;
-        if(!m_util_a.is_numeral(i, r)) {
-            return;
-        }
-
-        expr_ref ls(m_util_s.str.mk_length(s), m);
-        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
-        expr_ref zero(m_util_a.mk_int(0), m);
-        expr_ref eps(m_util_s.str.mk_string(""), m);
-
-        literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
-        
-        expr* num_val, *ind_val;
-        rational num_val_rat;
-        if(r.is_zero() && expr_cases::is_indexof_add(l, s, m, m_util_s, m_util_a, num_val, ind_val) && m_util_a.is_numeral(num_val, num_val_rat) && num_val_rat.is_one()) {
-            literal l_gt_zero = mk_literal(m_util_a.mk_le(l, zero));
-            expr_ref v = mk_str_var_fresh("substr");
-            expr_ref sub(m_util_a.mk_add(l, m_util_a.mk_int(-1)), m);
-            m_rewrite(sub);
-            expr_ref substr(m_util_s.str.mk_substr(s, i, sub), m);
-            expr_ref conc = mk_concat(substr, ind_val);
-            string_theory_propagation(conc);
-
-            add_axiom({l_gt_zero, mk_eq(e, conc, false)});
-            add_axiom({mk_eq(v, e, false)});
-
-            // add the replacement substr -> v
-            this->predicate_replace.insert(e, v.get());
-            mark_expression_as_length(s);
-            return;
-        }
-
-        expr_ref x(m_util_s.str.mk_string(""), m);
-        expr_ref v = mk_str_var_fresh("substr");
-
-        int val = r.get_int32();
-        for(int v = 0; v < val; v++) {
-            expr_ref var = mk_str_var_fresh("pre_substr");
-            expr_ref re(m_util_s.re.mk_in_re(var, m_util_s.re.mk_full_char(nullptr)), m);
-            x = m_util_s.str.mk_concat(x, var);
-            add_axiom({~i_ge_0, ~ls_le_i, mk_literal(re)});
-            // strenghtening the axiom to equivalence
-            // for multiple substrs, the SAT solver keeps guessing re and ~re until all possibilities are covered. 
-            // Now the choice of re is bound together with the substr axiom
-            add_axiom({~mk_literal(re), i_ge_0});
-            add_axiom({~mk_literal(re), ls_le_i});
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(m_util_s.str.mk_length(var), m_util_a.mk_int(1), false)});
-        }
-
-        expr_ref le(m_util_s.str.mk_length(v), m);
-        expr_ref y = mk_str_var_fresh("post_substr");
-
-        rational rl;
-        expr * num_len;
-        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
-
-        if(m_util_a.is_numeral(l, rl)) {
-            int lval = rl.get_int32();
-            expr_ref substr_re(m);
-            for(int i = 0; i < lval; i++) {
-                if(substr_re == nullptr) {
-                    substr_re = m_util_s.re.mk_full_char(nullptr);
-                } else {
-                    substr_re = m_util_s.re.mk_concat(substr_re, m_util_s.re.mk_full_char(nullptr));
-                }  
-            }
-            expr_ref substr_in(m_util_s.re.mk_in_re(v, substr_re), m);
-
-            string_theory_propagation(xey);
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| in substr_re
-            add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_literal(substr_in)});
-            // 0 <= i <= |s| && |s| < l + i  -> s = x.v
-            add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(y, eps, false)});
-            // 0 <= i <= |s| && l < 0 -> v = eps
-            add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
-            // 0 <= i <= |s| -> xey = s (e = v in fact)
-            add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
-            // i < 0 -> v = eps
-            add_axiom({i_ge_0, mk_eq(v, eps, false)});
-            // |s| < 0 -> v = eps
-            add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-            // i > |s| -> v = eps
-            add_axiom({ls_le_i, mk_eq(v, eps, false)});
-                // substr(s, i, n) = v
-            add_axiom({mk_eq(v, e, false)});
-             // add the replacement substr -> v
-            this->predicate_replace.insert(e, v.get());
-            // update length variables
-            mark_expression_as_length(s);
-            // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
-            // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
-            // after that)
-            this->var_eqs.add(expr_ref(l, m), v);
-            return;
-
-        } else if(util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl) && rl == r) {
-            xe = expr_ref(m_util_s.str.mk_concat(x, v), m);
-            xey = expr_ref(m_util_s.str.mk_concat(x, v), m);
-        } else if(m_util_a.is_zero(i) && util::is_len_sub(l, s, m, m_util_s, m_util_a, num_len) && m_util_a.is_numeral(num_len, rl)  && rl.is_minus_one()) {
-            expr_ref substr_re(m_util_s.re.mk_full_char(nullptr), m);
-            expr_ref substr_in(m_util_s.re.mk_in_re(y, substr_re), m);
-            expr_ref ly(m_util_s.str.mk_length(y), m);
-
-            literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-            string_theory_propagation(xey);
-            add_axiom({~l_ge_zero, mk_literal(substr_in)});
-            add_axiom({~l_ge_zero, mk_eq(ly, m_util_a.mk_int(1), false)});
-            add_axiom({~l_ge_zero, mk_eq(xey, s, false)});
-            add_axiom({~l_ge_zero, mk_eq(le, l, false)});
-            add_axiom({l_ge_zero, mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
-            // update length variables
-            mark_expression_as_length(s);
-            this->var_eqs.add(expr_ref(l, m), v);
-            return;
-        } else {
-            expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
-            m_rewrite(post_bound); // simplify
-            // if i + l >= |s|, we can set post_substr to eps
-            if(m.is_true(post_bound)) {
-                y = expr_ref(m_util_s.str.mk_string(""), m);
-            }
-            // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-             add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-             // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-             add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
-             this->len_vars.insert(v);
-        }
-
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
-        // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
-        // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
-        add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({ls_le_i, mk_eq(v, eps, false)});
-        // i > |s| -> v = eps
-        add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-        // substr(s, i, n) = v
-        add_axiom({mk_eq(v, e, false)});
+        add_axiom({i_ge_0, mk_eq(v, emp, false)});
+        // i >= |s| -> v = eps
+        add_axiom({~i_ge_len_s, mk_eq(v, emp, false)});
 
-        // add the replacement substr -> v
-        this->predicate_replace.insert(e, v.get());
-        // update length variables
+        // mark s and x as length expressions as |s| and |x| are used in the axioms
         mark_expression_as_length(s);
-        // add length |v| = l. This is not true entirely, because there could be a case that v = eps. 
-        // but this case is handled by epsilon propagation preprocessing (this variable will not in the system
-        // after that)
-        this->var_eqs.add(expr_ref(l, m), v);
+        mark_expression_as_length(x);
     }
 
     /**
      * @brief Handle str.substr(s,i,l)
      *
+     * We set str.substr(s,i,l) = v where v is fresh.
      * Translates to the following theory axioms:
-     * 0 <= i <= |s| -> x.v.y = s
-     * 0 <= i <= |s| -> |x| = i
-     * 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-     * 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-     * 0 <= i <= |s| && l < 0 -> v = eps
+     * l < 0 -> v = eps
      * i < 0 -> v = eps
-     * not(0 <= l <= |s| - i) -> v = eps
      * i > |s| -> v = eps
+     * s = eps -> v = eps
+     * 0 <= i <= |s| -> x.v.y = s
+     * 0 <= i -> |x| = i (as x is fresh, we do not need i <= |s|, for larger i, x will be ignored)
+     * 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
+     * 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
      *
-     * We store
-     * substr(s, i, n) = v
+     * Special cases:
+     *  - when s is a one letter string literal
+     *  - the case (str.substr s 0 (1 + (str.indexof s t n))) with t a nonempty string literal
+     *  - the case (str.substr s 0 (|s|-1))
+     * 
+     * There is also some special handling of x when i is either a numeral or of the form n+|s|
+     * where n is a numeral. Furthermore, for l a numeral, there is special handlings of the
+     * axioms for |v|.
      *
      * @param e str.substr(s, i, l)
      */
     void theory_str_noodler::handle_substr(expr *e) {
-        STRACE(str, tout << "handle-substr: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
+        STRACE(str, tout << "handle substr: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_extract(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("substr");
+        expr_ref v = get_fresh_var_for_string_function("substr", e);
 
-        // Check if the substring is of the form str.substr x k 1 and rewrite to str.at x k
-        rational num_l;
-        if(m_util_a.is_numeral(l, num_l) && num_l == 1) {
-            expr_ref at(m_util_s.str.mk_at(s, i), m);
-            add_axiom({mk_eq(v, e, false)});
-            add_axiom({mk_eq(v, at, false)});
-            // set an additional constraint that v in eps union sigma
-            expr_ref re(m_util_s.re.mk_in_re(v, m_util_s.re.mk_union( m_util_s.re.mk_to_re(m_util_s.str.mk_string("")),  m_util_s.re.mk_full_char(nullptr))) , m);
-            add_axiom({mk_literal(re)});
-            this->predicate_replace.insert(e, v.get());
-            return;
-        }
-
-        // check the form str.substr "B" i l
-        zstring str_s;
-        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
-            expr_ref zero(m_util_a.mk_int(0), m);
-            expr_ref one(m_util_a.mk_int(1), m);
-            expr_ref eps(m_util_s.str.mk_string(""), m);
-
-            literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
-            literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-            literal l_eq_0 = mk_literal(m_util_a.mk_eq(l, zero));
-            literal i_ge_1 = mk_literal(m_util_a.mk_ge(i, one));
-            literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
-            literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
-
-            // i < 0 -> v = eps
-            add_axiom({i_ge_0, mk_eq(v, eps, false)});
-            // l < 0 -> v = eps
-            add_axiom({l_ge_0, mk_eq(v, eps, false)});
-            // l >= 0 && i = 0 && i >= 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
-            // l >= 0 && i >= 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_ge_1, mk_eq(v, eps, false)});
-            // l >= 0 && i = 0 && l < 1 -> v = eps
-            add_axiom({~l_ge_0, ~i_eq_0, l_ge_1, mk_eq(v, eps, false)});
-            // substr(s, i, l) = v
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
-            return;
-        }
-        // check the form str.substr "" x y --> str.substr "" x y == ""
-        if(m_util_s.str.is_string(s, str_s) && str_s.length() == 0) {
-            expr_ref eps(m_util_s.str.mk_string(""), m);
-            add_axiom({mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, e, false)});
-            this->predicate_replace.insert(e, v.get());
-            return;
-        }
-
-        expr* num = nullptr;
-        expr* pred = nullptr;
-        rational r;
-        if(m_util_a.is_numeral(i)) {
-            handle_substr_int(e);
-            return;
-        }
-
-        expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
-        m_rewrite(post_bound); // simplify
-
-        expr_ref xvar = mk_str_var_fresh("pre_substr");
-        expr_ref x = xvar;
-        expr_ref y = mk_str_var_fresh("post_substr");
-
-        // if i + l >= |s|, we can set post_substr to eps
-        if(m.is_true(post_bound)) {
-            y = expr_ref(m_util_s.str.mk_string(""), m);
-        }
-        std::vector<expr_ref> vars;
-        // if i is of the form i = n + ...., create pre_substr . in_substr1 ... in_substrn to be x
-        if(m_util_a.is_add(i, num, pred) && m_util_a.is_numeral(num, r)) {
-            for(int i = 0; i < r.get_int32(); i++) {
-                expr_ref fv = mk_str_var_fresh("in_substr");
-                x = m_util_s.str.mk_concat(x, fv);
-                vars.push_back(fv);
-            }    
-        }
-        expr_ref xe(m_util_s.str.mk_concat(x, v), m);
-        expr_ref xey(m_util_s.str.mk_concat(x, v, y), m);
-
-       
-        expr_ref ls(m_util_s.str.mk_length(s), m);
-        expr_ref lx(m_util_s.str.mk_length(x), m);
-        expr_ref le(m_util_s.str.mk_length(v), m);
-        expr_ref ls_minus_i_l(mk_sub(mk_sub(ls, i), l), m);
         expr_ref zero(m_util_a.mk_int(0), m);
+        expr_ref one(m_util_a.mk_int(1), m);
         expr_ref eps(m_util_s.str.mk_string(""), m);
+        expr_ref re_allchar(m_util_s.re.mk_full_char(nullptr), m);
+
+        expr_ref lv(m_util_s.str.mk_length(v), m);
+        expr_ref ls(m_util_s.str.mk_length(s), m);
+        expr_ref ls_minus_i_minus_l(mk_sub(mk_sub(ls, i), l), m);
 
         literal i_ge_0 = mk_literal(m_util_a.mk_ge(i, zero));
-        literal ls_le_i = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
-        literal li_ge_ls = mk_literal(m_util_a.mk_ge(ls_minus_i_l, zero));
-        literal l_ge_zero = mk_literal(m_util_a.mk_ge(l, zero));
-        literal ls_le_0 = mk_literal(m_util_a.mk_le(ls, zero));
+        literal i_le_ls = mk_literal(m_util_a.mk_le(mk_sub(i, ls), zero));
+        literal ls_ge_l_plus_i = mk_literal(m_util_a.mk_ge(ls_minus_i_minus_l, zero));
+        literal l_ge_0 = mk_literal(m_util_a.mk_ge(l, zero));
+        literal s_is_empty = mk_eq(s, eps, false);
 
-        string_theory_propagation(xe);
-        string_theory_propagation(xey);
+        const unsigned MAX_LOOPING = 50; // maximal looping allowed in regexes (if too large, the automata get too large)
 
-        // create axioms in_substri is Sigma
-        for(const expr_ref& val : vars) {
-            expr_ref re(m_util_s.re.mk_in_re(val, m_util_s.re.mk_full_char(nullptr)), m);
-            literal pred_ge = mk_literal(m_util_a.mk_ge(pred, m_util_a.mk_int(0)));
-            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_literal(re)});
-            add_axiom({~i_ge_0, ~ls_le_i, ~pred_ge, mk_eq(m_util_s.str.mk_length(val), m_util_a.mk_int(1), false)});
+        // SPECIAL CASES
+
+        // the case where s is a string literal of length 1, i.e. (str.substr "A" i l)
+        //   i != 0 -> v = eps
+        //   l < 1 -> v = eps
+        //   i = 0 && l >= 1 -> v = "A"
+        if(zstring str_s; m_util_s.str.is_string(s, str_s) && str_s.length() == 1) {
+            literal i_eq_0 = mk_literal(m_util_a.mk_eq(i, zero));
+            literal l_ge_1 = mk_literal(m_util_a.mk_ge(l, one));
+
+            // i != 0 -> v = eps
+            add_axiom({i_eq_0, mk_eq(v, eps, false)});
+            // l < 1 -> v = eps
+            add_axiom({l_ge_1, mk_eq(v, eps, false)});
+            // i = 0 && l >= 1 -> v = s
+            add_axiom({~i_eq_0, ~l_ge_1, mk_eq(v, s, false)});
+            return;
         }
-        // 0 <= i <= |s| -> xvy = s
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(xey, s, false)});
-        // 0 <= i <= |s| -> |x| = i
-        add_axiom({~i_ge_0, ~ls_le_i, mk_eq(lx, i, false)});
-        // 0 <= i <= |s| && 0 <= l <= |s| - i -> |v| = l
-        add_axiom({~i_ge_0, ~ls_le_i, ~l_ge_zero, ~li_ge_ls, mk_eq(le, l, false)});
-        // 0 <= i <= |s| && |s| < l + i  -> |v| = |s| - i
-        add_axiom({~i_ge_0, ~ls_le_i, li_ge_ls, mk_eq(le, mk_sub(ls, i), false)});
-        // 0 <= i <= |s| && l < 0 -> v = eps
-        add_axiom({~i_ge_0, ~ls_le_i, l_ge_zero, mk_eq(v, eps, false)});
+
+        // the case (str.substr s 0 (1 + (str.indexof s t n))) with t a nonempty string literal
+        //    - this case is very useful for pyex, try for example on QF_SLIA/20180523-Reynolds/pyex/peterc-pyex-doc-cav17-zz/httplib2/httplib2-entry-disposition/39783579d992a26f238877df4ca2ead6571ddafc66bf1b6d7fd58db0.smt2
+        //    - if (str.indexof s t n) != -1 (i.e. t occurs somewhere in s starting from position n), then we can rewrite
+        //           (str.substr s 0 (1 + (str.indexof s t n)))   to   (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+        //    - we add axiom
+        //         (str.indexof s t n) != -1 -> (str.substr s 0 (1 + (str.indexof s t n))) = (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+        if(zstring indexof_find_string; m_util_a.is_zero(i) && expr_cases::is_one_add_indexof_string(l, s, m, m_util_s, m_util_a, indexof_find_string) && !indexof_find_string.empty()) {
+            literal indexof_did_not_find = mk_eq(l, zero, false); // if (1 + (str.indexof s t n))==0, then t was not found in s from position n
+            // we get the indexof expr by substracting 1 from l
+            expr_ref indexof(m_util_a.mk_add(l, m_util_a.mk_int(-1)), m);
+            m_rewrite(indexof);
+            // (str.substr s 0 (str.indexof s t n))
+            expr_ref new_substr(m_util_s.str.mk_substr(s, i, indexof), m);
+            // t[0]
+            expr_ref first_char_of_t(m_util_s.str.mk_string(indexof_find_string.extract(0,1)), m);
+            // (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+            expr_ref conc = mk_concat(new_substr, first_char_of_t);
+            string_theory_propagation(conc);
+
+            // (str.indexof s t n) != -1 -> (str.substr s 0 (1 + (str.indexof s t n))) = (str.++ (str.substr s 0 (str.indexof s t n)) t[0])
+            add_axiom({indexof_did_not_find, mk_eq(e, conc, false)});
+            return;
+        }
+
+        // the case (str.substr s 0 (|s|-1))
+        //   s != eps -> s = vy
+        //   s != eps -> y in re.allchar
+        //   s != eps -> |y| = 1 (not completely neccessary, helps z3)
+        //   s = eps -> v = eps
+        if(rational num; m_util_a.is_zero(i) && expr_cases::is_num_plus_len(l, s, m, m_util_s, m_util_a, num) && num.is_minus_one()) {
+            expr_ref y = mk_str_var_fresh("post_substr");
+            expr_ref y_in_allchar(m_util_s.re.mk_in_re(y, m_util_s.re.mk_full_char(nullptr)), m);
+            expr_ref ly(m_util_s.str.mk_length(y), m);
+            expr_ref vy(m_util_s.str.mk_concat(v, y), m);
+            string_theory_propagation(vy);
+
+            // s != eps -> s = vy
+            add_axiom({s_is_empty, mk_eq(s, vy, false)});
+            // s != eps -> y in re.allchar
+            add_axiom({s_is_empty, mk_literal(y_in_allchar)});
+            // s != eps -> |y| = 1
+            add_axiom({s_is_empty, mk_eq(ly, one, false)});
+            // s = eps -> v = eps
+            add_axiom({~s_is_empty, mk_eq(v, eps, false)});
+            // update length variables
+            mark_expression_as_length(s);
+            this->var_eqs.add(expr_ref(l, m), v);
+            return;
+        }
+
+        // GENERAL CASE
+
+        // First the invalid cases
+        // l < 0 -> v = eps
+        add_axiom({l_ge_0, mk_eq(v, eps, false)});
         // i < 0 -> v = eps
         add_axiom({i_ge_0, mk_eq(v, eps, false)});
-        // not(0 <= l <= |s| - i) -> v = eps
-        add_axiom({ls_le_i, mk_eq(v, eps, false)});
         // i > |s| -> v = eps
-        add_axiom({~ls_le_0, mk_eq(v, eps, false)});
-        // substr(s, i, n) = v
-        add_axiom({mk_eq(v, e, false)});
+        add_axiom({i_le_ls, mk_eq(v, eps, false)});
+        // s = eps -> v = eps
+        add_axiom({~s_is_empty, mk_eq(v, eps, false)});
 
-        // add the replacement substr -> v
-        this->predicate_replace.insert(e, v.get());
-        // update length variables
-        mark_expression_as_length(s);
-        this->len_vars.insert(v);
-        if(vars.size() > 0) {
-            this->var_eqs.add(expr_ref(pred, m), xvar);
-            this->var_eqs.add(expr_ref(l, m), v); 
-            this->len_vars.insert(xvar);
+        // We will now create concatenation s=xvy for the valid case where v is the result of substr,
+        // |x|=i and either |v|=l (if 0 <= l <= |s|-i) or |v|=|s|-i (if |s|-i < l)
+
+        // Starting with x, we want to have |x| = i (but only if i >= 0) and put x in len vars.
+        // Note that for i > |s| (invalid case), we do not care about x, so it can still be equal to i.
+        // We can also handle some special cases in a better way.
+        expr_ref x(m);
+        if (m_util_a.is_zero(i)) {
+            // if i=0 there is nothing before v in the concatenation, so x=eps
+            x = eps;
         } else {
-            this->var_eqs.add(expr_ref(i, m), x);
-            this->len_vars.insert(x);
-        }        
+            x = mk_str_var_fresh("pre_substr");
+
+            // stronger axioms: if i = t+n for some (positive) numeral n and expression t, then, if t>=0, we can split x to two parts x = x1.x2 where |x1|=t and |x2|=n
+            //   t>=0 -> x2 in re.allchar^n
+            //   t>=0 -> |x2| = n (not completely needed, helps z3)
+            // these axioms are needed for pyex/full_str_int so x1 is in var_eqs with t
+            if(expr *n, *t; m_util_a.is_add(i, n, t)) { // is i of the form t+n?
+                if (rational n_value; m_util_a.is_numeral(n, n_value) && n_value.is_pos() && n_value <= MAX_LOOPING) {
+                    unsigned n_value_unsigned = n_value.get_unsigned();
+
+                    expr_ref x1 = x;
+                    expr_ref x2 = mk_str_var_fresh("in_substr");
+                    x = m_util_s.str.mk_concat(x1, x2);
+
+                    // x2 in re.allchar^n
+                    expr_ref x2_in_sigma_times_num(m_util_s.re.mk_in_re(x2, m_util_s.re.mk_loop_proper(re_allchar, n_value_unsigned, n_value_unsigned)), m);
+                    literal t_ge_0 = mk_literal(m_util_a.mk_ge(t, zero)); // t>=0
+                    // t>=0 -> x2 in re.allchar^n
+                    add_axiom({~t_ge_0, mk_literal(x2_in_sigma_times_num)});
+                    // t>=0 -> |x2| = n (not completely needed, helps z3)
+                    add_axiom({~i_ge_0, ~i_le_ls, ~t_ge_0, mk_eq(m_util_s.str.mk_length(x2), n, false)});
+                    // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
+                    this->var_eqs.add(expr_ref(t, m), x1); // TODO: PROBABLY NOT CORRECT, in case where t<0, needs checking, I am unable to create a formula where this shows up
+                }
+            }
+
+            // 0 <= i -> |x| = i
+            add_axiom({~i_ge_0, mk_eq(m_util_s.str.mk_length(x), i, false)});
+            this->var_eqs.add(expr_ref(i, m), x); // |x| = i, is not true for i <0, but because x is fresh and is used only in s=xvy, we only care about the situation where s=xvy is true, and in that case i>=0
+
+            // Because we use |x| in the axiom, we should put it in length vars, however, if i is a (reasonably small) numeral
+            // we can put x in re.allchar^i and then we do not have to add x to len vars as the length is restricted by the regex
+            if (rational i_val; m_util_a.is_numeral(i, i_val) && i_val.is_pos() && i_val <= MAX_LOOPING) {
+                unsigned i_val_unsigned = i_val.get_unsigned();
+                expr_ref x_in_sigma_time_i(m_util_s.re.mk_in_re(x, m_util_s.re.mk_loop_proper(re_allchar, i_val_unsigned, i_val_unsigned)), m);
+                // x in re.allchar^i
+                add_axiom({mk_literal(x_in_sigma_time_i)});
+            } else {
+                mark_expression_as_length(x);
+            }
+        }
+
+        // We now set the length of v:
+        // 0 <= i <= |s| && 0 <= l <= |s|-i -> |v| = l
+        add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_eq(lv, l, false)});
+        // 0 <= i <= |s| && |s|-i < l  -> |v| = |s|-i
+        add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(lv, mk_sub(ls, i), false)});
+        // remember l=|v|
+        this->var_eqs.add(expr_ref(l, m), v); // TODO: NOT CORRECT, in case where l > |s|-i, the length of v is |s|-i, needs to be fixed somehow (see issue #334)
+
+        // We also need to put v in length variables, but not always. For this we nned to have y created.
+
+        expr_ref y(m);
+        // i+l >= |s|
+        expr_ref post_bound(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(s)), m);
+        m_rewrite(post_bound); // simplify
+        if(m.is_true(post_bound)) {
+            // If i + l >= |s|, we can set y to eps and we do not have to put v in length vars
+            // as s=xv and the length of x is already handled by previous axioms (so v will be
+            // automatically the rest of s).
+            y = expr_ref(m_util_s.str.mk_string(""), m);
+        } else {
+            y = mk_str_var_fresh("post_substr");
+            // If l is some (reasonably small) numeral, we can put
+            //   - v in re.allchar^l, for the case 0 <= l <= |s|-i,
+            //   - y=eps, for the case |s|-i < l.
+            // Then we do not have to put v in length vars.
+            if(rational l_val; m_util_a.is_numeral(l, l_val) && l_val.is_pos() && l_val <= MAX_LOOPING) {
+                unsigned l_val_unsigned = l_val.get_unsigned();
+                expr_ref substr_in(m_util_s.re.mk_in_re(v, m_util_s.re.mk_loop_proper(re_allchar, l_val_unsigned, l_val_unsigned)), m);
+    
+                // 0 <= i <= |s| && |s| < l + i  -> y = eps
+                add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(y, eps, false)});
+                // 0 <= i <= |s| && 0 <= l <= |s| - i -> v in re.allchar^l
+                add_axiom({~i_ge_0, ~i_le_ls, ~l_ge_0, ~ls_ge_l_plus_i, mk_literal(substr_in)});
+            } else {
+                 mark_expression_as_length(v);
+            }
+        }
+
+        // We now create concatenation xvy and the main axiom
+        expr_ref xvy(m_util_s.str.mk_concat(x, v, y), m);
+        string_theory_propagation(xvy);
+
+        // 0 <= i <= |s| -> xvy = s
+        add_axiom({~i_ge_0, ~i_le_ls, mk_eq(xvy, s, false)});
+
+        // mark s as length, as |s| is used in the axioms
+        mark_expression_as_length(s);
     }
 
     /**
@@ -1199,17 +1140,16 @@ namespace smt::noodler {
      * @param r replace term
      */
     void theory_str_noodler::handle_replace(expr *r) {
-        STRACE(str, tout << "handle-replace: " << mk_pp(r, m) << '\n';);
-
-        if(axiomatized_persist_terms.contains(r))
-            return;
-
+        if (axiomatized_persist_terms.contains(r)) { return; }
         axiomatized_persist_terms.insert(r);
-        context& ctx = get_context();
+
+        STRACE(str, tout << "handle replace: " << mk_pp(r, m) << '\n';);
+
         expr* a = nullptr, *s = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace(r, a, s, t));
 
-        expr_ref v = mk_str_var_fresh("replace");
+        expr_ref v = get_fresh_var_for_string_function("replace", r);
+
         expr_ref x = mk_str_var_fresh("replace_left");
         expr_ref y = mk_str_var_fresh("replace_right");
         expr_ref xty = mk_concat(x, mk_concat(t, y));
@@ -1234,27 +1174,21 @@ namespace smt::noodler {
                 add_axiom({mk_eq_empty(t1), mk_eq(v, a,false)});
             }
 
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
         expr* indexof = nullptr;
         if(expr_cases::is_replace_indexof(a, s, m, m_util_s, m_util_a, indexof)) {
             expr_ref minus_one(m_util_a.mk_int(-1), m);
-            expr_ref v = mk_str_var_fresh("replace");
             expr_ref eps(m_util_s.str.mk_string(""), m);
             literal ind_eq_m1 = mk_eq(indexof, minus_one, false);
             expr_ref len_a_m1(m_util_a.mk_sub(m_util_s.str.mk_length(a), m_util_a.mk_int(1)), m);
             expr_ref substr(m_util_s.str.mk_substr(a, m_util_a.mk_int(0), len_a_m1), m);
 
-
             // s = eps -> v = t.a
             add_axiom({~s_emp, mk_eq(v, mk_concat(t, a),false)});
             add_axiom({ind_eq_m1, mk_eq(v, mk_concat(substr, t),false)});
             add_axiom({~ind_eq_m1, mk_eq(v, eps, false)});
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
@@ -1281,9 +1215,6 @@ namespace smt::noodler {
             add_axiom({cnt, s_emp, mk_eq(v, a,false)});
             ctx.force_phase(cnt);
 
-            // replace(a,s,t) = v
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         // str.replace "" s t where a = ""
         } else if(m_util_s.str.is_string(a, str_a) && str_a.length() == 0) {
@@ -1291,15 +1222,10 @@ namespace smt::noodler {
             add_axiom({mk_literal(m.mk_not(m.mk_eq(s, eps))), mk_eq(v,t,false)});
             // s = emp -> v = t.a
             add_axiom({s_emp, mk_eq_empty(v)});
-            // replace(a,s,t) = v
-            add_axiom({mk_eq(v, r, false)});
-            predicate_replace.insert(r, v.get());
             return;
         }
 
         literal cnt = mk_literal(m_util_s.str.mk_contains(a, s));
-        // replace(a,s,t) = v
-        add_axiom({mk_eq(v, r, false)});
         // a = eps && s != eps -> v = a
         add_axiom({~a_emp, s_emp, mk_eq(v, a, false)});
         // (not(contains(a,s))) -> v = a
@@ -1319,8 +1245,6 @@ namespace smt::noodler {
         ctx.force_phase(cnt);
         // tighttestprefix(s, x, not(contains(a,s) && a != eps && s != eps))
         tightest_prefix(s, x, {~cnt, a_emp, s_emp});
-
-        predicate_replace.insert(r, v.get());
     }
 
     /**
@@ -1334,16 +1258,16 @@ namespace smt::noodler {
      * @param e replace_re term
      */
     void theory_str_noodler::handle_replace_re(expr *e) {
-        STRACE(str, tout << "handle-replace: " << mk_pp(e, m) << '\n';);
-
-        if(axiomatized_persist_terms.contains(e))
-            return;
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        context& ctx = get_context();
+        STRACE(str, tout << "handle replace_re: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *R = nullptr, *t = nullptr;
         VERIFY(m_util_s.str.is_replace_re(e, s, R, t));
-        expr_ref v = mk_str_var_fresh("replace_re");
+
+        expr_ref v = get_fresh_var_for_string_function("replace_re", e);
+
         expr_ref x = mk_str_var_fresh("replace_re_left");
         expr_ref y = mk_str_var_fresh("replace_re_middle");
         expr_ref a = mk_str_var_fresh("replace_re_middle_char");
@@ -1374,9 +1298,6 @@ namespace smt::noodler {
         add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(a, m_util_s.re.mk_full_char(R->get_sort())))});
         add_axiom({~s_in_SRS, eps_in_R, mk_literal(m_util_s.re.mk_in_re(ya, R))});
         add_axiom({~s_in_SRS, eps_in_R, mk_eq(v, xtz, false)});
-        
-        add_axiom({mk_eq(v, e, false)});
-        predicate_replace.insert(e, v.get());
     }
 
     /**
@@ -1406,14 +1327,12 @@ namespace smt::noodler {
      * @param i indexof term
      */
     void theory_str_noodler::handle_index_of(expr *i) {
-        STRACE(str, tout << "handle-indexof: " << mk_pp(i, m) << '\n';);
-        if(axiomatized_persist_terms.contains(i))
-            return;
-
+        if (axiomatized_persist_terms.contains(i)) { return; }
         axiomatized_persist_terms.insert(i);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle indexof: " << mk_pp(i, m) << '\n';);
+
         expr *s = nullptr, *t = nullptr, *offset = nullptr;
-        rational r;
         VERIFY(m_util_s.str.is_index(i, t, s) || m_util_s.str.is_index(i, t, s, offset));
 
         expr_ref minus_one(m_util_a.mk_int(-1), m);
@@ -1430,7 +1349,7 @@ namespace smt::noodler {
         // t = eps && s != eps -> indexof = -1
         add_axiom({~t_eq_empty, s_eq_empty, i_eq_m1});
 
-        if (!offset || (m_util_a.is_numeral(offset, r) && r.is_zero())) {
+        if (!offset || m_util_a.is_zero(offset)) {
             expr_ref x = mk_str_var_fresh("index_left");
             expr_ref y = mk_str_var_fresh("index_right");
             expr_ref xsy(m_util_s.str.mk_concat(x, s, y), m);
@@ -1553,21 +1472,15 @@ namespace smt::noodler {
      * @param e replace_all
      */
     void theory_str_noodler::handle_replace_all(expr *e) {
-        STRACE(str, tout << "handle-replace-all: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
+        STRACE(str, tout << "handle replace_all: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_replace_all(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("replace_all");
-        // create equation for propagating length constraints
-        // tmp = replace_all(...) => |tmp| = |replace_all(...)|
-        add_axiom({mk_eq(v, e, false)});
-        this->predicate_replace.insert(e, v.get());  
+        expr_ref v = get_fresh_var_for_string_function("replace_all", e);
     }
 
     /**
@@ -1577,21 +1490,15 @@ namespace smt::noodler {
      * @param e replace_re_all
      */
     void theory_str_noodler::handle_replace_re_all(expr *e) {
-        STRACE(str, tout << "handle-replace-re-all: " << mk_pp(e, m) << '\n';);
-        if (axiomatized_persist_terms.contains(e))
-            return;
-
+        if (axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
 
-        ast_manager &m = get_manager();
+        STRACE(str, tout << "handle replace_re_all: " << mk_pp(e, m) << '\n';);
+
         expr *s = nullptr, *i = nullptr, *l = nullptr;
         VERIFY(m_util_s.str.is_replace_re_all(e, s, i, l));
 
-        expr_ref v = mk_str_var_fresh("replace_all");
-        // create equation for propagating length constraints
-        // tmp = replace_all(...) => |tmp| = |replace_all(...)|
-        add_axiom({mk_eq(v, e, false)});
-        this->predicate_replace.insert(e, v.get());  
+        expr_ref v = get_fresh_var_for_string_function("replace_re_all", e);
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {
@@ -1631,12 +1538,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_prefix(expr *e) {
-        STRACE(str, tout << "handle-prefix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle prefix: " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
@@ -1670,12 +1576,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_prefix(expr *e) {
-        STRACE(str, tout << "handle-not-prefx: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(m.mk_not(e)))
-            return;
-
+        if(axiomatized_persist_terms.contains(m.mk_not(e))) { return; }
         axiomatized_persist_terms.insert(m.mk_not(e));
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle not(prefx): " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_prefix(e, x, y));
 
@@ -1778,12 +1683,11 @@ namespace smt::noodler {
      * @param e suffix term
      */
     void theory_str_noodler::handle_suffix(expr *e) {
-        STRACE(str, tout << "handle-suffix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle suffix: " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
@@ -1806,12 +1710,11 @@ namespace smt::noodler {
      * @param e prefix term
      */
     void theory_str_noodler::handle_not_suffix(expr *e) {
-        STRACE(str, tout << "handle-not-suffix: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(m.mk_not(e)))
-            return;
-
+        if(axiomatized_persist_terms.contains(m.mk_not(e))) { return; }
         axiomatized_persist_terms.insert(m.mk_not(e));
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout << "handle not(suffix): " << mk_pp(e, m) << '\n';);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_suffix(e, x, y));
 
@@ -1889,12 +1792,11 @@ namespace smt::noodler {
      * @param e str.contains(x,y)
      */
     void theory_str_noodler::handle_contains(expr *e) {
-        if(axiomatized_persist_terms.contains(e))
-            return;
-
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
-        STRACE(str, tout  << "handle contains " << mk_pp(e, m) << std::endl;);
-        ast_manager &m = get_manager();
+
+        STRACE(str, tout  << "handle contains: " << mk_pp(e, m) << std::endl;);
+
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
@@ -1938,11 +1840,12 @@ namespace smt::noodler {
      * @param e contains term.
      */
     void theory_str_noodler::handle_not_contains(expr *e) {
+        STRACE(str, tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
+
         expr* cont = this->m.mk_not(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
 
-        STRACE(str, tout  << "handle not(contains) " << mk_pp(e, m) << std::endl;);
         zstring s;
         if(m_util_s.str.is_string(y, s)) {
             expr_ref re(m_util_s.re.mk_in_re(x, m_util_s.re.mk_concat(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)),
@@ -1971,10 +1874,11 @@ namespace smt::noodler {
      * @param e Not contains predicate
      */
     void theory_str_noodler::assign_not_contains(expr *e) {
+        STRACE(str, tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
+
         expr* cont = this->m.mk_not(e);
         expr *x = nullptr, *y = nullptr;
         VERIFY(m_util_s.str.is_contains(e, x, y));
-        STRACE(str, tout  << "assign not(contains) " << mk_pp(e, m) << std::endl;);
 
         zstring s;
         // not(contains) was not axiomatized in handle_not_contains
@@ -2061,10 +1965,10 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::handle_in_re(expr *const e, const bool is_true) {
+        STRACE(str, tout  << "handle in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
+
         expr *s = nullptr, *re = nullptr;
         VERIFY(m_util_s.str.is_in_re(e, s, re));
-        ast_manager& m = get_manager();
-        STRACE(str, tout  << "handle_in_re " << mk_pp(e, m) << " " << is_true << std::endl;);
 
         app_ref re_constr(to_app(s), m);
         expr_ref re_atom(e, m);
@@ -2112,10 +2016,10 @@ namespace smt::noodler {
      * TODO: This probably makes is_digit always relevant.
      */
     void theory_str_noodler::handle_is_digit(expr *e) {
-        STRACE(str, tout << "handle-is-digit: " << mk_pp(e, m) << '\n';);
-        if(axiomatized_persist_terms.contains(e))
-            return;
+        if(axiomatized_persist_terms.contains(e)) { return; }
         axiomatized_persist_terms.insert(e);
+
+        STRACE(str, tout << "handle is_digit: " << mk_pp(e, m) << '\n';);
 
         expr *s = nullptr;
         VERIFY(m_util_s.str.is_is_digit(e, s));

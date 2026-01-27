@@ -297,10 +297,26 @@ namespace smt::noodler {
          */
         void add_axiom(std::vector<literal> ls);
 
+        /**
+         * @brief Get a fresh variable with prefix @p var_name replacing the string function @p str_func
+         * 
+         * Adds an axiom stating that the fresh variable is equal to the string function and registers
+         * the replacement in predicate_replace.
+         * 
+         * @param var_name prefix of the fresh variable name
+         * @param str_func the string function to be replaced
+         * @return the created fresh variable
+         */
+        expr_ref get_fresh_var_for_string_function(const std::string& var_name, expr* str_func) {
+            expr_ref res = mk_str_var_fresh(var_name);
+            predicate_replace.insert(str_func, res.get());
+            add_axiom({mk_eq(res, str_func, false)});
+            return res;
+        }
+
         // methods for rewriting different predicates into something simpler that we can handle
         void handle_char_at(expr *e);
         void handle_substr(expr *e);
-        void handle_substr_int(expr *e);
         void handle_index_of(expr *e);
         void handle_replace(expr *e);
         void handle_replace_re(expr *e);

@@ -87,26 +87,6 @@ namespace smt::noodler::util {
         }
     }
 
-    bool is_len_sub(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& num_res) {
-        expr* num = nullptr;
-        expr* len = nullptr;
-        expr* str = nullptr;
-        if(!m_util_a.is_add(val, num, len)) {
-            return false;
-        }
-
-        if(!m_util_a.is_int(num)) {
-            return false;
-        }
-        num_res = num;
-
-        if(!m_util_s.str.is_length(len, str) || str->hash() != s->hash()) {
-            return false;
-        }
-
-        return true;
-    }
-
     bool split_word_to_automata(const zstring& word, const std::vector<std::shared_ptr<mata::nfa::Nfa>>& automata, std::vector<zstring>& words) {
         STRACE(str_split_word_to_automata,
             tout << "split_word_to_automata with word:\n" << word << "\n";

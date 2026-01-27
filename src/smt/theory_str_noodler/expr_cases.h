@@ -52,7 +52,7 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
 
 /**
  * @brief Check if the given contraint @p e is of the form 
- * (( @p val ) + (str.indexof ( @p index_str ) ( @p ind_find ) n )
+ *    @p val + (str.indexof @p index_str @p ind_find n)
  * 
  * @param e Constraint to be checked
  * @param index_str Required index of parameter
@@ -64,6 +64,21 @@ bool is_replace_indexof(expr* rpl_str, expr* rpl_find, ast_manager& m, seq_util&
  * @return true <-> if of the particular form.
  */
 bool is_indexof_add(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr*& val, expr*& ind_find);
+
+/**
+ * @brief Check if the given contraint @p e is of the form 
+ *    1 + (str.indexof @p index_str @p ind_find n)
+ * where @p ind_find is string literal
+ * 
+ * @param e Constraint to be checked
+ * @param index_str Required index of parameter
+ * @param m Ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] ind_find Extracted string literal in indexof find 
+ * @return true <-> if of the particular form.
+ */
+bool is_one_add_indexof_string(expr* e, expr* index_str, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, zstring& ind_find);
 
 /**
  * @brief Check if the constraint is of the form (indexof ( @p index_param ) ( @p index_str )). 
@@ -124,6 +139,20 @@ bool is_len_num_eq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_ut
  * @return true <-> if of the particular form.
  */
 bool is_len_num_leq_or_geq(expr* e, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, expr_ref_vector& len_arg, rational& num, bool& num_is_larger);
+
+
+/**
+ * @brief Check whether the expression @p val is of the form ( @p num_res ) + (len @p s ).
+ *
+ * @param val Expression to be checked
+ * @param s String term
+ * @param m ast manager
+ * @param m_util_s string ast util
+ * @param m_util_a arith ast util
+ * @param[out] num_res expression added to the length term
+ * @return Is of the form.
+ */
+bool is_num_plus_len(expr* val, expr* s, ast_manager& m, seq_util& m_util_s, arith_util& m_util_a, rational& num_res);
 
 /**
  * @brief Check if the formula @p e contains a quantifier.

@@ -18,6 +18,7 @@
 #include "params/theory_str_noodler_params.h"
 #include "util/scoped_vector.h"
 #include "util/union_find.h"
+#include "smt/smt_context.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 
@@ -90,24 +91,40 @@ namespace smt::noodler {
          * 
          * @return Equivalence classes consisting of BasicTerms
          */
-        BasicTermEqiv get_equivalence_bt(const AutAssignment& aut_ass) const {
+        BasicTermEqiv get_equivalence_bt(const AutAssignment& aut_ass, smt::context& ctx, seq_util& m_util_s) const {
             std::vector<std::set<BasicTerm>> ret;
-            for(const auto& t : this->un_find) {
-                std::set<BasicTerm> st;
+            for (const auto& t : this->un_find) {
                 int len = key_to_value.at(t.m_key);
+
+                // Partition the stored bucket by actual (current) length-equality in Z3's e-graph.
+                // This prevents returning "equivalence" that is only conditionally implied by axioms
+                // and does not hold in the current final_check assignment.
+                std::unordered_map<enode const*, std::set<BasicTerm>> groups;
                 for (const auto& s : t.m_value) {
                     BasicTerm bvar = util::get_variable_basic_term(s);
-                    
-                    if(len != -1 && len > 1) {
+
+                    if (len != -1 && len > 1) {
                         std::set<std::pair<int, int>> aut_constr = mata::applications::strings::get_word_lengths(*aut_ass.at(bvar));
-                        if(aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
+                        if (aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
                             continue;
                         }
                     }
-                    
-                    st.insert(bvar);  
+
+                    expr* len_term = m_util_s.str.mk_length(s);
+                    enode* n = ctx.find_enode(len_term);
+                    if (!n) {
+                        // If we cannot validate by enodes, be conservative and skip.
+                        continue;
+                    }
+
+                    groups[n->get_root()].insert(bvar);
                 }
-                ret.push_back(st);
+
+                for (auto& [_, st] : groups) {
+                    if (!st.empty()) {
+                        ret.push_back(std::move(st));
+                    }
+                }
             }
             return ret;
         }

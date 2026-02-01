@@ -101,6 +101,9 @@ namespace smt::noodler {
                 // and does not hold in the current final_check assignment.
                 std::unordered_map<enode const*, std::set<BasicTerm>> groups;
                 for (const auto& s : t.m_value) {
+                    if(!is_app(s) || to_app(s)->get_num_args() != 0) {
+                        continue;
+                    }
                     BasicTerm bvar = util::get_variable_basic_term(s);
 
                     if (len != -1 && len > 1) {

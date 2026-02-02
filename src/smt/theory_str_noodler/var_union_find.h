@@ -21,6 +21,7 @@
 #include "smt/smt_context.h"
 #include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
+#include "smt/theory_str_noodler/expr_solver.h"
 
 namespace smt::noodler {
 
@@ -44,11 +45,16 @@ namespace smt::noodler {
 
         obj_map<expr, obj_hashtable<expr>> un_find;
         arith_util& m_util_a;
+        ast_manager& m;
+
+        // Keep references to keys/values used in this structure so that expr* stored
+        // in internal maps stays valid across Z3's GC.
+        expr_ref_vector m_pinned;
 
         std::map<expr*, int> key_to_value; // -1 means key is not a numeral
 
     public:
-        var_union_find(arith_util& m_util_a) : un_find(), m_util_a(m_util_a) { }
+        var_union_find(arith_util& m_util_a) : un_find(), m_util_a(m_util_a), m(m_util_a.get_manager()), m_pinned(m) { }
 
         /**
          * @brief Add new item to the equivalence
@@ -58,6 +64,9 @@ namespace smt::noodler {
          * @param val Value (variable) associated with the key.
          */
         void add(const expr_ref& key, const expr_ref& val) {
+            m_pinned.push_back(key);
+            m_pinned.push_back(val);
+
             obj_hashtable<expr> found;
             if(this->un_find.find(key, found)) {
                 this->un_find[key].insert(val);
@@ -96,16 +105,26 @@ namespace smt::noodler {
             for (const auto& t : this->un_find) {
                 int len = key_to_value.at(t.m_key);
 
-                // Partition the stored bucket by actual (current) length-equality in Z3's e-graph.
-                // This prevents returning "equivalence" that is only conditionally implied by axioms
-                // and does not hold in the current final_check assignment.
-                std::unordered_map<enode const*, std::set<BasicTerm>> groups;
+                ctx.ensure_internalized(t.m_key);
+                enode* key_n = ctx.find_enode(t.m_key);
+                if (!key_n) {
+                    continue;
+                }
+
+                // enodes are sometimes not precise (they do not relate terms to 
+                // the same equivalence class even though they are indeed equivalent).
+                int_expr_solver lia_solver(ctx.get_manager(), ctx.get_fparams());
+                lia_solver.initialize(ctx);
+
+                // Basic term in the equivalence class
+                std::set<BasicTerm> st;
                 for (const auto& s : t.m_value) {
+                    // we consider only variables (not concatenation or other complex terms)
+                    // therefore, s = variable
                     if(!is_app(s) || to_app(s)->get_num_args() != 0) {
                         continue;
                     }
                     BasicTerm bvar = util::get_variable_basic_term(s);
-
                     if (len != -1 && len > 1) {
                         std::set<std::pair<int, int>> aut_constr = mata::applications::strings::get_word_lengths(*aut_ass.at(bvar));
                         if (aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
@@ -113,21 +132,31 @@ namespace smt::noodler {
                         }
                     }
 
-                    expr* len_term = m_util_s.str.mk_length(s);
+                    // create a term |s|
+                    expr_ref len_term(m_util_s.str.mk_length(s), ctx.get_manager());
+                    ctx.ensure_internalized(len_term);
                     enode* n = ctx.find_enode(len_term);
                     if (!n) {
-                        // If we cannot validate by enodes, be conservative and skip.
                         continue;
                     }
 
-                    groups[n->get_root()].insert(bvar);
-                }
-
-                for (auto& [_, st] : groups) {
-                    if (!st.empty()) {
-                        ret.push_back(std::move(st));
+                    // key and s are not in the same equivalence class. We try to resolve using LIA solver.
+                    if (key_n->get_root() != n->get_root()) {
+                        // Fallback: if key != |s| is UNSAT in the current arithmetic context,
+                        // then key and |s| are equivalent even if the e-graph didn't merge them.
+                        bool lia_implies_eq = false;
+                        if (m_util_a.is_int(t.m_key) && m_util_a.is_int(len_term)) {
+                            ast_manager& m = ctx.get_manager();
+                            expr_ref neq(m.mk_not(m.mk_eq(t.m_key, len_term)), m);
+                            lia_implies_eq = (lia_solver.check_sat(neq) == l_false);
+                        }
+                        if (!lia_implies_eq) {
+                            continue;
+                        }
                     }
+                    st.insert(bvar);
                 }
+                ret.push_back(st);
             }
             return ret;
         }

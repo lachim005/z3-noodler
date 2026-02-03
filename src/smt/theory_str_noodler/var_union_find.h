@@ -102,6 +102,10 @@ namespace smt::noodler {
          */
         BasicTermEqiv get_equivalence_bt(const AutAssignment& aut_ass, smt::context& ctx, seq_util& m_util_s) const {
             std::vector<std::set<BasicTerm>> ret;
+            // enodes are sometimes not precise (they do not relate terms to 
+            // the same equivalence class even though they are indeed equivalent).
+            int_expr_solver lia_solver(ctx.get_manager(), ctx.get_fparams());
+
             for (const auto& t : this->un_find) {
                 int len = key_to_value.at(t.m_key);
 
@@ -110,11 +114,6 @@ namespace smt::noodler {
                 if (!key_n) {
                     continue;
                 }
-
-                // enodes are sometimes not precise (they do not relate terms to 
-                // the same equivalence class even though they are indeed equivalent).
-                int_expr_solver lia_solver(ctx.get_manager(), ctx.get_fparams());
-                lia_solver.initialize(ctx);
 
                 // Basic term in the equivalence class
                 std::set<BasicTerm> st;
@@ -148,6 +147,7 @@ namespace smt::noodler {
                         if (m_util_a.is_int(t.m_key) && m_util_a.is_int(len_term)) {
                             ast_manager& m = ctx.get_manager();
                             expr_ref neq(m.mk_not(m.mk_eq(t.m_key, len_term)), m);
+                            lia_solver.initialize(ctx);
                             lia_implies_eq = (lia_solver.check_sat(neq) == l_false);
                         }
                         if (!lia_implies_eq) {

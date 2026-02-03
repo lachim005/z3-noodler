@@ -6,6 +6,7 @@
 #include <numeric> 
 
 #include <mata/applications/strings.hh>
+#include "smt/theory_str_noodler/noodlification_state.h"
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -22,7 +23,10 @@ namespace smt::noodler {
 
         while (!is_worklist_empty()) {
             util::check_limit(m);
-            SolvingState element_to_process = pop_from_worklist();
+
+            auto element_opt = pop_from_worklist();
+            if (!element_opt.has_value()) break;
+            SolvingState element_to_process = element_opt.value();
 
             if (element_to_process.predicates_to_process.empty()) {
                 // we found another solution, element_to_process contain the automata
@@ -85,8 +89,10 @@ namespace smt::noodler {
             tout << std::endl;
         );
 
-        const auto &left_side_vars = inclusion_to_process.get_left_side();
-        const auto &right_side_vars = inclusion_to_process.get_right_side();
+        solving_state.left_side_vars = {inclusion_to_process.get_left_side()};
+        solving_state.right_side_vars = {inclusion_to_process.get_right_side()};
+        auto &left_side_vars = solving_state.left_side_vars.value();
+        auto &right_side_vars = solving_state.right_side_vars.value();
 
         /********************************************************************************************************/
         /****************************************** One side is empty *******************************************/
@@ -140,6 +146,7 @@ namespace smt::noodler {
         // Get automata of the variables on the left side
         STRACE(str_nfa, tout << "Left automata:" << std::endl);
         auto [left_side_automata, left_side_division] = solving_state.get_automata_and_division_of_concatenation(left_side_vars, false);
+        solving_state.left_side_division = {left_side_division};
         SASSERT(left_side_division.size() == left_side_vars.size()); // each division should contain exactly one left variable
         SASSERT(left_side_automata.size() == left_side_division.size()); // we have one automaton for each division
 
@@ -149,6 +156,7 @@ namespace smt::noodler {
         // side automaton the variables whose concatenation it represents.
         STRACE(str_nfa, tout << "Right automata:" << std::endl);
         auto [right_side_automata, right_side_division] = solving_state.get_automata_and_division_of_concatenation(right_side_vars, true);
+        solving_state.right_side_division = {right_side_division};
         SASSERT(right_side_automata.size() == right_side_division.size()); // we have one automaton for each division
 
 
@@ -194,86 +202,11 @@ namespace smt::noodler {
          * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
          * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
          **/
-        auto noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
+        solving_state.is_inclusion_to_process_on_cycle = is_inclusion_to_process_on_cycle;
+        solving_state.noodlification_state = NoodlificationState(left_side_automata,
                                                                     right_side_automata,
-                                                                    false,
                                                                     {{"reduce", "forward"}});
-
-        for (const auto &noodle : noodles) {
-            util::check_limit(m);
-            STRACE(str, tout << "Processing noodle" << (is_trace_enabled(TraceTag::str_nfa) ? " with automata:" : "") << std::endl;);
-            SolvingState new_element = solving_state;
-
-            /* Explanation of the next code on an example:
-             * Left side has variables x_1, x_2, x_3, x_2 while the right side has variables x_4, x_1, x_5, x_6, where x_1
-             * and x_4 are length-aware (i.e. there is one automaton for concatenation of x_5 and x_6 on the right side).
-             * Assume that noodle represents the case where it was split like this:
-             *              | x_1 |    x_2    | x_3 |       x_2       |
-             *              | t_1 | t_2 | t_3 | t_4 | t_5 |    t_6    |
-             *              |    x_4    |       x_1       | x_5 | x_6 |
-             * In the following for loop, we create the vars t1, t2, ..., t6 and prepare two vectors left_side_vars_to_new_vars
-             * and right_side_divisions_to_new_vars which map left vars and right divisions into the concatenation of the new
-             * vars. So for example left_side_vars_to_new_vars[1] = t_2 t_3, because second left var is x_2 and we map it to t_2 t_3,
-             * while right_side_divisions_to_new_vars[2] = t_6, because the third division on the right represents the automaton for
-             * concatenation of x_5 and x_6 and we map it to t_6.
-             */
-            std::vector<std::vector<BasicTerm>> left_side_vars_to_new_vars(left_side_vars.size());
-            std::vector<std::vector<BasicTerm>> right_side_divisions_to_new_vars(right_side_division.size());
-            for (unsigned i = 0; i < noodle.size(); ++i) {
-                // we add a fresh var for each segment of noodle (TODO: do not make new var if we can replace it from one side by one var)
-                BasicTerm new_var = new_element.add_fresh_var(
-                                                        noodle[i].first, // we assign to it the automaton from the segment
-                                                        std::string("align_") + std::to_string(noodlification_no), // the prefix of the new var
-                                                        // the var is length if the corresponding variable on the left or right is length too
-                                                        new_element.length_sensitive_vars.contains(left_side_vars[noodle[i].second[0]])
-                                                            || new_element.contains_length_var(right_side_division[noodle[i].second[1]]),
-                                                        true);
-                left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
-                right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
-                STRACE(str_nfa, tout << new_var << std::endl << *noodle[i].first;);
-            }
-
-            /* Following the example from before, the following will create these inclusions from the right side divisions:
-             *         t_1 t_2 ⊆ x_4
-             *     t_3 t_4 t_5 ⊆ x_1
-             *             t_6 ⊆ x_5 x_6
-             */
-            std::vector<Predicate> right_side_inclusions = util::create_inclusions_from_multiple_sides(right_side_divisions_to_new_vars, right_side_division);
-            /*
-             * However, we do not add the first two inclusions into the inclusion graph but use them for substitution, i.e.
-             *        substitution_map[x_4] = t_1 t_2
-             *        substitution_map[x_1] = t_3 t_4 t_5
-             * because they are length-aware vars and we only add the inclusion t_6 ⊆ x_5 x_6.
-             * The following function does this and it also add new inclusions/transducers to processing if needed.
-             */
-            std::set<BasicTerm> newly_substituted_vars_from_right = new_element.process_substituting_inclusions_from_right(right_side_inclusions, is_inclusion_to_process_on_cycle);
-
-            /* Following the example from before, the following will create these inclusions from the left side:
-             *           x_1 ⊆ t_1
-             *           x_2 ⊆ t_2 t_3
-             *           x_3 ⊆ t_4
-             *           x_2 ⊆ t_5 t_6
-             */
-             std::vector<Predicate> left_side_inclusions = util::create_inclusions_from_multiple_sides(left_side_division, left_side_vars_to_new_vars);
-             /* Again, we want to use the inclusions for substitutions, but we replace only those variables which were
-             * not substituted yet, so the first inclusion stays (x_1 was substituted from the right side) and the
-             * fourth inclusion stays (as we substitute x_2 using the second inclusion). So from the second and third
-             * inclusion we get:
-             *        substitution_map[x_2] = t_2 t_3
-             *        substitution_map[x_3] = t_4
-             * and we only add inclusions x_1 ⊆ t_1 and t_2 t_3 ⊆ t_5 t_6.
-             * The following function does this and it also add new inclusions/transducers to processing if needed.
-             */
-            std::set<BasicTerm> newly_substituted_vars_from_left = new_element.process_substituting_inclusions_from_left(left_side_inclusions, is_inclusion_to_process_on_cycle);
-
-            // Remove unneccesary variables that were substituted (we do it here, because we the code before depends on the newly substituted vars to be in subtitution_map)
-            new_element.remove_vars(newly_substituted_vars_from_right, initial_variables); // remove unneccesary variables that were substituted
-            new_element.remove_vars(newly_substituted_vars_from_left, initial_variables); // remove unneccesary variables that were substituted
-
-            // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
-            // and if there is no cycle, we do not need to do BFS, the algorithm should end
-            push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
-        }
+        worklist.push_front(std::move(solving_state));
 
         ++noodlification_no; // TODO: when to do this increment?? maybe noodlification_no should be part of SolvingState?
         /********************************************************************************************************/
@@ -1055,7 +988,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {});
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, std::nullopt);
             return l_true;
         } else {
             // preprocessing was not able to solve it

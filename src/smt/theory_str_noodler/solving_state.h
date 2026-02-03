@@ -5,9 +5,12 @@
 #include <deque>
 #include <algorithm>
 #include <functional>
+#include <optional>
+#include <vector>
 
 #include "formula.h"
 #include "aut_assignment.h"
+#include "smt/theory_str_noodler/noodlification_state.h"
 #include "util.h"
 
 namespace smt::noodler {
@@ -37,6 +40,14 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
 
+        // NoodlificationState noodlification_state;
+        std::optional<NoodlificationState> noodlification_state = std::nullopt;
+        std::optional<std::vector<BasicTerm>> left_side_vars = std::nullopt;
+        std::optional<std::vector<BasicTerm>> right_side_vars = std::nullopt;
+        std::optional<std::vector<std::vector<BasicTerm>>> left_side_division = std::nullopt;
+        std::optional<std::vector<std::vector<BasicTerm>>> right_side_division = std::nullopt;
+        bool is_inclusion_to_process_on_cycle = false;
+
         SolvingState() = default;
         SolvingState(AutAssignment aut_ass,
                      std::deque<Predicate> predicates_to_process,
@@ -44,14 +55,16 @@ namespace smt::noodler {
                      std::set<Predicate> transducers,
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
-                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map)
+                     std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
+                     std::optional<NoodlificationState> noodlification_state)
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
                           transducers(transducers),
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
-                          length_sensitive_vars(length_sensitive_vars) {}
+                          length_sensitive_vars(length_sensitive_vars),
+                          noodlification_state(noodlification_state) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
         void push_front_unique(const Predicate &predicate) {

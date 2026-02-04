@@ -2,6 +2,7 @@
 #include <mata/alphabet.hh>
 #include <mata/nfa/algorithms.hh>
 #include <optional>
+#include <ranges>
 
 // Forgive me
 using namespace mata;
@@ -120,8 +121,8 @@ namespace smt::noodler {
         while(1) {
             if (lifo.empty()) return std::nullopt;
 
-            SegItem item = lifo.front();
-            lifo.pop_front();
+            SegItem item = lifo.back();
+            lifo.pop_back();
 
             if(item.seg_id + 1 == segments.size()) {
                 // check if the noodle is already there

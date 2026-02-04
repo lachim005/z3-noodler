@@ -105,12 +105,14 @@ namespace smt::noodler {
         visited_eps = segmentation.get_visited_eps();
     }
     std::optional<mata::applications::strings::seg_nfa::NoodleWithEpsilonsCounter> NoodlificationState::create_next_noodle() {
+        if (!has_more_noodles) return std::nullopt;
         //=======================
         // FROM: noodlify_mult_eps
         //=======================
         if (segments.size() == 1) {
             std::shared_ptr<Nfa> segment = std::make_shared<Nfa>(segments[0]);
             segment->trim();
+            has_more_noodles = false;
             if (segment->num_of_states() > 0) {
                 return {{ {segment, def_eps_vector} }};
             } else {
@@ -119,7 +121,10 @@ namespace smt::noodler {
         }
 
         while(1) {
-            if (lifo.empty()) return std::nullopt;
+            if (lifo.empty()) {
+                has_more_noodles = false;
+                return std::nullopt;
+            }
 
             SegItem item = lifo.back();
             lifo.pop_back();

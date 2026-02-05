@@ -494,11 +494,11 @@ namespace smt::noodler {
     }
 
     bool theory_str_noodler::is_tmp_transducer_eq(app* const ex) {
-        if (this->m_util_s.str.is_replace_all(ex->get_arg(0)) || this->m_util_s.str.is_replace_re_all(ex->get_arg(0))) {
+        if (this->m_util_s.str.is_replace_all(ex->get_arg(0)) || this->m_util_s.str.is_replace_re_all(ex->get_arg(0)) || this->m_util_s.str.is_replace_re(ex->get_arg(0))) {
             expr* rpl = this->predicate_replace.find(ex->get_arg(0));
             return rpl == ex->get_arg(1);
         }
-        if (this->m_util_s.str.is_replace_all(ex->get_arg(1)) || this->m_util_s.str.is_replace_re_all(ex->get_arg(1))) {
+        if (this->m_util_s.str.is_replace_all(ex->get_arg(1)) || this->m_util_s.str.is_replace_re_all(ex->get_arg(1)) || this->m_util_s.str.is_replace_re(ex->get_arg(1))) {
             expr* rpl = this->predicate_replace.find(ex->get_arg(1));
             return rpl == ex->get_arg(0);
         }

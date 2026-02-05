@@ -1069,7 +1069,7 @@ namespace smt::noodler::regex {
             return;
         }
 
-        if (!(m_util_s.str.is_replace_all(ex) || m_util_s.str.is_replace_re_all(ex))) {
+        if (!(m_util_s.str.is_replace_all(ex) || m_util_s.str.is_replace_re_all(ex) || m_util_s.str.is_replace_re(ex))) {
             return;
         }
 
@@ -1087,7 +1087,13 @@ namespace smt::noodler::regex {
         // collect all nested replace_all and replace_re_all and keep their arguments as pairs
         // in find_and_replace (where find can be either zstring for replace_all or NFA for 
         // replace_re_all)
-        std::vector<std::pair<std::variant<zstring,mata::nfa::Nfa>,zstring>> find_and_replace;
+        // std::vector<std::pair<std::variant<zstring,mata::nfa::Nfa>,zstring>> find_and_replace;
+        struct ReplaceInfo {
+            std::variant<zstring,mata::nfa::Nfa> find;
+            zstring replace;
+            mata::applications::strings::replace::ReplaceMode mode;
+        };
+        std::vector<ReplaceInfo> find_and_replace;
         while (true) {
             if (m_util_s.str.is_replace_all(ex, a1, a2, a3)) {
                 zstring find, replace;
@@ -1095,7 +1101,7 @@ namespace smt::noodler::regex {
                     util::throw_error("only replace_all with concrete find&replace is supported");
                 }
 
-                find_and_replace.emplace_back(find, replace);
+                find_and_replace.emplace_back(find, replace, mata::applications::strings::replace::ReplaceMode::All);
                 ex = to_app(a1);
             } else if (m_util_s.str.is_replace_re_all(ex, a1, a2, a3)) {
                 zstring replace;
@@ -1106,7 +1112,18 @@ namespace smt::noodler::regex {
                 // construct NFA corresponding to the regex find
                 mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
-                find_and_replace.emplace_back(find_nfa, replace);
+                find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::All);
+                ex = to_app(a1);
+            } else if (m_util_s.str.is_replace_re(ex, a1, a2, a3)) {
+                zstring replace;
+                if(!m_util_s.str.is_string(a3, replace)) {
+                    util::throw_error("only replace_re with concrete find&replace is supported");
+                }
+
+                // construct NFA corresponding to the regex find
+                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+
+                find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::Single);
                 ex = to_app(a1);
             } else {
                 break;
@@ -1128,20 +1145,21 @@ namespace smt::noodler::regex {
                 auto backward_iterator_old = backward_iterator;
                 ReplaceAllPrefixTree prefix_tree;
                 while (backward_iterator != backward_iterator_end
-                    && std::holds_alternative<zstring>(backward_iterator->first)
-                    && prefix_tree.add_find(std::get<zstring>(backward_iterator->first), backward_iterator->second)) {
+                    && std::holds_alternative<zstring>(backward_iterator->find)
+                    && prefix_tree.add_find(std::get<zstring>(backward_iterator->find), backward_iterator->replace)) {
                         ++backward_iterator;
                 }
 
                 if (backward_iterator != backward_iterator_old) {
                     return mata::nft::reduce(prefix_tree.create_transducer(alph)).trim();
                 } else {
-                    auto& find = backward_iterator->first;
-                    zstring& replace = backward_iterator->second;
+                    const auto& find = backward_iterator->find;
+                    const zstring& replace = backward_iterator->replace;
+                    const mata::applications::strings::replace::ReplaceMode mode = backward_iterator->mode;
                     SASSERT(backward_iterator != backward_iterator_end);
                     mata::nft::Nft result = std::holds_alternative<zstring>(find) ?
-                                                mata::applications::strings::replace::replace_reluctant_literal(util::get_mata_word_zstring(std::get<zstring>(find)), util::get_mata_word_zstring(replace), &alph.get_mata_alphabet())
-                                              : mata::applications::strings::replace::replace_reluctant_regex(mata::nfa::determinize(std::get<mata::nfa::Nfa>(find)), util::get_mata_word_zstring(replace), &alph.get_mata_alphabet());
+                                                mata::applications::strings::replace::replace_reluctant_literal(util::get_mata_word_zstring(std::get<zstring>(find)), util::get_mata_word_zstring(replace), &alph.get_mata_alphabet(), mode)
+                                              : mata::applications::strings::replace::replace_reluctant_regex(mata::nfa::determinize(std::get<mata::nfa::Nfa>(find)), util::get_mata_word_zstring(replace), &alph.get_mata_alphabet(), mode);
                     ++backward_iterator;
                     return mata::nft::reduce(mata::nft::remove_epsilon(result).trim()).trim();
                 }

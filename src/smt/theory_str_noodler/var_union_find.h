@@ -43,7 +43,10 @@ namespace smt::noodler {
      */
     class var_union_find {
 
-        obj_map<expr, obj_hashtable<expr>> un_find;
+        // Map key -> (val -> precise)
+        // precise=true means we trust the (key,val) relation without requiring
+        // e-graph or LIA-based equivalence confirmation in get_equivalence_bt().
+        obj_map<expr, obj_map<expr, bool>> un_find;
         arith_util& m_util_a;
         ast_manager& m;
 
@@ -62,16 +65,24 @@ namespace smt::noodler {
          * @param key Key of the element. Each element @p val has a key (e.g., 
          * length term) that is then used for equivalence class merging.
          * @param val Value (variable) associated with the key.
+         * @param precise If true, the (key,val) relation is considered precise
          */
-        void add(const expr_ref& key, const expr_ref& val) {
+        void add(const expr_ref& key, const expr_ref& val, bool precise = true) {
             m_pinned.push_back(key);
             m_pinned.push_back(val);
 
-            obj_hashtable<expr> found;
-            if(this->un_find.find(key, found)) {
-                this->un_find[key].insert(val);
-            } else {
-                found.insert(val);
+            obj_map<expr, bool> found;
+            if (this->un_find.find(key, found)) {
+                bool already_precise = false;
+                if (this->un_find[key].find(val, already_precise)) {
+                    this->un_find[key].insert(val, already_precise || precise);
+                }
+                else {
+                    this->un_find[key].insert(val, precise);
+                }
+            }
+            else {
+                found.insert(val, precise);
                 this->un_find.insert(key, found);
             }
 
@@ -90,7 +101,7 @@ namespace smt::noodler {
         /**
          * @brief Get the equivalence classes
          */
-        const obj_map<expr, obj_hashtable<expr>>& get_equivalence() const {
+        const obj_map<expr, obj_map<expr, bool>>& get_equivalence() const {
             return this->un_find;
         }
 
@@ -109,21 +120,20 @@ namespace smt::noodler {
             for (const auto& t : this->un_find) {
                 int len = key_to_value.at(t.m_key);
 
-                ctx.ensure_internalized(t.m_key);
-                enode* key_n = ctx.find_enode(t.m_key);
-                if (!key_n) {
-                    continue;
-                }
+                // Internalize key lazily only if we need equivalence checks.
+                enode* key_n = nullptr;
 
                 // Basic term in the equivalence class
                 std::set<BasicTerm> st;
                 for (const auto& s : t.m_value) {
+                    expr* var = s.m_key;
+                    bool precise = s.m_value;
                     // we consider only variables (not concatenation or other complex terms)
                     // therefore, s = variable
-                    if(!is_app(s) || to_app(s)->get_num_args() != 0) {
+                    if(!is_app(var) || to_app(var)->get_num_args() != 0) {
                         continue;
                     }
-                    BasicTerm bvar = util::get_variable_basic_term(s);
+                    BasicTerm bvar = util::get_variable_basic_term(var);
                     if (len != -1 && len > 1) {
                         std::set<std::pair<int, int>> aut_constr = mata::applications::strings::get_word_lengths(*aut_ass.at(bvar));
                         if (aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
@@ -131,8 +141,23 @@ namespace smt::noodler {
                         }
                     }
 
+                    // If the relation is marked precise, we accept it without
+                    // e-graph root comparison or LIA fallback.
+                    if (precise) {
+                        st.insert(bvar);
+                        continue;
+                    }
+
+                    if (!key_n) {
+                        ctx.ensure_internalized(t.m_key);
+                        key_n = ctx.find_enode(t.m_key);
+                        if (!key_n) {
+                            continue;
+                        }
+                    }
+
                     // create a term |s|
-                    expr_ref len_term(m_util_s.str.mk_length(s), ctx.get_manager());
+                    expr_ref len_term(m_util_s.str.mk_length(var), ctx.get_manager());
                     ctx.ensure_internalized(len_term);
                     enode* n = ctx.find_enode(len_term);
                     if (!n) {
@@ -148,7 +173,8 @@ namespace smt::noodler {
                             ast_manager& m = ctx.get_manager();
                             expr_ref neq(m.mk_not(m.mk_eq(t.m_key, len_term)), m);
                             lia_solver.initialize(ctx);
-                            lia_implies_eq = (lia_solver.check_sat(neq) == l_false);
+                            lbool res = lia_solver.check_sat(neq);
+                            lia_implies_eq = (res == l_false);
                         }
                         if (!lia_implies_eq) {
                             continue;

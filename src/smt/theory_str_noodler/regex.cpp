@@ -1084,9 +1084,9 @@ namespace smt::noodler::regex {
             }
         }
 
-        // collect all nested replace_all and replace_re_all and keep their arguments as pairs
+        // collect all nested replace_all/replace_re/replace_re_all and keep their arguments as pairs
         // in find_and_replace (where find can be either zstring for replace_all or NFA for 
-        // replace_re_all)
+        // replace_re/replace_re_all)
         struct ReplaceInfo {
             std::variant<zstring,mata::nfa::Nfa> find;
             zstring replace;

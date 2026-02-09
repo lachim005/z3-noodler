@@ -1,7 +1,0 @@
-(set-logic QF_S)
-(set-info :status unsat)
-(declare-const d String)
-(assert (= 0 (str.to_code (str.at (str.replace_all d "@" "") 0))))
-(assert (= 0 (str.to_code (str.at (str.replace_all d "." "") 0))))
-(assert (str.in_re d (re.* (re.union (str.to_re "@") (str.to_re ".") (str.to_re "a")))))
-(check-sat)

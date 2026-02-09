@@ -5659,36 +5659,16 @@ br_status seq_rewriter::mk_eq_core(expr * l, expr * r, expr_ref & result) {
     }
 #endif
 
-    // str.at ... = str where |str| > 1 --> false
-    if(zstring val; str().is_at(l) && str().is_string(r, val) && val.length() > 1) {
-        result = m().mk_false(); 
-        return BR_DONE;
-    }
-
-    // "a".x.u = x.w (where "a" is string of size 1) -> x in a* && "a".u = w
-    auto check_eq = [this](expr* l, expr* r, expr_ref& result) {
-        m_lhs.reset();
-        m_rhs.reset();
-        str().get_concat(l, m_lhs);
-        str().get_concat(r, m_rhs);
-        if (zstring val; m_lhs.size() >= 2 && str().is_string(m_lhs.get(0), val) && val.length() == 1 && !m_rhs.empty() && m_rhs.get(0) == m_lhs.get(1)) {
-            expr_ref in(re().mk_in_re(m_rhs.get(0), re().mk_star(re().mk_to_re(m_lhs.get(0)))), m());
-            m_lhs.erase(1);
-            m_rhs.erase(0u);
-            expr_ref lhs(str().mk_concat(m_lhs, m_lhs[0]->get_sort()), m());
-            expr_ref rhs(str().mk_concat(m_rhs, m_rhs[0]->get_sort()), m());
-            result = m().mk_and(in, m().mk_eq(lhs, rhs));
-            return true;
-        }
-        return false;
-    };
-    if (check_eq(l, r, result) || check_eq(r, l, result)) {
-        return BR_REWRITE3;
-    }
-
     if (!reduce_eq(l, r, new_eqs, changed)) {
         result = m().mk_false();
         TRACE(seq_verbose, tout << result << "\n";);
+        return BR_DONE;
+    }
+
+    // str.at ... = str where |str| > 1 --> false
+    zstring val;
+    if(str().is_at(l) && str().is_string(r, val) && val.length() > 1) {
+        result = m().mk_false(); 
         return BR_DONE;
     }
     if (!changed) {

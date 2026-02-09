@@ -1057,7 +1057,8 @@ namespace smt::noodler {
                     // t>=0 -> |x2| = n (not completely needed, helps z3)
                     add_axiom({~i_ge_0, ~i_le_ls, ~t_ge_0, mk_eq(m_util_s.str.mk_length(x2), n, false)});
                     // |x1| = t (we do not need to put it in an axiom, we will have that |x| = i later from which |x1| = t follows)
-                    this->var_eqs.add(expr_ref(t, m), x1, false); // equivalence might not be precise (we need to check whether the equivalence holds in final_check)
+                    this->var_eqs.add(expr_ref(t, m), x1, false); // equivalence might not be precise (we need to check whether the equivalence holds in final_check).
+                    // It is not precise because for t < 0 the equivalence does not hold
                 }
             }
 
@@ -1084,6 +1085,7 @@ namespace smt::noodler {
         add_axiom({~i_ge_0, ~i_le_ls, ls_ge_l_plus_i, mk_eq(lv, mk_sub(ls, i), false)});
         // remember l=|v|
         this->var_eqs.add(expr_ref(l, m), v, false); // equivalence might not be precise (we need to check whether the equivalence holds in final_check)
+        // It is not precise because in case where l > |s|-i, the length of v is |s|-i (not l).
 
         // We also need to put v in length variables, but not always. For this we nned to have y created.
 

@@ -113,8 +113,6 @@ namespace smt::noodler {
          */
         BasicTermEqiv get_equivalence_bt(const AutAssignment& aut_ass, smt::context& ctx, seq_util& m_util_s) const {
             std::vector<std::set<BasicTerm>> ret;
-            // enodes are sometimes not precise (they do not relate terms to 
-            // the same equivalence class even though they are indeed equivalent).
             int_expr_solver lia_solver(ctx.get_manager(), ctx.get_fparams());
 
             for (const auto& t : this->un_find) {
@@ -166,6 +164,8 @@ namespace smt::noodler {
 
                     // key and s are not in the same equivalence class. We try to resolve using LIA solver.
                     if (key_n->get_root() != n->get_root()) {
+                        // enodes are sometimes not precise (they do not relate terms to 
+                        // the same equivalence class even though they are indeed equivalent).
                         // Fallback: if key != |s| is UNSAT in the current arithmetic context,
                         // then key and |s| are equivalent even if the e-graph didn't merge them.
                         bool lia_implies_eq = false;

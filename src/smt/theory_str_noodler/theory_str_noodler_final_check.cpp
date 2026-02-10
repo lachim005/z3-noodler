@@ -255,7 +255,7 @@ namespace smt::noodler {
             this->statistics.at("stabilization").num_solved_preprocess++;
             // If the instance is both length unsatisfiable and unsatisfiable from preprocessing,
             // we want to kill it after preprocessing as it generates stronger theory lemma (negation of the string part).
-            lbool result = main_dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
+            lbool result = main_dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment, ctx, m_util_s));
             if (result == l_false) {
                 block_curr_len(expr_ref(m.mk_false(), m), false, true);
             } else {
@@ -289,7 +289,7 @@ namespace smt::noodler {
         dec_proc = std::move(main_dec_proc);
 
         STRACE(str, tout << "Starting preprocessing" << std::endl);
-        lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment));
+        lbool result = dec_proc->preprocess(PreprocessType::PLAIN, this->var_eqs.get_equivalence_bt(aut_assignment, ctx, m_util_s));
         if (result == l_false) {
             this->statistics.at("stabilization").num_solved_preprocess++;
             STRACE(str, tout << "Unsat from preprocessing" << std::endl);
@@ -737,8 +737,9 @@ namespace smt::noodler {
     lbool theory_str_noodler::solve_underapprox(const Formula& instance, const AutAssignment& aut_assignment,
                                                 const std::unordered_set<BasicTerm>& init_length_sensitive_vars,
                                                 std::vector<TermConversion> conversions) {
+        context& ctx = get_context();
         dec_proc = std::make_shared<DecisionProcedure>(instance, aut_assignment, init_length_sensitive_vars, m_params, conversions, m);
-        if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment)) == l_false) {
+        if (dec_proc->preprocess(PreprocessType::UNDERAPPROX, this->var_eqs.get_equivalence_bt(aut_assignment, ctx, m_util_s)) == l_false) {
             return l_undef;
         }
 

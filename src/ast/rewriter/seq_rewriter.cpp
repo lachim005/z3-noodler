@@ -2312,6 +2312,10 @@ br_status seq_rewriter::mk_seq_replace_re_all(expr* a, expr* b, expr* c, expr_re
 }
 
 br_status seq_rewriter::mk_seq_replace_re(expr* a, expr* b, expr* c, expr_ref& result) {
+    if (m().is_true(is_nullable(b))) {
+        result = str().mk_concat(c, a);
+        return BR_REWRITE1;
+    }
     return replace_re_version(a, b, c, result, false);
 }
 

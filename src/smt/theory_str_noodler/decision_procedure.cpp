@@ -552,12 +552,11 @@ namespace smt::noodler {
         std::set<BasicTerm> length_input_vars;
         for (auto trans_iter = solution.transducers.begin(); trans_iter != solution.transducers.end();) {
             if (solution.contains_length_var(trans_iter->get_input())) {
+                // transducers in solution should be in simple form (one input, one output var)
                 SASSERT(trans_iter->get_input().size() == 1);
                 SASSERT(trans_iter->get_output().size() == 1);
-
                 BasicTerm input_var = trans_iter->get_input()[0];
                 BasicTerm output_var = trans_iter->get_output()[0];
-
                 SASSERT(solution.length_sensitive_vars.contains(input_var));
                 SASSERT(solution.length_sensitive_vars.contains(output_var)); // if input is length var, output must be too
 

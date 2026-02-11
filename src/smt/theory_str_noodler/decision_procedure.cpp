@@ -1325,6 +1325,377 @@ namespace smt::noodler {
                 tout << std::endl;
             }
         );
+
+                //Look for all egdes in the inclusion graph
+        vector<vector<Predicate>> graph_edges;
+        vector<vector<int>> adjacency_list;
+        for (unsigned i = 0; i < solution.inclusions.size(); i++) {
+            adjacency_list.push_back({});
+        }
+        int idx = 0;
+        for (Predicate incl : solution.inclusions) {
+            //Look throught all variable in the left side of the inclusion
+            for(BasicTerm term :  incl.get_side_vars(Predicate::EquationSideType::Left) ){
+                find_graph_edges(incl, idx, term, &graph_edges, &adjacency_list, true);
+            }
+            //Look throught all variable in the left side of the inclusion
+            for(BasicTerm term :  incl.get_side_vars(Predicate::EquationSideType::Right) ){
+                find_graph_edges(incl, idx, term, &graph_edges, &adjacency_list, false);
+            }
+            idx++;
+        }
+        //Find all SCC inclusions
+        idx = 0;
+        for(vector<int> x : adjacency_list){
+                std::cout << "Adjacency - " << idx << " = " << x << std::endl;
+                idx++;
+        }
+        vector<vector<Predicate>> scc = findSCC(solution.inclusions.size(), &adjacency_list);
+                       
+        regex::Alphabet alph(solution.aut_ass.get_alphabet());
+
+        //solve all SCC
+        for(vector<Predicate> scc_list : scc){
+            if(scc_list.size() > 1)
+            {
+                vector<Atom> left_side;
+                vector<Atom> right_side;
+
+                // T
+                std::set<Atom> T;
+                int T_max_size = 0;
+
+                // v
+                std::map<BasicTerm, mata::Word> scc_solution;
+
+                //shortest words
+                std::map<BasicTerm, std::set<mata::Word>> vars_shortest_words = find_shortest_words(scc_list);
+                
+                std::cout << "Creating atom equations!" << std::endl;
+                //create atom equations
+                for(Predicate incl: scc_list){
+                    //Add # symbol
+                    for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Left)){ 
+                        //is var
+                        unsigned var_length = 0;
+                        std::set<mata::Word> words;
+                        auto it = vars_shortest_words.find(var);
+                        if (it != vars_shortest_words.end())
+                            words = it->second;
+                        if(var.is_variable())
+                                var_length = alph.get_string_from_mata_word(*words.begin()).length();
+                        //is literal
+                        else{
+                            var_length = var.get_name().length();
+                            //add literal to solution
+                            if(!scc_solution.count(var)){
+                                scc_solution[var] = util::get_mata_word_zstring(var.get_name());
+                                T_max_size += var_length;
+                            }
+                        }
+                        for(unsigned idx = 0; idx < var_length; idx++){
+                            Atom a(var,idx);
+                            left_side.push_back(a);
+                        } 
+                    }
+                    for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
+                        //is var
+                        unsigned var_length = 0;
+                        std::set<mata::Word> words;
+                        auto it = vars_shortest_words.find(var);
+                        if (it != vars_shortest_words.end())
+                            words = it->second;
+                        if(var.is_variable())
+                                var_length = alph.get_string_from_mata_word(*words.begin()).length();
+                        //is literal
+                        else{
+                            var_length = var.get_name().length();
+                            if(!scc_solution.count(var)){
+                                scc_solution[var] = util::get_mata_word_zstring(var.get_name());
+                                T_max_size += var_length;
+                            }
+                        }
+                        for(unsigned idx = 0; idx < var_length; idx++){
+                            Atom a(var,idx);
+                            right_side.push_back(a);
+                        }
+                    }
+                }
+                
+                //assign random words to v
+                for (auto const& [var, words] : vars_shortest_words) {
+                    if (!words.empty()){
+                        scc_solution[var] = *words.begin(); 
+                        T_max_size += alph.get_string_from_mata_word(*words.begin()).length();
+                    }
+                }
+
+                std::cout << "Random Assigment!" << std::endl;
+                for(auto const& [var, word] : scc_solution)
+                {
+                    std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                }
+                std::cout << "Looking for words!" << std::endl;
+                
+                //find correct words
+                while(T.size() < T_max_size){
+                    //leftmost half full
+                    int left_most_index = -1;
+                    for (int i = 0; i < left_side.size(); i++) {
+                        if (isHalfFull(left_side, right_side, i, T))
+                        {
+                            left_most_index = i;
+                            break;
+                        }
+                    }
+                    //std::cout << "Left_most = "<< left_most_index << std::endl;
+
+                    if (left_most_index != -1) {
+                        // Lemma 4
+                        Atom add_atom = right_side[0];
+                        bool left_side_atom = true;
+                        if(T.count(left_side[left_most_index]))
+                            add_atom = right_side[left_most_index];
+                        else{
+                            add_atom = left_side[left_most_index];
+                            left_side_atom = false;
+                        }
+                        
+                        //perform algoritm
+                        get_assignment(left_most_index, left_side_atom, left_side, right_side,
+                                        &scc_solution, &T);
+                        
+                        // aktualizuj T
+                        T.insert(add_atom);
+
+                    } else {
+                        // Lemma 3
+                        for (unsigned pos = 0; pos < left_side.size(); pos++) {
+                            if (!T.count(left_side[pos])) {
+                                //std::cout << "Adding " << left_side[pos].var.get_name() << "," << left_side[pos].index << std::endl;
+                                T.insert(left_side[pos]);
+                                break;
+                            }
+                            if (!T.count(right_side[pos])) {
+                                //std::cout << "Adding " << left_side[pos].var.get_name() << "," << left_side[pos].index << std::endl;
+                                T.insert(right_side[pos]);
+                                break;
+                            }
+                        }
+                    }                   
+                }
+                std::cout << "SCC all" << std::endl;
+
+                std::cout << "Var Assigment!" << std::endl;
+                for(auto const& [var, word] : scc_solution)
+                {
+                    std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                    if(var.is_variable()){
+                        update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
+                    }
+                }
+            }
+        }   
+    }
+
+    void DecisionProcedure::get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
+    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T){
+        
+        Atom missing_atom = missing_left ? left_side[p] : right_side[p];
+        
+        // var that would be changed
+        BasicTerm changed_var = missing_atom.var;
+
+        //get word from opposite side
+        vector<Atom> opposite_side = missing_left ? right_side : left_side;
+        mata::Word opposite_word;
+
+        for (const auto atom : opposite_side) {
+            //concat word
+            const mata::Word& word = (*scc_solution)[atom.var];
+            opposite_word.push_back(word[atom.index]);
+        }
+        
+        //get word for var (change scc_solution)
+        int start_in_pattern = p - missing_atom.index;
+        int var_lenght = (*scc_solution)[changed_var].size(); 
+
+        mata::Word new_word_for_var;
+        for (int i = 0; i < var_lenght; i++) {
+            new_word_for_var.push_back(opposite_word[start_in_pattern + i]);
+        }
+        (*scc_solution)[changed_var] = new_word_for_var;
+
+        //remove atoms from T  
+        auto it = T->begin();
+        while (it != T->end()) {
+            if (it->var == changed_var && it->index > missing_atom.index)
+                it = T->erase(it);
+            else
+                ++it;
+        }
+    }
+
+    bool DecisionProcedure::isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T)
+    {
+        bool is_left_atom = T.count(left_side[idx]);
+        bool is_right_atom = T.count(right_side[idx]);
+        //std::cout << "Check halffull " << idx << " - " << is_left_atom << "," << is_right_atom << std::endl;
+        if((is_left_atom && !is_right_atom) || (!is_left_atom && is_right_atom))
+            return true;
+        else
+            return false;
+    }
+
+    std::map<BasicTerm, std::set<mata::Word>> DecisionProcedure::find_shortest_words(vector<Predicate> scc_list)
+    {
+        //return var
+        std::map<BasicTerm, std::set<mata::Word>> res_map;
+
+        regex::Alphabet alph(solution.aut_ass.get_alphabet());
+        //Get shortest words for every var in scc
+        std::cout << "Predicate SCC:" << std::endl;
+        for(Predicate incl: scc_list){
+            std::cout << "\t" << incl << std::endl;
+
+            //Get words from left side
+            for(BasicTerm var: incl.get_side_vars(Predicate::EquationSideType::Left)){           
+                if(res_map.count(var) == 0) 
+                {
+                    const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
+                    std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
+                    std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
+
+                    for(mata::Word w: words){
+                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
+                    }
+                    //add result to ans
+                    res_map.insert({var, words});
+                }
+            }
+            //Get words from right side
+            for(BasicTerm var: incl.get_side_vars(Predicate::EquationSideType::Right)){
+                if(res_map.count(var) == 0) 
+                {
+                    const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
+                    std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
+                    std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
+                    for(mata::Word w: words){
+                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
+                    }
+                    // add result to ans
+                    res_map.insert({var, words});
+                }
+            }
+        }
+        return res_map;
+    } 
+    
+    void DecisionProcedure::find_graph_edges(Predicate input_inclusion, int inclIdx, BasicTerm checked_term, vector<vector<Predicate>> *graph_edges,
+                                             vector<vector<int>> *adjacency_list, bool inclusion_side){
+        //Look throught all inclusions for variable matches
+        int idx = 0;
+        for(Predicate incl : solution.inclusions){
+            //if(incl == input_inclusion) continue;
+            std::set<BasicTerm> checked_side;
+            //Choose with side of the inclusion check
+            //Left
+            if(inclusion_side)
+                checked_side = incl.get_side_vars(Predicate::EquationSideType::Right);
+            //Right
+            else
+                checked_side = incl.get_side_vars(Predicate::EquationSideType::Left);
+            if(checked_side.find(checked_term) != checked_side.end()){
+
+                vector<Predicate> edge = {input_inclusion, incl};
+                //Check if the edge is already added
+                int cnt = 0;
+                for(auto edgeC : *graph_edges){
+                    if(edgeC == edge)
+                    cnt++;
+                }
+                if(cnt == 0)
+                {
+                    //Add new edge into the vector
+                    graph_edges->push_back(edge);
+                    //Add new adjacency at idx
+                    (*adjacency_list)[idx].push_back(inclIdx);
+                }
+            }
+            //increment idx
+            idx++;
+        }
+    }
+
+    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis)
+    {
+        // If curr node is destination return true
+        if (curr == des) {
+            return true;
+        }
+        //Loop throught all reachable verticles
+        (*vis)[curr] = 1;
+        for (int x : (*adj)[curr]) {
+            if (!(*vis)[x]) {
+                if (dfs(x, des, adj, vis)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool isPath(int src, int des, vector<vector<int>> *adj)
+    {
+        vector<int> vis(adj->size(), 0);
+        return dfs(src, des, adj, &vis);
+    }
+
+    vector<vector<Predicate>> DecisionProcedure::findSCC(int n, vector<vector<int>> *adjacency_list)
+    {
+        vector<vector<Predicate>> predicate_ans;
+        // Stores all the strongly connected components.
+        vector<vector<int> > ans;
+        // Stores whether a vertex is a part of any Strongly
+        // Connected Component
+        vector<int> is_scc(n, 0);
+        int i = 0;
+        for(Predicate p: solution.inclusions){
+            //Check if the is part of scc
+            if (!is_scc[i]) 
+            {
+                vector<int> scc;
+                scc.push_back(i);
+                vector<Predicate> scc_predicate;
+                scc_predicate.push_back(p);
+                //Check for all scc verticles
+                int j = 0;
+                for (Predicate pr: solution.inclusions){
+                    if(j <= i){
+                        j++;
+                        continue;
+                    }
+                    //If there is an edge from p1 -> p2 and p2 -> p1
+                    bool path1 = isPath(i, j, adjacency_list);
+                    bool path2 = isPath(j, i, adjacency_list);
+                    //std::cout << "path - " << path1 << "," << path2 << std::endl;
+                    if (!is_scc[j] && path1 && path2){
+                        is_scc[j] = 1;
+                        scc.push_back(j);
+                        scc_predicate.push_back(pr);
+                    }
+                    j++;
+                }
+                ans.push_back(scc);
+                predicate_ans.push_back(scc_predicate);
+            }
+            i++;
+        }
+        for(vector<int> scc_list : ans){
+            std::cout << "SCC:" << std::endl;
+            std::cout << scc_list << std::endl;
+        }
+        return predicate_ans;
     }
 
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {

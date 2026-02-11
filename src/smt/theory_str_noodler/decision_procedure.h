@@ -314,6 +314,35 @@ namespace smt::noodler {
          */
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
+        //SCC helper functions
+        void find_graph_edges(Predicate input_inclusion, int inclIdx, BasicTerm checked_term, vector<vector<Predicate>> *graph_edges,
+                                vector<vector<int>> *adjacency_list, bool inclusion_side);
+        vector<vector<Predicate> > findSCC(int n, vector<vector<int>> *adjacency_list);
+
+        //struct for atoms in cycled inclusions
+        struct Atom {
+            BasicTerm var;
+            int index;
+
+            bool operator==(const Atom& other) const {
+                return var == other.var && index == other.index;
+            }
+
+            bool operator<(const Atom& other) const {
+                if (var < other.var) return true;
+                if (other.var < var) return false;
+                return index < other.index;
+            }
+        };
+
+        void get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
+                    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
+
+        //get shortest words of all vars in scc 
+        std::map<BasicTerm, std::set<mata::Word>> find_shortest_words(vector<Predicate> scc_list);    
+        
+        bool isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T);
+
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;
         // vars for which we already called get_model() at least once (used for cyclicity detection, will be removed when get_model() can handle cycles in inclusions)

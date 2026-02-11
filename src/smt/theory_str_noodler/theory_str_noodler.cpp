@@ -617,6 +617,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::push_scope_eh() {
+        theory::push_scope_eh();
         m_scope_level += 1;
         m_word_eq_todo.push_scope();
         m_lang_eq_todo.push_scope();
@@ -648,6 +649,8 @@ namespace smt::noodler {
         }
         STRACE(str,
             tout << "pop_scope: " << num_scopes << " (back to level " << m_scope_level << ")\n";);
+
+        theory::pop_scope_eh(num_scopes);
     }
     
     void theory_str_noodler::restart_eh() {
@@ -655,7 +658,7 @@ namespace smt::noodler {
     }
 
     void theory_str_noodler::reset_eh() {
-        // FIXME should here be something?
+        theory::reset_eh();
         STRACE(str, tout << "reset" << '\n';);
     }
 

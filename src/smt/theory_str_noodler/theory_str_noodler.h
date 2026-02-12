@@ -64,7 +64,7 @@ namespace smt::noodler {
          */
         struct stored_instance {
             expr_ref lengths; // length formula 
-            bool initial_length; // was the length formula obtained from the initial length checking?
+            bool is_overapprox; // is the formula an overapproximation? (obtained from initial or premature length checking)
             // TODO we could also keep here the decision procedure and immediately get the model when loop protection gets sat
         };
 
@@ -487,11 +487,11 @@ namespace smt::noodler {
          * 
          * @param len_formula Length formula corresponding to the current instance
          * @param add_axiomatized Add item to the vector of axiomatized instances (for the loop protection)
-         * @param init_lengths Was the length formula obtained from the initial length checking (for the fool protection)
+         * @param is_overapprox Was the length formula obtained from the initial or premature length checking (for the loop protection)
          * 
          * TODO explain better
          */
-        void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool init_lengths = false);
+        void block_curr_len(expr_ref len_formula, bool add_axiomatized = true, bool is_overapprox = false);
 
         /**
          * @brief Checks if the current instance is suitable for Nielsen decision procedure.

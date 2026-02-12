@@ -854,13 +854,13 @@ namespace smt::noodler {
         return expr_ref(refinement, m);
     }
 
-    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool init_lengths) {
+    void theory_str_noodler::block_curr_len(expr_ref len_formula, bool add_axiomatized, bool is_overapprox) {
         STRACE(str_block, tout << __LINE__ << " enter " << __FUNCTION__ << std::endl;);
 
         expr_ref refinement = construct_refinement();
 
         if(m_params.m_loop_protect && add_axiomatized) {
-            this->axiomatized_instances.push_back({refinement, stored_instance{ .lengths = len_formula, .initial_length = init_lengths}});
+            this->axiomatized_instances.push_back({refinement, stored_instance{ .lengths = len_formula, .is_overapprox = is_overapprox}});
         }
         if (refinement != nullptr) {
             add_axiom(m.mk_or(m.mk_not(refinement), len_formula));
@@ -1116,21 +1116,21 @@ namespace smt::noodler {
         if (refine != nullptr) {
             bool found = false;
             /**
-             * Variable denoting that the only stored instance in @p axiomatized_instances was obtained by unsat from initial lengths. In that case
-             * if we get SAT from lengths, we do not surely know if it is indeed sat and we need to call the decision procedure again (now it
+             * Variable denoting that the only stored instance in @p axiomatized_instances was obtained by unsat from initial lengths or premature LIA checks.
+             * In that case if we get SAT from lengths, we do not surely know if it is indeed sat and we need to call the decision procedure again (now it
              * should proceed to the main decision procedure and obtain lengths different from the initial assignment).
              */
-            bool init_only = true;
+            bool overapprox_only = true;
             expr_ref len_formula(this->m);
 
             for (const auto &pr : this->axiomatized_instances) {
                 if (pr.first == refine) {
                     len_formula = pr.second.lengths;
-                    init_only = init_only && pr.second.initial_length;
+                    overapprox_only = overapprox_only && pr.second.is_overapprox;
                     found = true;
                     STRACE(str,
                         tout << "loop-protection: found ";
-                        if (pr.second.initial_length) { tout << "(init) "; }
+                        if (pr.second.is_overapprox) { tout << "(overapprox) "; }
                         tout << std::endl;);
 
                     // We need to force the LIA solver to find another solution, because adding block_curr_len(len_formula) is not sufficient for SAT solver to get another solution
@@ -1157,7 +1157,7 @@ namespace smt::noodler {
                     }
                 }
             }
-            if (found && !init_only) {
+            if (found && !overapprox_only) {
                 /**
                  * If all stored items are SAT and the lengths were obtained from the main decision
                  * procedure --> it is safe to say SAT.

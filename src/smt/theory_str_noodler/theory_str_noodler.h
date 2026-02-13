@@ -204,7 +204,7 @@ namespace smt::noodler {
         void pop_scope_eh(unsigned num_scopes) override;
         void restart_eh() override;
         void reset_eh() override;
-        final_check_status final_check_eh() override;
+        final_check_status final_check_eh(unsigned level) override;
         model_value_proc *mk_value(enode *n, model_generator& mg) override;
         void init_model(model_generator& m) override;
         void finalize_model(model_generator& mg) override;

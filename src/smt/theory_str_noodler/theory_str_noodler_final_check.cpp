@@ -36,7 +36,7 @@ namespace smt::noodler {
      *        - iteratively running the decision procedure until a satisfiable solution and length constraint is found or until
      *          it finishes wihtout result
      */
-    final_check_status theory_str_noodler::final_check_eh() {
+    final_check_status theory_str_noodler::final_check_eh(unsigned) {
         TRACE(str, tout << "final_check starts" << std::endl;);
 
         if (last_run_was_sat) {

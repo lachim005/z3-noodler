@@ -79,11 +79,7 @@ struct smt_params : public preprocessor_params,
                     public theory_arith_params,
                     public theory_array_params,
                     public theory_bv_params,
-<<<<<<< HEAD
-                    public theory_str_params,
                     public theory_str_noodler_params,
-=======
->>>>>>> master
                     public theory_seq_params,
                     public theory_pb_params,
                     public theory_datatype_params {

@@ -108,8 +108,11 @@ namespace smt {
         void setup_mi_arith();
         void setup_lra_arith();
         void setup_fpa();
+<<<<<<< HEAD
         void setup_str();
         void setup_str_noodler();
+=======
+>>>>>>> master
         void setup_relevancy(static_features& st);
 
     public:

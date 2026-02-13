@@ -228,11 +228,11 @@ public:
             TRACE(smt_tactic, tout << r << " " << pr << "\n";);
 
             // check underapproximation
-            if(r == l_false && m_ctx->get_context().get_fparams().is_underapprox) {
+            if(r == l_false && m_ctx.load()->get_context().get_fparams().is_underapprox) {
                 r = l_undef;
             }
             // check overapproximation
-            if(r == l_true && m_ctx->get_context().get_fparams().is_overapprox) {
+            if(r == l_true && m_ctx.load()->get_context().get_fparams().is_overapprox) {
                 r = l_undef;
             }
 

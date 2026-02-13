@@ -14,15 +14,47 @@
 
 namespace smt::noodler {
     lbool DecisionProcedure::compute_next_solution() {
+        // We call the one with length checks but don't check them
+        return compute_next_solution_with_len_checks(nullptr).first;
+    }
+
+    std::pair<lbool, bool> DecisionProcedure::compute_next_solution_with_len_checks(std::function<lbool()> check_lens) {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE(str, tout << "------------------------"
                            << "Getting another solution"
                            << "------------------------" << std::endl;);
 
+        bool len_checks_enabled = check_lens != nullptr &&
+                                  m_params.m_try_premature_len_checks &&
+                                  !conversion_handler.are_there_any_conversions() &&
+                                  disequations.get_predicates().empty() &&
+                                  not_contains.get_predicates().empty();
+        bool some_skipped = false;
+
         while (!is_worklist_empty()) {
             util::check_limit(m);
             SolvingState element_to_process = pop_from_worklist();
+
+            if (len_checks_enabled &&
+                !element_to_process.predicates_to_process.empty() &&
+                element_to_process.transducers.empty() &&
+                element_to_process.has_siblings) {
+                // Before processing this solving state, we check the
+                // length constraints first to potentionally save some time if it is unsat
+                this->solution = element_to_process;
+                auto lens_sat = check_lens();
+
+                STRACE(str_noodle_dot,
+                    tout << element_to_process.DOT_name << " [style=filled,fillcolor=\"" << ((lens_sat == l_true) ? "springGreen" : "salmon") << "\"];\n";
+                );
+
+                if (lens_sat == l_false) {
+                    // Lengths were unsat, we don't have to process this solving state
+                    some_skipped = true;
+                    continue;
+                }
+            }
 
             if (element_to_process.predicates_to_process.empty()) {
                 // we found another solution, element_to_process contain the automata
@@ -49,7 +81,7 @@ namespace smt::noodler {
                     }
                 );
                 STRACE(str_noodle_dot, tout << solution.DOT_name << " [style=filled,fillcolor=\"aqua\"];\n";);
-                return l_true;
+                return { l_true, some_skipped };
             }
 
             // we will now process one inclusion from the inclusion graph which is at front
@@ -67,7 +99,7 @@ namespace smt::noodler {
 
         // there are no solving states left, which means nothing led to solution -> it must be unsatisfiable
         STRACE(str_noodle_dot, tout << "}\n";);
-        return l_false;
+        return { l_false, some_skipped };
     }
 
     void DecisionProcedure::process_inclusion(const Predicate& inclusion_to_process, SolvingState& solving_state) {
@@ -198,6 +230,7 @@ namespace smt::noodler {
                                                                     right_side_automata,
                                                                     false,
                                                                     {{"reduce", "forward"}});
+        bool more_than_one_noodle = noodles.size() > 1;
 
         for (const auto &noodle : noodles) {
             util::check_limit(m);
@@ -272,6 +305,7 @@ namespace smt::noodler {
 
             // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
             // and if there is no cycle, we do not need to do BFS, the algorithm should end
+            new_element.has_siblings = more_than_one_noodle;
             push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
         }
 
@@ -1055,7 +1089,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {});
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, false);
             return l_true;
         } else {
             // preprocessing was not able to solve it

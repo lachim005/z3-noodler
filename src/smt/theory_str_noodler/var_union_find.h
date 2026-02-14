@@ -71,8 +71,7 @@ namespace smt::noodler {
             m_pinned.push_back(key);
             m_pinned.push_back(val);
 
-            obj_map<expr, bool> found;
-            if (this->un_find.find(key, found)) {
+            if (this->un_find.contains(key)) {
                 bool already_precise = false;
                 if (this->un_find[key].find(val, already_precise)) {
                     this->un_find[key].insert(val, already_precise || precise);
@@ -82,6 +81,7 @@ namespace smt::noodler {
                 }
             }
             else {
+                obj_map<expr, bool> found;
                 found.insert(val, precise);
                 this->un_find.insert(key, found);
             }

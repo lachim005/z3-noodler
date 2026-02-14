@@ -208,7 +208,6 @@ namespace smt::noodler {
         model_value_proc *mk_value(enode *n, model_generator& mg) override;
         void init_model(model_generator& m) override;
         void finalize_model(model_generator& mg) override;
-        lbool validate_unsat_core(expr_ref_vector& unsat_core) override;
 
         /**
          * @brief Collect statistics (called at the end of the run)

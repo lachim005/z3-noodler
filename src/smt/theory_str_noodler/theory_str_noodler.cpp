@@ -662,10 +662,6 @@ namespace smt::noodler {
         STRACE(str, tout << "reset" << '\n';);
     }
 
-    lbool theory_str_noodler::validate_unsat_core(expr_ref_vector &unsat_core) {
-        return l_undef;
-    }
-
     expr_ref theory_str_noodler::mk_sub(expr *a, expr *b) {
         ast_manager &m = get_manager();
 

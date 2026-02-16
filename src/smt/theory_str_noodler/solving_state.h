@@ -36,6 +36,15 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // disequations postponed to be handled after finding stable solutions
+        std::vector<Predicate> disequations;
+
+        // conversions local to this solving state
+        std::vector<TermConversion> conversions;
+
+        // length conjuncts generated while replacing disequalities in this state
+        std::vector<LenNode> disequations_len_formula_conjuncts;
+
         // indicates whether this solving state has any siblings in the solving state tree
         bool has_siblings = false;
 
@@ -47,7 +56,9 @@ namespace smt::noodler {
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
                      std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
-                     bool has_siblings)
+                     bool has_siblings,
+                     std::vector<Predicate> disequations = {},
+                                         std::vector<TermConversion> conversions = {})
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
@@ -55,6 +66,8 @@ namespace smt::noodler {
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
                           length_sensitive_vars(length_sensitive_vars),
+                         disequations(disequations),
+                                                 conversions(conversions),
                           has_siblings(has_siblings) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
@@ -253,6 +266,11 @@ namespace smt::noodler {
          */
         void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
 
+        /// @brief Apply substitutions from substitution_map directly to disequations.
+        void apply_substitutions_to_disequations();
+
+        LenNode get_disequations_length_formula() const;
+
         /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
         void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
 
@@ -376,6 +394,19 @@ namespace smt::noodler {
          * If @p replacements is empty, it only deletes dummy symbols from transducers.
          */
         void replace_dummy_symbol_in_transducers_with(std::set<mata::Symbol> replacements);
+
+        /**
+         * @brief Replace disequality L != R with equalities while updating this solving state.
+         *
+         * The method updates this state (automata assignment and length-sensitive vars),
+         * It stores created disequality-related length constraints into
+         * disequations_len_formula_conjuncts and stores needed to_code
+         * conversions in this state's conversions.
+         *
+         * @param diseq Disequality to replace.
+         * @return Vector with created equalities.
+         */
+        std::vector<Predicate> replace_disequality(const Predicate& diseq);
 
         std::string DOT_name = "init";
         std::string set_new_DOT_name() {

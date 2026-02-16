@@ -195,7 +195,7 @@ namespace smt::noodler {
          * Assumes that code_subst_vars and int_subst_vars are computed already.
          * It also updates length_vars_with_transducers and code_subst_vars_handled_by_parikh
          */
-        LenNode get_formula_for_transducers();
+        LenNode get_formula_for_transducers(ConversionHandler& conversion_handler_for_solution);
 
         /**
          * @brief Get the formula encoding lengths of variables based on solution

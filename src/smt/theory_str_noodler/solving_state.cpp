@@ -64,12 +64,131 @@ namespace smt::noodler {
         for (auto& [subst_var, substitution] : substitution_map) {
             substitution = substitute_vector(substitution);
         }
+
+        apply_substitutions_to_disequations();
+    }
+
+    LenNode SolvingState::get_disequations_length_formula() const {
+        LenNode result{LenFormulaType::AND};
+        for(const Predicate& diseq : disequations) {
+            result.succ.push_back(diseq.get_formula_eq());
+        }
+        return result;
+    }
+
+    void SolvingState::apply_substitutions_to_disequations() {
+        auto substitute_concat = [this](const std::vector<BasicTerm>& con) {
+            std::vector<BasicTerm> result;
+            for (const BasicTerm& bt : con) {
+                const std::vector<BasicTerm> subst = get_substituted_vars(bt);
+                result.insert(result.end(), subst.begin(), subst.end());
+            }
+            return result;
+        };
+
+        for (Predicate& diseq : disequations) {
+            SASSERT(diseq.is_inequation());
+            diseq = Predicate::create_disequation(
+                substitute_concat(diseq.get_left_side()),
+                substitute_concat(diseq.get_right_side())
+            );
+        }
+    }
+
+    std::vector<Predicate> SolvingState::replace_disequality(const Predicate& diseq) {
+        // automaton accepting empty word or exactly one symbol
+        std::shared_ptr<mata::nfa::Nfa> sigma_eps_automaton = std::make_shared<mata::nfa::Nfa>(aut_ass.sigma_eps_automaton());
+
+        // function that will take a1 and a2 and create the "to_code(a1) != to_code(a2)" part of the arithmetic formula
+        auto create_to_code_ineq = [this](const BasicTerm& var1, const BasicTerm& var2) {
+            // we are going to check that to_code(var1) != to_code(var2), we need exact languages, so we make them length
+            length_sensitive_vars.insert(var1);
+            length_sensitive_vars.insert(var2);
+
+            // variables that are results of to_code applied to var1/var2
+            BasicTerm var1_to_code = util::mk_internal_noodler_var(var1.get_name() + zstring("!ineq_to_code"));
+            BasicTerm var2_to_code = util::mk_internal_noodler_var(var2.get_name() + zstring("!ineq_to_code"));
+
+            // add the information that we need to process "var1_to_code = to_code(var1)" and "var2_to_code = to_code(var2)"
+            conversions.push_back(TermConversion{ConversionType::TO_CODE, var1, var1_to_code});
+            conversions.push_back(TermConversion{ConversionType::TO_CODE, var2, var2_to_code});
+
+            // add to_code(var1) != to_code(var2) to the len formula for disequations
+            disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::NEQ, {var1_to_code, var2_to_code}));
+        };
+
+        // This optimization represents the situation where L = a1 and R = a2
+        // and we know that a1,a2 \in \Sigma \cup {\epsilon}, i.e. we do not create new equations.
+        if (diseq.get_left_side().size() == 1 && diseq.get_right_side().size() == 1) {
+            BasicTerm a1 = diseq.get_left_side()[0];
+            BasicTerm a2 = diseq.get_right_side()[0];
+            auto autl = aut_ass.at(a1);
+            auto autr = aut_ass.at(a2);
+
+            if (mata::nfa::is_included(*autl, *sigma_eps_automaton) && mata::nfa::is_included(*autr, *sigma_eps_automaton)) {
+                // create to_code(a1) != to_code(a2)
+                create_to_code_ineq(a1, a2);
+                STRACE(str_dis, tout << "from disequation " << diseq << " no new equations were created" << std::endl;);
+                return std::vector<Predicate>();
+            }
+        }
+
+        // automaton accepting everything
+        std::shared_ptr<mata::nfa::Nfa> sigma_star_automaton = std::make_shared<mata::nfa::Nfa>(aut_ass.sigma_star_automaton());
+
+        BasicTerm x1 = util::mk_noodler_var_fresh("diseq_start");
+        aut_ass[x1] = sigma_star_automaton;
+        BasicTerm a1 = util::mk_noodler_var_fresh("diseq_char");
+        aut_ass[a1] = sigma_eps_automaton;
+        BasicTerm y1 = util::mk_noodler_var_fresh("diseq_end");
+        aut_ass[y1] = sigma_star_automaton;
+        BasicTerm x2 = util::mk_noodler_var_fresh("diseq_start");
+        aut_ass[x2] = sigma_star_automaton;
+        BasicTerm a2 = util::mk_noodler_var_fresh("diseq_char");
+        aut_ass[a2] = sigma_eps_automaton;
+        BasicTerm y2 = util::mk_noodler_var_fresh("diseq_end");
+        aut_ass[y2] = sigma_star_automaton;
+
+        std::vector<Predicate> new_eqs;
+        // L = x1a1y1
+        new_eqs.push_back(Predicate::create_equation(diseq.get_left_side(), std::vector<BasicTerm>{x1, a1, y1}));
+        // R = x2a2y2
+        new_eqs.push_back(Predicate::create_equation(diseq.get_right_side(), std::vector<BasicTerm>{x2, a2, y2}));
+
+        // we want |x1| == |x2|, making x1 and x2 length ones
+        length_sensitive_vars.insert(x1);
+        length_sensitive_vars.insert(x2);
+        // |x1| = |x2|
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::EQ, {x1, x2}));
+
+        // create to_code(a1) != to_code(a2)
+        create_to_code_ineq(a1, a2);
+
+        // we are also going to check for the lengths of y1 and y2, so they have to be length
+        length_sensitive_vars.insert(y1);
+        length_sensitive_vars.insert(y2);
+        // (|a1| = 0) => (|y1| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a1, 0}), LenNode(LenFormulaType::EQ, {y1, 0})}));
+        // (|a2| = 0) => (|y2| = 0)
+        disequations_len_formula_conjuncts.push_back(LenNode(LenFormulaType::OR, {LenNode(LenFormulaType::NEQ, {a2, 0}), LenNode(LenFormulaType::EQ, {y2, 0})}));
+
+        STRACE(str_dis, tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
+        return new_eqs;
     }
 
     void SolvingState::remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep) {
         for (const BasicTerm& var : vars_to_remove) {
             if (!vars_to_keep.contains(var)) {
-                substitution_map.erase(var);
+                bool is_conversion_string_var = false;
+                for (const TermConversion& conversion : conversions) {
+                    if (conversion.string_var == var) {
+                        is_conversion_string_var = true;
+                        break;
+                    }
+                }
+                if (!is_conversion_string_var) {
+                    substitution_map.erase(var);
+                }
                 length_sensitive_vars.erase(var);
                 aut_ass.erase(var);
             }

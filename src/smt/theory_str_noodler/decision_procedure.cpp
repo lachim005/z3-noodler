@@ -28,7 +28,6 @@ namespace smt::noodler {
         bool len_checks_enabled = check_lens != nullptr &&
                                   m_params.m_try_premature_len_checks &&
                                   !conversion_handler.are_there_any_conversions() &&
-                                  disequations.get_predicates().empty() &&
                                   not_contains.get_predicates().empty();
         bool some_skipped = false;
 
@@ -57,6 +56,24 @@ namespace smt::noodler {
             }
 
             if (element_to_process.predicates_to_process.empty()) {
+                if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.disequations.empty()) {
+                    solution = element_to_process;
+                    lbool underapprox_sat = check_lens();
+                    if (underapprox_sat != l_true) {
+                        for (const Predicate& diseq : element_to_process.disequations) {
+                            for(const Predicate& t : element_to_process.replace_disequality(diseq)) {
+                                element_to_process.push_unique(t, false);
+                            }
+                        }
+                        element_to_process.disequations.clear();
+                    } else {
+                        solution = std::move(element_to_process);
+                        return { l_true, true };
+                    }
+                    push_to_worklist(element_to_process, true);
+                    continue;
+                }
+
                 // we found another solution, element_to_process contain the automata
                 // assignment and variable substition that satisfy the original
                 // inclusion graph
@@ -532,22 +549,24 @@ namespace smt::noodler {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
         if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty() 
-            && this->disequations.get_predicates().empty()) {
+            && this->solution.disequations.empty()) {
             // There is not notcontains predicate to be solved and there are no length vars (which also means no
             // disequations nor conversions), it is not needed to create the lengths formula.
             return {LenNode(LenFormulaType::TRUE), precision};
         }
 
-        conversion_handler.initialize_solution(solution);
+        ConversionHandler conversion_handler_for_solution(solution.conversions, m_params.m_underapprox_length);
+        conversion_handler_for_solution.initialize_solution(solution);
 
-        // start with formula for disequations
+        // start with formula from disequation replacements
         std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
+        conjuncts.insert(conjuncts.end(), solution.disequations_len_formula_conjuncts.begin(), solution.disequations_len_formula_conjuncts.end());
 
         // add length formula from preprocessing
         conjuncts.push_back(preprocessing_len_formula);
 
         // compute formula for vars in transducers (lengths and code-point conversions)
-        conjuncts.push_back(get_formula_for_transducers());
+        conjuncts.push_back(get_formula_for_transducers(conversion_handler_for_solution));
         util::check_limit(m);
 
         // formula for encoding lengths
@@ -555,12 +574,17 @@ namespace smt::noodler {
         util::check_limit(m);
 
         // add formula for conversions
-        auto [conversion_formula, conversion_precision] = conversion_handler.get_formula_encoding_conversions(code_subst_vars_handled_by_parikh);
+        auto [conversion_formula, conversion_precision] = conversion_handler_for_solution.get_formula_encoding_conversions(code_subst_vars_handled_by_parikh);
         conjuncts.push_back(conversion_formula);
         precision = get_resulting_precision_for_conjunction(precision, conversion_precision);
 
         // get the LIA formula describing solutions for special predicates
-        conjuncts.push_back(get_formula_for_ca_diseqs());
+        if(this->m_params.m_ca_constr) {
+            conjuncts.push_back(get_formula_for_ca_diseqs());
+        }
+        if (!solution.disequations.empty()) {
+            conjuncts.push_back(solution.get_disequations_length_formula());
+        }
         auto [not_cont_formula, not_cont_precicions] = get_formula_for_not_contains();
         conjuncts.push_back(not_cont_formula);
         precision = get_resulting_precision_for_conjunction(precision, not_cont_precicions);
@@ -570,7 +594,7 @@ namespace smt::noodler {
         return {result, precision};
     }
 
-    LenNode DecisionProcedure::get_formula_for_transducers() {
+    LenNode DecisionProcedure::get_formula_for_transducers(ConversionHandler& conversion_handler_for_solution) {
         LenNode result(LenFormulaType::AND);
 
         length_vars_with_transducers = {};
@@ -653,7 +677,7 @@ namespace smt::noodler {
             
             // we build a parikh image for the transducer (first we collect all levels of code_vars)
             std::set<mata::nft::Level> levels_of_code_subst_vars;
-            std::set<BasicTerm> code_subst_vars = conversion_handler.get_code_subst_vars();
+            std::set<BasicTerm> code_subst_vars = conversion_handler_for_solution.get_code_subst_vars();
             for (size_t i = 0; i < vars_on_tapes.size(); ++i) {
                 const BasicTerm& var = vars_on_tapes[i];
                 length_vars_with_transducers.insert(var);
@@ -661,7 +685,7 @@ namespace smt::noodler {
                     code_subst_vars_handled_by_parikh.insert(var);
                     levels_of_code_subst_vars.insert(i);
                 }
-                if (conversion_handler.get_int_subst_vars().contains(var) || conversion_handler.get_real_subst_vars().contains(var)) {
+                if (conversion_handler_for_solution.get_int_subst_vars().contains(var) || conversion_handler_for_solution.get_real_subst_vars().contains(var)) {
                     // TODO add support (pretty hard, we need to remember the order of selected transitions by parikh)
                     util::throw_error("Integer/real conversions with transducers are not supported yet");
                 }
@@ -741,7 +765,7 @@ namespace smt::noodler {
                     if (!parikh_transducer.get_tape_var_used_symbols().contains(var)) {
                         // if we are here, this means there is no non-epsilon transition for this var in the transducer,
                         // |var| == 0 (this is encoded in parikh) which means that code_version_of(var) == -1
-                        result.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conversion_handler.code_version_of(var),-1});
+                        result.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conversion_handler_for_solution.code_version_of(var),-1});
                     } else {
                         // If we are here, parikh_transducer.get_tape_var_used_symbols().at(var) contains all symbols
                         // that are on some transition in the transducer for this var. Therefore we need to create for
@@ -750,7 +774,7 @@ namespace smt::noodler {
 
                         // We first encode the formula that var is not one symbol
                         // (|var| != 1 && code_version_of(var) == -1)
-                        LenNode non_char_case(LenFormulaType::AND, { {LenFormulaType::NEQ, std::vector<LenNode>{var, 1}}, {LenFormulaType::EQ, std::vector<LenNode>{conversion_handler.code_version_of(var),-1}} });
+                        LenNode non_char_case(LenFormulaType::AND, { {LenFormulaType::NEQ, std::vector<LenNode>{var, 1}}, {LenFormulaType::EQ, std::vector<LenNode>{conversion_handler_for_solution.code_version_of(var),-1}} });
 
                         // We now continue with the case that |var| ==1
                         // (|var| == 1 && code_version_of(var) is code point of one of the symbols based on parikh)
@@ -770,7 +794,7 @@ namespace smt::noodler {
                             LenNode num_of_s_in_var_is_one{ LenFormulaType::NEQ, std::vector<LenNode>{num_of_s_in_var, 1} };
 
                             // code_version_of(var) == s
-                            LenNode code_version_is_equal_to_s(LenFormulaType::EQ, {conversion_handler.code_version_of(var), s});
+                            LenNode code_version_is_equal_to_s(LenFormulaType::EQ, {conversion_handler_for_solution.code_version_of(var), s});
 
                             // (num_of_s_in_var == 1) => (code_version_of(var) == s), i.e.
                             // (num_of_s_in_var != 1) || (code_version_of(var) == s)
@@ -812,24 +836,8 @@ namespace smt::noodler {
 
     LenNode DecisionProcedure::get_formula_for_ca_diseqs() {
         Formula proj_diseqs {};
-
-        auto proj_concat = [&](const Concat& con) -> Concat {
-            Concat ret {};
-            for(const BasicTerm& bt : con) {
-                Concat subst = this->solution.get_substituted_vars(bt);
-                ret.insert(ret.end(), subst.begin(), subst.end());
-            }
-            return ret;
-        };
-
-        // take the original disequations (taken from input) and
-        // propagate substitutions involved by the current substitution map of
-        // a stable solution
-        for(const Predicate& dis : this->disequations.get_predicates()) {
-            proj_diseqs.add_predicate(Predicate::create_disequation(
-                proj_concat(dis.get_left_side()),
-                proj_concat(dis.get_right_side())
-            ));
+        for (const Predicate& diseq : this->solution.disequations) {
+            proj_diseqs.add_predicate(diseq);
         }
 
         STRACE(str, tout << "CA-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
@@ -879,7 +887,7 @@ namespace smt::noodler {
                 equations_and_transducers.add_predicate(pred);
             } else if (pred.is_inequation()) {
                 // If we solve diesquations using CA --> we store the disequations to be solved later on
-                if (this->m_params.m_ca_constr) {
+                if (this->m_params.m_ca_constr || this->m_params.m_postpone_diseqs_stabilization) {
                     init_ca_diseq(pred);
                     some_diseq_handled_by_ca = true;
                 } else {
@@ -924,6 +932,8 @@ namespace smt::noodler {
             init_solving_state.aut_ass.erase(subs.first);
         }
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
+        init_solving_state.disequations = this->disequations.get_predicates();
+        init_solving_state.conversions = this->conversion_handler.get_conversions();
 
         if (!equations_and_transducers.get_predicates().empty()) {
             FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers);
@@ -949,6 +959,7 @@ namespace smt::noodler {
         }
 
         init_solving_state.flatten_substition_map();
+        init_solving_state.apply_substitutions_to_disequations();
 
         STRACE(str_noodle_dot, tout << "digraph Procedure {\ninit[shape=none, label=\"\"]\n";);
         push_to_worklist(std::move(init_solving_state), true);

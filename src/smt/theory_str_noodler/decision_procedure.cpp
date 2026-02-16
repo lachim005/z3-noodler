@@ -1381,7 +1381,7 @@ namespace smt::noodler {
         //Find all SCC inclusions
         idx = 0;
         for(vector<int> x : adjacency_list){
-                std::cout << "Adjacency - " << idx << " = " << x << std::endl;
+                //std::cout << "Adjacency - " << idx << " = " << x << std::endl;
                 idx++;
         }
         vector<vector<Predicate>> scc = findSCC(solution.inclusions.size(), &adjacency_list);
@@ -1405,7 +1405,7 @@ namespace smt::noodler {
                 //shortest words
                 std::map<BasicTerm, std::set<mata::Word>> vars_shortest_words = find_shortest_words(scc_list);
                 
-                std::cout << "Creating atom equations!" << std::endl;
+                //std::cout << "Creating atom equations!" << std::endl;
                 //create atom equations
                 for(Predicate incl: scc_list){
                     //Add # symbol
@@ -1464,12 +1464,12 @@ namespace smt::noodler {
                     }
                 }
 
-                std::cout << "Random Assigment!" << std::endl;
+                //std::cout << "Random Assigment!" << std::endl;
                 for(auto const& [var, word] : scc_solution)
                 {
-                    std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                    //std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
                 }
-                std::cout << "Looking for words!" << std::endl;
+                //std::cout << "Looking for words!" << std::endl;
                 
                 //find correct words
                 while(T.size() < T_max_size){
@@ -1518,12 +1518,12 @@ namespace smt::noodler {
                         }
                     }                   
                 }
-                std::cout << "SCC all" << std::endl;
+                //std::cout << "SCC all" << std::endl;
 
-                std::cout << "Var Assigment!" << std::endl;
+                //std::cout << "Var Assigment!" << std::endl;
                 for(auto const& [var, word] : scc_solution)
                 {
-                    std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                    //std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
                     if(var.is_variable()){
                         update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
                     }
@@ -1588,9 +1588,9 @@ namespace smt::noodler {
 
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
         //Get shortest words for every var in scc
-        std::cout << "Predicate SCC:" << std::endl;
+        //std::cout << "Predicate SCC:" << std::endl;
         for(Predicate incl: scc_list){
-            std::cout << "\t" << incl << std::endl;
+            //std::cout << "\t" << incl << std::endl;
 
             //Get words from left side
             for(BasicTerm var: incl.get_side_vars(Predicate::EquationSideType::Left)){           
@@ -1598,10 +1598,10 @@ namespace smt::noodler {
                 {
                     const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                     std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
-                    std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
+                    //std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
 
                     for(mata::Word w: words){
-                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
+                        //std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
                     }
                     //add result to ans
                     res_map.insert({var, words});
@@ -1613,9 +1613,9 @@ namespace smt::noodler {
                 {
                     const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                     std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
-                    std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
+                    //std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
                     for(mata::Word w: words){
-                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
+                        //std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
                     }
                     // add result to ans
                     res_map.insert({var, words});
@@ -1726,8 +1726,8 @@ namespace smt::noodler {
             i++;
         }
         for(vector<int> scc_list : ans){
-            std::cout << "SCC:" << std::endl;
-            std::cout << scc_list << std::endl;
+            //std::cout << "SCC:" << std::endl;
+            //std::cout << scc_list << std::endl;
         }
         return predicate_ans;
     }

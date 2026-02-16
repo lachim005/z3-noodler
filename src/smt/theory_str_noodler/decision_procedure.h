@@ -407,6 +407,14 @@ namespace smt::noodler {
 
         void init_computation() override;
         lbool compute_next_solution() override;
+        /**
+         * Same as compute_next_solution, but checks length constraints while running
+         * to potentionally skip processing some noodles which are found unsat
+         *
+         * @return first: True if there is a satisfiable element in the worklist.
+         *         second: if any solving states were skipped (the length check was unsat)
+         */
+        std::pair<lbool, bool> compute_next_solution_with_len_checks(std::function<lbool()> check_lens);
 
         LenNode get_initial_lengths(bool all_vars = false) override;
 

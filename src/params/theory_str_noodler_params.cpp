@@ -16,6 +16,7 @@ void theory_str_noodler_params::updt_params(params_ref const & _p) {
     m_try_unary_proc = p.str_try_unary_proc();
     m_underapprox_length = p.str_underapprox_length();
     m_ca_constr = p.str_ca_constr();
+    m_try_premature_len_checks = p.str_try_premature_length_checks();
     m_produce_models = gparams::get_ref().get_bool("model", false);
 }
 

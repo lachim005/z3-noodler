@@ -4,7 +4,10 @@
 
 namespace smt::noodler {
 
-void ConversionHandler::initialize_solution(SolvingState solution) {
+void ConversionHandler::initialize_solution(const SolvingState& solution) {
+    conversions = solution.conversions;
+    this->solution = solution;
+
     code_subst_vars.clear();
     int_subst_vars.clear();
     real_subst_vars.clear();
@@ -40,14 +43,12 @@ void ConversionHandler::initialize_solution(SolvingState solution) {
         }
     }
 
-    contain_non_digit = solution.aut_ass.complement_aut(only_digits);
+    contain_non_digit = this->solution.aut_ass.complement_aut(only_digits);
     STRACE(str_conversion_int, tout << "only-digit NFA:" << std::endl << only_digits << std::endl;);
     STRACE(str_conversion_int, tout << "contains-non-digit NFA:" << std::endl << contain_non_digit << std::endl;);
-    non_number = solution.aut_ass.complement_aut(mata::nfa::union_nondet(only_digits, real_numbers));
+    non_number = this->solution.aut_ass.complement_aut(mata::nfa::union_nondet(only_digits, real_numbers));
     STRACE(str_conversion_int, tout << "real-number NFA:" << std::endl << real_numbers << std::endl;);
     STRACE(str_conversion_int, tout << "non-number NFA:" << std::endl << non_number << std::endl;);
-
-    this->solution = std::move(solution);
 }
 
 LenNode ConversionHandler::get_formula_for_code_subst_var(const BasicTerm& code_subst_var) {

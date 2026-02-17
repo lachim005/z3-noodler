@@ -555,8 +555,7 @@ namespace smt::noodler {
             return {LenNode(LenFormulaType::TRUE), precision};
         }
 
-        ConversionHandler conversion_handler_for_solution(solution.conversions, m_params.m_underapprox_length);
-        conversion_handler_for_solution.initialize_solution(solution);
+        conversion_handler.initialize_solution(solution);
 
         // start with formula from disequation replacements
         std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
@@ -566,7 +565,7 @@ namespace smt::noodler {
         conjuncts.push_back(preprocessing_len_formula);
 
         // compute formula for vars in transducers (lengths and code-point conversions)
-        conjuncts.push_back(get_formula_for_transducers(conversion_handler_for_solution));
+        conjuncts.push_back(get_formula_for_transducers(conversion_handler));
         util::check_limit(m);
 
         // formula for encoding lengths
@@ -574,7 +573,7 @@ namespace smt::noodler {
         util::check_limit(m);
 
         // add formula for conversions
-        auto [conversion_formula, conversion_precision] = conversion_handler_for_solution.get_formula_encoding_conversions(code_subst_vars_handled_by_parikh);
+        auto [conversion_formula, conversion_precision] = conversion_handler.get_formula_encoding_conversions(code_subst_vars_handled_by_parikh);
         conjuncts.push_back(conversion_formula);
         precision = get_resulting_precision_for_conjunction(precision, conversion_precision);
 

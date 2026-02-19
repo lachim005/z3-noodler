@@ -60,11 +60,24 @@ namespace smt::noodler {
                     solution = element_to_process;
                     lbool underapprox_sat = check_lens();
                     if (underapprox_sat != l_true) {
+                        Formula equations_from_diseqs;
                         for (const Predicate& diseq : element_to_process.disequations) {
                             for(const Predicate& t : element_to_process.replace_disequality(diseq)) {
-                                element_to_process.push_unique(t, false);
+                                equations_from_diseqs.add_predicate(t);
                             }
                         }
+
+                        if (!equations_from_diseqs.get_predicates().empty()) {
+                            FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);
+                            for (const FormulaGraphNode& node : incl_graph.get_nodes()) {
+                                Predicate node_pred = node.get_real_predicate();
+                                SASSERT(node_pred.is_equation());
+                                bool is_on_cycle = incl_graph.is_on_cycle(node);
+                                element_to_process.add_predicate(node_pred, is_on_cycle);
+                                element_to_process.push_unique(node_pred, is_on_cycle);
+                            }
+                        }
+
                         element_to_process.disequations.clear();
                     } else {
                         solution = std::move(element_to_process);

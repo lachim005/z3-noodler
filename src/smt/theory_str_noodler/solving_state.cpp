@@ -76,6 +76,27 @@ namespace smt::noodler {
         return result;
     }
 
+    std::set<BasicTerm> SolvingState::get_vars_referenced_by_state_constraints() const {
+        std::set<BasicTerm> referenced_vars;
+
+        for (const TermConversion& conversion : conversions) {
+            referenced_vars.insert(conversion.string_var);
+            referenced_vars.insert(conversion.number_var);
+        }
+
+        for (const Predicate& diseq : disequations) {
+            const std::set<BasicTerm> diseq_vars = diseq.get_vars();
+            referenced_vars.insert(diseq_vars.begin(), diseq_vars.end());
+        }
+
+        for (const LenNode& conjunct : disequations_len_formula_conjuncts) {
+            const std::set<BasicTerm> vars_in_conjunct = collect_free_vars(conjunct);
+            referenced_vars.insert(vars_in_conjunct.begin(), vars_in_conjunct.end());
+        }
+
+        return referenced_vars;
+    }
+
     void SolvingState::apply_substitutions_to_disequations() {
         auto substitute_concat = [this](const std::vector<BasicTerm>& con) {
             std::vector<BasicTerm> result;
@@ -177,21 +198,24 @@ namespace smt::noodler {
     }
 
     void SolvingState::remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep) {
+        std::set<BasicTerm> vars_required_by_state = get_vars_referenced_by_state_constraints();
+
         for (const BasicTerm& var : vars_to_remove) {
-            if (!vars_to_keep.contains(var)) {
-                bool is_conversion_string_var = false;
-                for (const TermConversion& conversion : conversions) {
-                    if (conversion.string_var == var) {
-                        is_conversion_string_var = true;
-                        break;
-                    }
-                }
-                if (!is_conversion_string_var) {
-                    substitution_map.erase(var);
-                }
-                length_sensitive_vars.erase(var);
-                aut_ass.erase(var);
+            if (vars_to_keep.contains(var)) {
+                continue;
             }
+
+            if (vars_required_by_state.contains(var)) {
+                // Keep substitution/length information for variables that still occur in
+                // state-local constraints (e.g., disequality replacement artifacts),
+                // but remove direct automaton assignment to preserve substitution semantics.
+                aut_ass.erase(var);
+                continue;
+            }
+
+            substitution_map.erase(var);
+            length_sensitive_vars.erase(var);
+            aut_ass.erase(var);
         }
     }
 

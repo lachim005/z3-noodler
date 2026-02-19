@@ -271,6 +271,13 @@ namespace smt::noodler {
 
         LenNode get_disequations_length_formula() const;
 
+        /**
+         * @brief Collect vars that are referenced by constraints stored directly in this state
+         *        (e.g., postponed disequality-length conjuncts and conversions) and therefore
+         *        must not be fully removed from substitution-related structures.
+         */
+        std::set<BasicTerm> get_vars_referenced_by_state_constraints() const;
+
         /// @brief Remove vars @p vars_to_remove (except those in @p vars_to_keep ) from the subtitution_map/aut_ass
         void remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep);
 

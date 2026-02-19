@@ -1,4 +1,5 @@
 #include "solving_state.h"
+#include "formula_preprocess.h"
 
 namespace smt::noodler {
 
@@ -195,6 +196,43 @@ namespace smt::noodler {
 
         STRACE(str_dis, tout << "from disequation " << diseq << " created equations: " << new_eqs[0] << " and " << new_eqs[1] << std::endl;);
         return new_eqs;
+    }
+
+    lbool SolvingState::preprocess_disequations_for_unsat(const theory_str_noodler_params& params) {
+        if (disequations.empty()) {
+            return l_true;
+        }
+
+        Formula diseq_formula;
+        for (const Predicate& diseq : disequations) {
+            diseq_formula.add_predicate(diseq);
+        }
+
+        std::set<BasicTerm> conversion_vars;
+        for (const TermConversion& conv : conversions) {
+            conversion_vars.insert(conv.string_var);
+        }
+
+        FormulaPreprocessor prep_handler{diseq_formula, aut_ass, length_sensitive_vars, params, conversion_vars};
+
+        prep_handler.remove_trivial();
+        prep_handler.reduce_diseqalities();
+        prep_handler.propagate_eps();
+        prep_handler.refine_languages();
+        prep_handler.reduce_diseqalities();
+
+        if (!prep_handler.get_aut_assignment().is_sat() || prep_handler.contains_unsat_eqs_or_diseqs()) {
+            return l_false;
+        }
+
+        // Persist the simplified disequations and refined state back.
+        Formula simplified_diseqs = prep_handler.get_modified_formula();
+        disequations = simplified_diseqs.get_predicates();
+        aut_ass = prep_handler.get_aut_assignment();
+        const std::unordered_set<BasicTerm>& prep_len_vars = prep_handler.get_len_variables();
+        length_sensitive_vars.insert(prep_len_vars.begin(), prep_len_vars.end());
+
+        return l_true;
     }
 
     void SolvingState::remove_vars(const std::set<BasicTerm>& vars_to_remove, const std::set<BasicTerm>& vars_to_keep) {

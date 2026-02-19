@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "params/theory_str_noodler_params.h"
 #include "formula.h"
 #include "aut_assignment.h"
 #include "util.h"
@@ -414,6 +415,18 @@ namespace smt::noodler {
          * @return Vector with created equalities.
          */
         std::vector<Predicate> replace_disequality(const Predicate& diseq);
+
+        /**
+         * @brief Run lightweight preprocessing focused on postponed disequations and
+         *        detect whether they are immediately unsatisfiable in this state.
+         *
+         * The method does not mutate this solving state; it only analyzes a local
+         * preprocessor instance built from current disequations and state data.
+         *
+         * @return l_false iff preprocessing proves some disequation branch unsat,
+         *         l_true otherwise.
+         */
+        lbool preprocess_disequations_for_unsat(const theory_str_noodler_params& params);
 
         std::string DOT_name = "init";
         std::string set_new_DOT_name() {

@@ -60,12 +60,17 @@ namespace smt::noodler {
                     solution = element_to_process;
                     lbool underapprox_sat = check_lens();
                     if (underapprox_sat != l_true) {
+                        if (element_to_process.preprocess_disequations_for_unsat(this->m_params) == l_false) {
+                            continue;
+                        }
+
                         Formula equations_from_diseqs;
                         for (const Predicate& diseq : element_to_process.disequations) {
                             for(const Predicate& t : element_to_process.replace_disequality(diseq)) {
                                 equations_from_diseqs.add_predicate(t);
                             }
                         }
+
 
                         if (!equations_from_diseqs.get_predicates().empty()) {
                             FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);

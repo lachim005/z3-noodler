@@ -380,12 +380,19 @@ namespace smt::noodler {
         lbool compute_next_solution() override;
         /**
          * Same as compute_next_solution, but checks length constraints while running
-         * to potentionally skip processing some noodles which are found unsat
+         * to potentionally skip processing some noodles which are found unsat.
+         *
+         * @param check_lens length check used for premature pruning (may update blocking formula).
+         * @param check_lens_sat_only length check used by postponed disequation underapproximation
+         *                            (should only check satisfiability and not update blocking formula).
          *
          * @return first: True if there is a satisfiable element in the worklist.
          *         second: if any solving states were skipped (the length check was unsat)
          */
-        std::pair<lbool, bool> compute_next_solution_with_len_checks(std::function<lbool()> check_lens);
+        std::pair<lbool, bool> compute_next_solution_with_len_checks(
+            std::function<lbool()> check_lens,
+            std::function<lbool()> check_lens_sat_only
+        );
 
         LenNode get_initial_lengths(bool all_vars = false) override;
 

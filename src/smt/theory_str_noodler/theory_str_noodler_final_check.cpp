@@ -331,10 +331,15 @@ namespace smt::noodler {
             return std::pair<lbool, LenNodePrecision>(sat, precision);
         };
         auto check_lens = [&check_lens_with_precision]() { return check_lens_with_precision().first; };
+        auto check_lens_sat_only = [this, &lengths, &check_len_sat_with_context]() {
+            auto [noodler_lengths, _precision] = dec_proc->get_lengths();
+            lengths = len_node_to_z3_formula(noodler_lengths);
+            return check_len_sat(lengths, check_len_sat_with_context);
+        };
 
         while (true) {
             util::check_limit(m);
-            auto [result, some_skipped] = main_dec_proc->compute_next_solution_with_len_checks(check_lens);
+            auto [result, some_skipped] = main_dec_proc->compute_next_solution_with_len_checks(check_lens, check_lens_sat_only);
             if (result == l_true) {
                 auto [is_lengths_sat, precision] = check_lens_with_precision();
 
@@ -763,7 +768,7 @@ namespace smt::noodler {
             return check_len_sat(lengths, check_with_context);
         };
 
-        while(main_dec_proc->compute_next_solution_with_len_checks(check_lens).first == l_true) {
+        while(main_dec_proc->compute_next_solution_with_len_checks(check_lens, check_lens).first == l_true) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             if(check_len_sat(lengths, check_with_context) == l_true) { // if there are no length vars in the current string formula, we do not need to check with context
                 sat_handling(lengths);

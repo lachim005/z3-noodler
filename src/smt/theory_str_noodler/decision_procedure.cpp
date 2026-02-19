@@ -15,10 +15,13 @@
 namespace smt::noodler {
     lbool DecisionProcedure::compute_next_solution() {
         // We call the one with length checks but don't check them
-        return compute_next_solution_with_len_checks(nullptr).first;
+        return compute_next_solution_with_len_checks(nullptr, nullptr).first;
     }
 
-    std::pair<lbool, bool> DecisionProcedure::compute_next_solution_with_len_checks(std::function<lbool()> check_lens) {
+    std::pair<lbool, bool> DecisionProcedure::compute_next_solution_with_len_checks(
+        std::function<lbool()> check_lens,
+        std::function<lbool()> check_lens_sat_only
+    ) {
         // iteratively select next state of solving that can lead to solution and
         // process one of the unprocessed nodes (or possibly find solution)
         STRACE(str, tout << "------------------------"
@@ -28,7 +31,8 @@ namespace smt::noodler {
         bool len_checks_enabled = check_lens != nullptr &&
                                   m_params.m_try_premature_len_checks &&
                                   !conversion_handler.are_there_any_conversions() &&
-                                  not_contains.get_predicates().empty();
+                                  not_contains.get_predicates().empty() &&
+                                  !this->m_params.m_postpone_diseqs_stabilization;
         bool some_skipped = false;
 
         while (!is_worklist_empty()) {
@@ -57,8 +61,8 @@ namespace smt::noodler {
 
             if (element_to_process.predicates_to_process.empty()) {
                 if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.disequations.empty()) {
-                    solution = element_to_process;
-                    lbool underapprox_sat = check_lens();
+                    this->solution = element_to_process;
+                    lbool underapprox_sat = check_lens_sat_only();
                     if (underapprox_sat != l_true) {
                         if (element_to_process.preprocess_disequations_for_unsat(this->m_params) == l_false) {
                             continue;
@@ -86,7 +90,7 @@ namespace smt::noodler {
                         element_to_process.disequations.clear();
                     } else {
                         solution = std::move(element_to_process);
-                        return { l_true, true };
+                        return { l_true, false };
                     }
                     push_to_worklist(element_to_process, true);
                     continue;
@@ -601,6 +605,10 @@ namespace smt::noodler {
         }
         if (!solution.disequations.empty()) {
             conjuncts.push_back(solution.get_disequations_length_formula());
+            // For postponed disequations we currently encode only |lhs| != |rhs|.
+            // This is an underapproximation of string disequality and must not be
+            // treated as a precise source of unsat.
+            precision = get_resulting_precision_for_conjunction(precision, LenNodePrecision::UNDERAPPROX);
         }
         auto [not_cont_formula, not_cont_precicions] = get_formula_for_not_contains();
         conjuncts.push_back(not_cont_formula);

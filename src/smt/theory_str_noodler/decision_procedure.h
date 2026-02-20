@@ -134,6 +134,9 @@ namespace smt::noodler {
         // keeps the length formulas from replace_disequality(), they need to hold for solution to be satisfiable (get_lengths should create conjunct from them)
         std::vector<LenNode> disequations_len_formula_conjuncts;
 
+        // remembers whether the input formula passed to init_computation() contained any disequation
+        bool input_contains_disequations = false;
+
         std::set<BasicTerm> code_subst_vars_handled_by_parikh;
 
         const theory_str_noodler_params& m_params;

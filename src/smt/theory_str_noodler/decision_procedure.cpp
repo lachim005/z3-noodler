@@ -32,7 +32,7 @@ namespace smt::noodler {
                                   m_params.m_try_premature_len_checks &&
                                   !conversion_handler.are_there_any_conversions() &&
                                   not_contains.get_predicates().empty() &&
-                                  !this->m_params.m_postpone_diseqs_stabilization;
+                                  (!this->m_params.m_postpone_diseqs_stabilization || !this->input_contains_disequations);
         bool some_skipped = false;
 
         while (!is_worklist_empty()) {
@@ -903,18 +903,17 @@ namespace smt::noodler {
     void DecisionProcedure::init_computation() {
         Formula equations_and_transducers;
 
-        bool some_diseq_handled_by_ca = false;
-
+        this->input_contains_disequations = false;
         bool has_transducers = false;
 
         for (auto const &pred : formula.get_predicates()) {
             if (pred.is_equation()) {
                 equations_and_transducers.add_predicate(pred);
             } else if (pred.is_inequation()) {
+                this->input_contains_disequations = true;
                 // If we solve diesquations using CA --> we store the disequations to be solved later on
                 if (this->m_params.m_ca_constr || this->m_params.m_postpone_diseqs_stabilization) {
                     init_ca_diseq(pred);
-                    some_diseq_handled_by_ca = true;
                 } else {
                     for (auto const &eq_from_diseq : replace_disequality(pred)) {
                         equations_and_transducers.add_predicate(eq_from_diseq);

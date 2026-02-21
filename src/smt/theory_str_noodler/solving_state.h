@@ -13,6 +13,16 @@
 
 namespace smt::noodler {
 
+    using AddConversionFn = std::function<void(const TermConversion&)>;
+
+    std::vector<Predicate> replace_disequality_shared(
+        const Predicate& diseq,
+        AutAssignment& aut_ass,
+        std::unordered_set<BasicTerm>& length_sensitive_vars,
+        std::vector<LenNode>& disequations_len_formula_conjuncts,
+        const AddConversionFn& add_conversion
+    );
+
     /// A state of decision procedure that can lead to a solution
     struct SolvingState {
         // aut_ass[x] assigns variable x to some automaton while substitution_map[x] maps variable x to

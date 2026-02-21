@@ -1,5 +1,6 @@
 #include "solving_state.h"
 #include "formula_preprocess.h"
+#include "inclusion_graph.h"
 
 namespace smt::noodler {
 
@@ -171,7 +172,7 @@ namespace smt::noodler {
 
     LenNode SolvingState::get_disequations_length_formula() const {
         LenNode result{LenFormulaType::AND};
-        for(const Predicate& diseq : disequations) {
+        for(const Predicate& diseq : disequations.get_predicates()) {
             result.succ.push_back(diseq.get_formula_eq());
         }
         return result;
@@ -185,10 +186,8 @@ namespace smt::noodler {
             referenced_vars.insert(conversion.number_var);
         }
 
-        for (const Predicate& diseq : disequations) {
-            const std::set<BasicTerm> diseq_vars = diseq.get_vars();
-            referenced_vars.insert(diseq_vars.begin(), diseq_vars.end());
-        }
+        const std::set<BasicTerm> diseq_vars = disequations.get_vars();
+        referenced_vars.insert(diseq_vars.begin(), diseq_vars.end());
 
         for (const LenNode& conjunct : disequations_len_formula_conjuncts) {
             const std::set<BasicTerm> vars_in_conjunct = collect_free_vars(conjunct);
@@ -208,7 +207,7 @@ namespace smt::noodler {
             return result;
         };
 
-        for (Predicate& diseq : disequations) {
+        for (Predicate& diseq : disequations.get_predicates()) {
             SASSERT(diseq.is_inequation());
             diseq = Predicate::create_disequation(
                 substitute_concat(diseq.get_left_side()),
@@ -230,14 +229,35 @@ namespace smt::noodler {
         );
     }
 
-    lbool SolvingState::preprocess_disequations_for_unsat(const theory_str_noodler_params& params) {
-        if (disequations.empty()) {
-            return l_true;
+    bool SolvingState::translate_postponed_disequations_to_equations() {
+        Formula equations_from_diseqs;
+        for (const Predicate& diseq : disequations.get_predicates()) {
+            for (const Predicate& eq_from_diseq : replace_disequality(diseq)) {
+                equations_from_diseqs.add_predicate(eq_from_diseq);
+            }
         }
 
-        Formula diseq_formula;
-        for (const Predicate& diseq : disequations) {
-            diseq_formula.add_predicate(diseq);
+        if (equations_from_diseqs.get_predicates().empty()) {
+            disequations.get_predicates().clear();
+            return false;
+        }
+
+        FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);
+        for (const FormulaGraphNode& node : incl_graph.get_nodes()) {
+            Predicate node_pred = node.get_real_predicate();
+            SASSERT(node_pred.is_equation());
+            bool is_on_cycle = incl_graph.is_on_cycle(node);
+            add_predicate(node_pred, is_on_cycle);
+            push_unique(node_pred, is_on_cycle);
+        }
+
+        disequations.get_predicates().clear();
+        return true;
+    }
+
+    lbool SolvingState::preprocess_disequations_for_unsat(const theory_str_noodler_params& params) {
+        if (disequations.get_predicates().empty()) {
+            return l_true;
         }
 
         std::set<BasicTerm> conversion_vars;
@@ -245,7 +265,7 @@ namespace smt::noodler {
             conversion_vars.insert(conv.string_var);
         }
 
-        FormulaPreprocessor prep_handler{diseq_formula, aut_ass, length_sensitive_vars, params, conversion_vars};
+        FormulaPreprocessor prep_handler{disequations, aut_ass, length_sensitive_vars, params, conversion_vars};
 
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -258,8 +278,7 @@ namespace smt::noodler {
         }
 
         // Persist the simplified disequations and refined state back.
-        Formula simplified_diseqs = prep_handler.get_modified_formula();
-        disequations = simplified_diseqs.get_predicates();
+        disequations = prep_handler.get_modified_formula();
         aut_ass = prep_handler.get_aut_assignment();
         const std::unordered_set<BasicTerm>& prep_len_vars = prep_handler.get_len_variables();
         length_sensitive_vars.insert(prep_len_vars.begin(), prep_len_vars.end());

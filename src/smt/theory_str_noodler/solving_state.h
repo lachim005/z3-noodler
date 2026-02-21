@@ -48,7 +48,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
         // disequations postponed to be handled after finding stable solutions
-        std::vector<Predicate> disequations;
+        Formula disequations;
 
         // conversions local to this solving state
         std::vector<TermConversion> conversions;
@@ -68,8 +68,8 @@ namespace smt::noodler {
                      std::unordered_set<BasicTerm> length_sensitive_vars,
                      std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
                      bool has_siblings,
-                     std::vector<Predicate> disequations = {},
-                                         std::vector<TermConversion> conversions = {})
+                     Formula disequations = {},
+                     std::vector<TermConversion> conversions = {})
                         : aut_ass(aut_ass),
                           substitution_map(substitution_map),
                           inclusions(inclusions),
@@ -77,8 +77,8 @@ namespace smt::noodler {
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
                           length_sensitive_vars(length_sensitive_vars),
-                         disequations(disequations),
-                                                 conversions(conversions),
+                          disequations(disequations),
+                          conversions(conversions),
                           has_siblings(has_siblings) {}
 
         /// pushes predicate to the beginning of predicates_to_process but only if it is not in it yet
@@ -425,6 +425,18 @@ namespace smt::noodler {
          * @return Vector with created equalities.
          */
         std::vector<Predicate> replace_disequality(const Predicate& diseq);
+
+        /**
+         * @brief Expand postponed disequations into equations and enqueue them.
+         *
+         * Each postponed disequation is replaced by equations via replace_disequality().
+         * The created equations are inserted into an inclusion graph and then added
+         * to this state as predicates, preserving cycle information and processing
+         * order from the graph.
+         *
+         * @return true iff at least one equation was created and added.
+         */
+        bool translate_postponed_disequations_to_equations();
 
         /**
          * @brief Run lightweight preprocessing focused on postponed disequations and

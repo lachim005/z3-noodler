@@ -63,7 +63,7 @@ namespace smt::noodler {
                 if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.disequations.get_predicates().empty()) {
                     this->solution = element_to_process;
                     lbool underapprox_sat = check_lens_sat_only();
-                    if (underapprox_sat != l_true) {
+                    if (underapprox_sat == l_false) {
                         if (element_to_process.preprocess_disequations_for_unsat(this->m_params) == l_false) {
                             continue;
                         }

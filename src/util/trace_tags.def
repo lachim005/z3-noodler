@@ -1358,3 +1358,5 @@ X(using_params_tactical, using_params, "using params")
 X(well_sorted_proc, well_sorted_proc, "well sorted proc")
 X(well_sorted_proc, tc, "tc")
 X(well_sorted_proc, ws, "ws")
+
+X(Global, scc_debug, "scc model debug")

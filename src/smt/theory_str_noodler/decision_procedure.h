@@ -315,9 +315,8 @@ namespace smt::noodler {
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
         //SCC helper functions
-        void find_graph_edges(Predicate input_inclusion, int inclIdx, BasicTerm checked_term, vector<vector<Predicate>> *graph_edges,
-                                vector<vector<int>> *adjacency_list, bool inclusion_side);
-        vector<vector<Predicate> > findSCC(int n, vector<vector<int>> *adjacency_list);
+        vector<vector<int>> find_graph_edges();
+        vector<vector<Predicate> > findSCC(vector<vector<int>> *adjacency_list);
 
         //struct for atoms in cycled inclusions
         struct Atom {

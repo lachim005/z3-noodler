@@ -1360,31 +1360,18 @@ namespace smt::noodler {
             }
         );
 
-                //Look for all egdes in the inclusion graph
-        vector<vector<Predicate>> graph_edges;
-        vector<vector<int>> adjacency_list;
-        for (unsigned i = 0; i < solution.inclusions.size(); i++) {
-            adjacency_list.push_back({});
-        }
-        int idx = 0;
-        for (Predicate incl : solution.inclusions) {
-            //Look throught all variable in the left side of the inclusion
-            for(BasicTerm term :  incl.get_side_vars(Predicate::EquationSideType::Left) ){
-                find_graph_edges(incl, idx, term, &graph_edges, &adjacency_list, true);
-            }
-            //Look throught all variable in the left side of the inclusion
-            for(BasicTerm term :  incl.get_side_vars(Predicate::EquationSideType::Right) ){
-                find_graph_edges(incl, idx, term, &graph_edges, &adjacency_list, false);
-            }
-            idx++;
-        }
-        //Find all SCC inclusions
-        /*idx = 0;
-        for(vector<int> x : adjacency_list){
-                std::cout << "Adjacency - " << idx << " = " << x << std::endl;
+        //Look for all egdes in the inclusion graph
+        vector<vector<int>> adjacency_list = find_graph_edges();
+    
+        STRACE(scc_debug,
+            int idx = 0;
+            for(vector<int> x : adjacency_list){
+                tout << "Adjacency - " << idx << " = " << x << std::endl;
                 idx++;
-        }*/
-        vector<vector<Predicate>> scc = findSCC(solution.inclusions.size(), &adjacency_list);
+            }
+        );
+
+        vector<vector<Predicate>> scc = findSCC(&adjacency_list);
                        
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
@@ -1434,13 +1421,15 @@ namespace smt::noodler {
                     }
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
                         //is var
+                        const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                         unsigned var_length = 0;
                         std::set<mata::Word> words;
                         auto it = vars_shortest_words.find(var);
                         if (it != vars_shortest_words.end())
                             words = it->second;
                         if(var.is_variable())
-                                var_length = alph.get_string_from_mata_word(*words.begin()).length();
+                            var_length = alph.get_string_from_mata_word(*words.begin()).length();
+
                         //is literal
                         else{
                             var_length = var.get_name().length();
@@ -1463,14 +1452,15 @@ namespace smt::noodler {
                         T_max_size += alph.get_string_from_mata_word(*words.begin()).length();
                     }
                 }
-
-                /*std::cout << "Random Assigment!" << std::endl;
-                for(auto const& [var, word] : scc_solution)
-                {
-                    std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
-                }
-                std::cout << "Looking for words!" << std::endl;*/
                 
+                STRACE(scc_debug,
+                    tout << "Random Assigment!" << std::endl;
+                    for(auto const& [var, word] : scc_solution)
+                    {
+                        tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                    }
+                );
+
                 //find correct words
                 while(T.size() < T_max_size){
                     //leftmost half full
@@ -1482,7 +1472,6 @@ namespace smt::noodler {
                             break;
                         }
                     }
-                    //std::cout << "Left_most = "<< left_most_index << std::endl;
 
                     if (left_most_index != -1) {
                         // Lemma 4
@@ -1499,42 +1488,128 @@ namespace smt::noodler {
                         get_assignment(left_most_index, left_side_atom, left_side, right_side,
                                         &scc_solution, &T);
                         
-                        // aktualizuj T
+                        // add atom to T
                         T.insert(add_atom);
 
                     } else {
                         // Lemma 3
                         for (unsigned pos = 0; pos < left_side.size(); pos++) {
                             if (!T.count(left_side[pos])) {
-                                //std::cout << "Adding " << left_side[pos].var.get_name() << "," << left_side[pos].index << std::endl;
                                 T.insert(left_side[pos]);
                                 break;
                             }
                             if (!T.count(right_side[pos])) {
-                                //std::cout << "Adding " << left_side[pos].var.get_name() << "," << left_side[pos].index << std::endl;
                                 T.insert(right_side[pos]);
                                 break;
                             }
                         }
                     }                   
                 }
-                //std::cout << "SCC all" << std::endl;
 
-                //std::cout << "Var Assigment!" << std::endl;
-                for(auto const& [var, word] : scc_solution)
-                {
-                    //std::cout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+                STRACE(scc_debug, tout << "Var Assigment!" << std::endl;);
+                for(auto const& [var, word] : scc_solution){
+                    STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
                     if(var.is_variable()){
                         update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
                     }
                 }
+
             }
         }   
+
+    }
+
+    vector<vector<int>> DecisionProcedure::find_graph_edges(){
+        vector<vector<int>> adjacency_list;
+        //Look throught all inclusions for variable matches
+        for (unsigned i = 0; i < solution.inclusions.size(); i++) {
+            adjacency_list.push_back({});
+        }
+        int idxRight = 0;
+        int idxLeft = 0;
+        
+        //foreach inclusions right side
+        for (Predicate inclLeft : solution.inclusions) {
+            //foreach inclusions left side
+            idxRight = 0;
+           for(Predicate inclRight : solution.inclusions){
+                //Is there an edge from L -> R
+                if(solution.is_dependent(inclLeft.get_side_vars(Predicate::EquationSideType::Left), inclRight.get_side_vars(Predicate::EquationSideType::Right)))
+                    adjacency_list[idxLeft].push_back(idxRight);           
+                idxRight++;
+           }
+           idxLeft++;
+        }
+        return adjacency_list;
+    }
+
+    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis)
+    {
+        // If curr node is destination return true
+        if (curr == des) {
+            return true;
+        }
+        //Loop throught all reachable verticles
+        (*vis)[curr] = 1;
+        for (int x : (*adj)[curr]) {
+            if (!(*vis)[x]) {
+                if (dfs(x, des, adj, vis)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool isPath(int src, int des, vector<vector<int>> *adj)
+    {
+        vector<int> vis(adj->size(), 0);
+        return dfs(src, des, adj, &vis);
+    }
+
+    vector<vector<Predicate>> DecisionProcedure::findSCC(vector<vector<int>> *adjacency_list)
+    {
+        vector<vector<Predicate>> predicate_ans;
+        // Stores all the strongly connected components.
+        vector<vector<int> > ans;
+        // Stores whether a vertex is a part of any Strongly Connected Component
+        vector<int> is_scc(solution.inclusions.size(), 0);
+        int idx = 0;
+        for(Predicate incl: solution.inclusions){
+            //Check if the is part of scc
+            if (!is_scc[idx]) 
+            {
+                vector<int> scc;
+                scc.push_back(idx);
+                vector<Predicate> scc_predicate;
+                scc_predicate.push_back(incl);
+                //Check for all scc verticles
+                int idx2 = 0;
+                for (Predicate pr: solution.inclusions){
+                    if(idx2 <= idx){
+                        idx2++;
+                        continue;
+                    }
+                    //If there is an edge from p1 -> p2 and p2 -> p1
+                    bool path1 = isPath(idx, idx2, adjacency_list);
+                    bool path2 = isPath(idx2, idx, adjacency_list);
+                    if (!is_scc[idx2] && path1 && path2){
+                        is_scc[idx2] = 1;
+                        scc.push_back(idx2);
+                        scc_predicate.push_back(pr);
+                    }
+                    idx2++;
+                }
+                ans.push_back(scc);
+                predicate_ans.push_back(scc_predicate);
+            }
+            idx++;
+        }
+        return predicate_ans;
     }
 
     void DecisionProcedure::get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
     std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T){
-        
         Atom missing_atom = missing_left ? left_side[p] : right_side[p];
         
         // var that would be changed
@@ -1592,32 +1667,25 @@ namespace smt::noodler {
         for(Predicate incl: scc_list){
             //std::cout << "\t" << incl << std::endl;
 
+            std::set<BasicTerm> incl_vars = incl.get_side_vars(Predicate::EquationSideType::Left);
+            incl_vars.merge(incl.get_side_vars(Predicate::EquationSideType::Right));
             //Get words from left side
-            for(BasicTerm var: incl.get_side_vars(Predicate::EquationSideType::Left)){           
+            for(BasicTerm var: incl_vars){           
                 if(res_map.count(var) == 0) 
                 {
-                    const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                    std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
-                    //std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
 
-                    /*for(mata::Word w: words){
+                    /*std::cout << "Checking: "<< var << std::endl;
+                    var_nfa.print_to_dot(std::cout);
+                    std::cout << "Print_to_mata " << std::endl;
+                    var_nfa.print_to_mata(std::cout);
+                    mata::nfa::builder::parse_from_mata(std::string{ R"()"});
+                    for(mata::Word w: words){
                         std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
                     }*/
+
                     //add result to ans
-                    res_map.insert({var, words});
-                }
-            }
-            //Get words from right side
-            for(BasicTerm var: incl.get_side_vars(Predicate::EquationSideType::Right)){
-                if(res_map.count(var) == 0) 
-                {
                     const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                     std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
-                    //std::cout << "\tChecking: "<< var << "[" << words.size() << "]"<< ":" << std::endl;
-                    /*for(mata::Word w: words){
-                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
-                    }*/
-                    // add result to ans
                     res_map.insert({var, words});
                 }
             }
@@ -1625,113 +1693,6 @@ namespace smt::noodler {
         return res_map;
     } 
     
-    void DecisionProcedure::find_graph_edges(Predicate input_inclusion, int inclIdx, BasicTerm checked_term, vector<vector<Predicate>> *graph_edges,
-                                             vector<vector<int>> *adjacency_list, bool inclusion_side){
-        //Look throught all inclusions for variable matches
-        int idx = 0;
-        for(Predicate incl : solution.inclusions){
-            //if(incl == input_inclusion) continue;
-            std::set<BasicTerm> checked_side;
-            //Choose with side of the inclusion check
-            //Left
-            if(inclusion_side)
-                checked_side = incl.get_side_vars(Predicate::EquationSideType::Right);
-            //Right
-            else
-                checked_side = incl.get_side_vars(Predicate::EquationSideType::Left);
-            if(checked_side.find(checked_term) != checked_side.end()){
-
-                vector<Predicate> edge = {input_inclusion, incl};
-                //Check if the edge is already added
-                int cnt = 0;
-                for(auto edgeC : *graph_edges){
-                    if(edgeC == edge)
-                    cnt++;
-                }
-                if(cnt == 0)
-                {
-                    //Add new edge into the vector
-                    graph_edges->push_back(edge);
-                    //Add new adjacency at idx
-                    (*adjacency_list)[idx].push_back(inclIdx);
-                }
-            }
-            //increment idx
-            idx++;
-        }
-    }
-
-    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis)
-    {
-        // If curr node is destination return true
-        if (curr == des) {
-            return true;
-        }
-        //Loop throught all reachable verticles
-        (*vis)[curr] = 1;
-        for (int x : (*adj)[curr]) {
-            if (!(*vis)[x]) {
-                if (dfs(x, des, adj, vis)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool isPath(int src, int des, vector<vector<int>> *adj)
-    {
-        vector<int> vis(adj->size(), 0);
-        return dfs(src, des, adj, &vis);
-    }
-
-    vector<vector<Predicate>> DecisionProcedure::findSCC(int n, vector<vector<int>> *adjacency_list)
-    {
-        vector<vector<Predicate>> predicate_ans;
-        // Stores all the strongly connected components.
-        vector<vector<int> > ans;
-        // Stores whether a vertex is a part of any Strongly
-        // Connected Component
-        vector<int> is_scc(n, 0);
-        int i = 0;
-        for(Predicate p: solution.inclusions){
-            //Check if the is part of scc
-            if (!is_scc[i]) 
-            {
-                vector<int> scc;
-                scc.push_back(i);
-                vector<Predicate> scc_predicate;
-                scc_predicate.push_back(p);
-                //Check for all scc verticles
-                int j = 0;
-                for (Predicate pr: solution.inclusions){
-                    if(j <= i){
-                        j++;
-                        continue;
-                    }
-                    //If there is an edge from p1 -> p2 and p2 -> p1
-                    bool path1 = isPath(i, j, adjacency_list);
-                    bool path2 = isPath(j, i, adjacency_list);
-                    //std::cout << "path - " << path1 << "," << path2 << std::endl;
-                    if (!is_scc[j] && path1 && path2){
-                        is_scc[j] = 1;
-                        scc.push_back(j);
-                        scc_predicate.push_back(pr);
-                    }
-                    j++;
-                }
-                ans.push_back(scc);
-                predicate_ans.push_back(scc_predicate);
-            }
-            i++;
-        }
-        /*for(vector<int> scc_list : ans){
-            std::cout << "SCC:" << std::endl;
-            std::cout << scc_list << std::endl;
-        }*/
-        return predicate_ans;
-    }
-
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {
         init_model(arith_model);
 

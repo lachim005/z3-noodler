@@ -131,8 +131,6 @@ namespace smt::noodler {
 
         // the length formula from preprocessing, get_lengths should create conjunct with it
         LenNode preprocessing_len_formula = LenNode(LenFormulaType::TRUE,{});
-        // keeps the length formulas from replace_disequality(), they need to hold for solution to be satisfiable (get_lengths should create conjunct from them)
-        std::vector<LenNode> disequations_len_formula_conjuncts;
 
         // remembers whether the input formula passed to init_computation() contained any disequation
         bool input_contains_disequations = false;
@@ -144,16 +142,8 @@ namespace smt::noodler {
         /// @brief We save here all string variables that exist before the decision procedure is run (useful for removing variables created in decision procedure, @sa SolvingState::remove_vars())
         std::set<BasicTerm> initial_variables;
 
-        /// @brief Sets the initial_variables by adding all variables from @p f and other stuff (init_aut_ass, init_length_sensitive_vars, conversions, inclusions_from_preprocessing)
-        void set_initial_variables(const Formula& f);
-
-        /**
-         * @brief Replace disequality L != R with equalities and a length constraint saved in disequations_len_formula_conjuncts.
-         * 
-         * @param diseq Disequality to replace
-         * @return Vector with created equalities
-         */
-        std::vector<Predicate> replace_disequality(Predicate diseq);
+        /// @brief Sets initial_variables by collecting all variables from @p f, @p state (aut_ass, length_sensitive_vars, conversions), and inclusions_from_preprocessing.
+        void set_initial_variables(const Formula& f, const SolvingState& state);
 
         void process_inclusion(const Predicate& inclusion_to_process, SolvingState& solving_state);
         void process_transducer(const Predicate& transducer_to_process, SolvingState& solving_state);

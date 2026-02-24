@@ -560,8 +560,7 @@ namespace smt::noodler {
         conversion_handler.initialize_solution(solution);
 
         // start with formula from disequation replacements
-        std::vector<LenNode> conjuncts = disequations_len_formula_conjuncts;
-        conjuncts.insert(conjuncts.end(), solution.disequations_len_formula_conjuncts.begin(), solution.disequations_len_formula_conjuncts.end());
+        std::vector<LenNode> conjuncts(solution.disequations_len_formula_conjuncts.begin(), solution.disequations_len_formula_conjuncts.end());
 
         // add length formula from preprocessing
         conjuncts.push_back(preprocessing_len_formula);
@@ -879,6 +878,7 @@ namespace smt::noodler {
      */
     void DecisionProcedure::init_computation() {
         Formula equations_and_transducers;
+        std::vector<Predicate> disequalities_to_replace;
 
         this->input_contains_disequations = false;
         bool has_transducers = false;
@@ -892,9 +892,7 @@ namespace smt::noodler {
                 if (this->m_params.m_ca_constr || this->m_params.m_postpone_diseqs_stabilization) {
                     init_ca_diseq(pred);
                 } else {
-                    for (auto const &eq_from_diseq : replace_disequality(pred)) {
-                        equations_and_transducers.add_predicate(eq_from_diseq);
-                    }
+                    disequalities_to_replace.push_back(pred);
                 }
             } else if (pred.is_transducer()) {
                 has_transducers = true;
@@ -913,19 +911,7 @@ namespace smt::noodler {
             }
         }
 
-        STRACE(str_dis,
-            tout << "Disequation len formula: " << LenNode(LenFormulaType::AND, disequations_len_formula_conjuncts) << std::endl;
-        );
-
-        STRACE(str_dis,
-            tout << "Equations and transducers after removing disequations" << std::endl;
-            for (const auto &eq : equations_and_transducers.get_predicates()) {
-                tout << "    " << eq << std::endl;
-            }
-        );
-
-        set_initial_variables(equations_and_transducers);
-
+        // Build init_solving_state before replacing disequalities so we can use SolvingState::replace_disequality
         SolvingState init_solving_state;
         init_solving_state.length_sensitive_vars = std::move(this->init_length_sensitive_vars);
         init_solving_state.aut_ass = std::move(this->init_aut_ass);
@@ -935,6 +921,26 @@ namespace smt::noodler {
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
         init_solving_state.disequations = this->disequations;
         init_solving_state.conversions = this->conversion_handler.get_conversions();
+
+        // Replace disequalities using SolvingState::replace_disequality
+        for (const Predicate& diseq : disequalities_to_replace) {
+            for (const Predicate& eq_from_diseq : init_solving_state.replace_disequality(diseq)) {
+                equations_and_transducers.add_predicate(eq_from_diseq);
+            }
+        }
+
+        STRACE(str_dis,
+            tout << "Disequation len formula: " << LenNode(LenFormulaType::AND, init_solving_state.disequations_len_formula_conjuncts) << std::endl;
+        );
+
+        STRACE(str_dis,
+            tout << "Equations and transducers after removing disequations" << std::endl;
+            for (const auto &eq : equations_and_transducers.get_predicates()) {
+                tout << "    " << eq << std::endl;
+            }
+        );
+
+        set_initial_variables(equations_and_transducers, init_solving_state);
 
         if (!equations_and_transducers.get_predicates().empty()) {
             FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers);
@@ -1107,32 +1113,6 @@ namespace smt::noodler {
             // preprocessing was not able to solve it
             return l_undef;
         }
-    }
-
-    /**
-     * Replace disequality @p diseq L != P by equalities L = x1a1y1 and R = x2a2y2
-     * where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
-     * also create arithmetic formula:
-     *   |x1| = |x2| && to_code(a1) != to_code(a2) && (|a1| = 0 => |y1| = 0) && (|a2| = 0 => |y2| = 0)
-     * The variables a1/a2 represent the characters on which the two sides differ
-     * (they have different code values). They have to occur on the same position,
-     * i.e. lengths of x1 and x2 are equal. The situation where one of the a1/a2
-     * is empty word (to_code returns -1) represents that one of the sides is
-     * longer than the other (they differ on the character just after the last
-     * character of the shorter side). We have to force that nothing is after
-     * the empty a1/a2, i.e. length of y1/y2 must be 0.
-     */
-    std::vector<Predicate> DecisionProcedure::replace_disequality(Predicate diseq) {
-        auto add_conversion = [this](const TermConversion& conversion) {
-            conversion_handler.add_conversion(conversion);
-        };
-        return replace_disequality_shared(
-            diseq,
-            init_aut_ass,
-            init_length_sensitive_vars,
-            disequations_len_formula_conjuncts,
-            add_conversion
-        );
     }
 
     void DecisionProcedure::init_model(const std::map<BasicTerm,rational>& arith_model) {
@@ -1424,16 +1404,16 @@ namespace smt::noodler {
         return needed_vars;
     }
 
-    void DecisionProcedure::set_initial_variables(const Formula& f) {
+    void DecisionProcedure::set_initial_variables(const Formula& f, const SolvingState& state) {
         initial_variables = f.get_vars();
-        for (const auto& [var,_aut] : init_aut_ass) {
+        for (const auto& [var, _aut] : state.aut_ass) {
             initial_variables.insert(var);
         }
-        for (const auto& var : init_length_sensitive_vars) {
+        for (const auto& var : state.length_sensitive_vars) {
             initial_variables.insert(var);
         }
-        for (const BasicTerm& conv_string_var : conversion_handler.get_string_vars_in_conversions()) {
-            initial_variables.insert(conv_string_var);
+        for (const TermConversion& conv : state.conversions) {
+            initial_variables.insert(conv.string_var);
         }
         for (const auto& incl : inclusions_from_preprocessing) {
             for (const auto& var : incl.get_vars()) {

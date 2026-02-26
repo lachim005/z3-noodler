@@ -271,7 +271,13 @@ namespace smt::noodler {
          */
         void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
 
-        LenNode get_disequations_length_formula() const;
+        /**
+         * @brief Get under-approximation of the postponed disequations length formula. For each disquation L != R add to 
+         * the resulting conjunction a formula |L| != |R|.
+         * 
+         * @return LenNode Postponed disequations length under-approximation 
+         */
+        LenNode get_disequations_underapprox_length_formula() const;
 
         /**
          * @brief Collect vars that are referenced by constraints stored directly in this state

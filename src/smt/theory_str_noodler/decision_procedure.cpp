@@ -582,7 +582,7 @@ namespace smt::noodler {
             conjuncts.push_back(get_formula_for_ca_diseqs());
         }
         if (!solution.postponed_disequations.get_predicates().empty()) {
-            conjuncts.push_back(solution.get_disequations_length_formula());
+            conjuncts.push_back(solution.get_disequations_underapprox_length_formula());
             // For postponed disequations we currently encode only |lhs| != |rhs|.
             // This is an underapproximation of string disequality and must not be
             // treated as a precise source of unsat.

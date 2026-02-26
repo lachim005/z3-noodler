@@ -72,7 +72,7 @@ namespace smt::noodler {
         apply_substitutions_to_disequations();
     }
 
-    LenNode SolvingState::get_disequations_length_formula() const {
+    LenNode SolvingState::get_disequations_underapprox_length_formula() const {
         LenNode result{LenFormulaType::AND};
         for(const Predicate& diseq : postponed_disequations.get_predicates()) {
             result.succ.push_back(diseq.get_formula_eq());

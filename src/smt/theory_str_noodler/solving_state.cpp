@@ -339,6 +339,7 @@ namespace smt::noodler {
             });
 
         substitution_map = new_substitution_map;
+        apply_substitutions_to_disequations();
     }
 
     std::pair<std::vector<std::shared_ptr<mata::nfa::Nfa>>,std::vector<std::vector<BasicTerm>>> SolvingState::get_automata_and_division_of_concatenation(const std::vector<BasicTerm>& concatenation, bool group_non_length) {

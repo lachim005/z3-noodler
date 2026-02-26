@@ -965,7 +965,6 @@ namespace smt::noodler {
         }
 
         init_solving_state.flatten_substition_map();
-        init_solving_state.apply_substitutions_to_disequations();
 
         STRACE(str_noodle_dot, tout << "digraph Procedure {\ninit[shape=none, label=\"\"]\n";);
         push_to_worklist(std::move(init_solving_state), true);

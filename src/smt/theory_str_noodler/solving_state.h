@@ -14,6 +14,13 @@ namespace smt::noodler {
 
     /// A state of decision procedure that can lead to a solution
     struct SolvingState {
+
+    private:
+        
+        /// @brief Apply substitutions from substitution_map directly to disequations.
+        void apply_substitutions_to_disequations();
+
+    public:
         // aut_ass[x] assigns variable x to some automaton while substitution_map[x] maps variable x to
         // the concatenation of variables for which x was substituted (i.e. its automaton is concatenation
         // of the automata from these variables). Each variable is either assigned in aut_ass or
@@ -255,8 +262,6 @@ namespace smt::noodler {
             return false;
         }
 
-        // substitutes vars and merge same nodes + delete copies of the merged nodes from the predicates_to_process (and also inclusions that have same sides are deleted)
-
         /**
          * @brief Substitutes variables from @p vars_to_substitute in predicates using substitution_map and removes unnnecessary nodes
          * 
@@ -265,9 +270,6 @@ namespace smt::noodler {
          * one). Furthermore, it removes inclusions that have both sides equal after substitution.
          */
         void substitute_vars(const std::set<BasicTerm>& vars_to_substitute);
-
-        /// @brief Apply substitutions from substitution_map directly to disequations.
-        void apply_substitutions_to_disequations();
 
         LenNode get_disequations_length_formula() const;
 

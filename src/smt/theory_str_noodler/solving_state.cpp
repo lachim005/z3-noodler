@@ -74,7 +74,7 @@ namespace smt::noodler {
 
     LenNode SolvingState::get_disequations_length_formula() const {
         LenNode result{LenFormulaType::AND};
-        for(const Predicate& diseq : disequations.get_predicates()) {
+        for(const Predicate& diseq : postponed_disequations.get_predicates()) {
             result.succ.push_back(diseq.get_formula_eq());
         }
         return result;
@@ -88,7 +88,7 @@ namespace smt::noodler {
             referenced_vars.insert(conversion.number_var);
         }
 
-        const std::set<BasicTerm> diseq_vars = disequations.get_vars();
+        const std::set<BasicTerm> diseq_vars = postponed_disequations.get_vars();
         referenced_vars.insert(diseq_vars.begin(), diseq_vars.end());
 
         for (const LenNode& conjunct : disequations_len_formula_conjuncts) {
@@ -109,7 +109,7 @@ namespace smt::noodler {
             return result;
         };
 
-        for (Predicate& diseq : disequations.get_predicates()) {
+        for (Predicate& diseq : postponed_disequations.get_predicates()) {
             SASSERT(diseq.is_inequation());
             diseq = Predicate::create_disequation(
                 substitute_concat(diseq.get_left_side()),
@@ -201,14 +201,14 @@ namespace smt::noodler {
 
     bool SolvingState::translate_postponed_disequations_to_equations() {
         Formula equations_from_diseqs;
-        for (const Predicate& diseq : disequations.get_predicates()) {
+        for (const Predicate& diseq : postponed_disequations.get_predicates()) {
             for (const Predicate& eq_from_diseq : replace_disequality(diseq)) {
                 equations_from_diseqs.add_predicate(eq_from_diseq);
             }
         }
 
         if (equations_from_diseqs.get_predicates().empty()) {
-            disequations.get_predicates().clear();
+            postponed_disequations.get_predicates().clear();
             return false;
         }
 
@@ -221,12 +221,12 @@ namespace smt::noodler {
             push_unique(node_pred, is_on_cycle);
         }
 
-        disequations.get_predicates().clear();
+        postponed_disequations.get_predicates().clear();
         return true;
     }
 
     lbool SolvingState::preprocess_disequations_for_unsat(const theory_str_noodler_params& params) {
-        if (disequations.get_predicates().empty()) {
+        if (postponed_disequations.get_predicates().empty()) {
             return l_true;
         }
 
@@ -235,7 +235,7 @@ namespace smt::noodler {
             conversion_vars.insert(conv.string_var);
         }
 
-        FormulaPreprocessor prep_handler{disequations, aut_ass, length_sensitive_vars, params, conversion_vars};
+        FormulaPreprocessor prep_handler{postponed_disequations, aut_ass, length_sensitive_vars, params, conversion_vars};
 
         prep_handler.remove_trivial();
         prep_handler.reduce_diseqalities();
@@ -248,7 +248,7 @@ namespace smt::noodler {
         }
 
         // Persist the simplified disequations and refined state back.
-        disequations = prep_handler.get_modified_formula();
+        postponed_disequations = prep_handler.get_modified_formula();
         aut_ass = prep_handler.get_aut_assignment();
         const std::unordered_set<BasicTerm>& prep_len_vars = prep_handler.get_len_variables();
         length_sensitive_vars.insert(prep_len_vars.begin(), prep_len_vars.end());

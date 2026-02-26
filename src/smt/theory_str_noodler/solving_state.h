@@ -44,7 +44,7 @@ namespace smt::noodler {
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
         // disequations postponed to be handled after finding stable solutions
-        Formula disequations;
+        Formula postponed_disequations;
 
         // conversions local to this solving state
         std::vector<TermConversion> conversions;
@@ -73,7 +73,7 @@ namespace smt::noodler {
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
                           length_sensitive_vars(length_sensitive_vars),
-                          disequations(disequations),
+                          postponed_disequations(disequations),
                           conversions(conversions),
                           has_siblings(has_siblings) {}
 

@@ -59,7 +59,7 @@ namespace smt::noodler {
             }
 
             if (element_to_process.predicates_to_process.empty()) {
-                if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.disequations.get_predicates().empty()) {
+                if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.postponed_disequations.get_predicates().empty()) {
                     this->solution = element_to_process;
                     lbool underapprox_sat = check_lens(false);
                     if (underapprox_sat == l_false) {
@@ -550,7 +550,7 @@ namespace smt::noodler {
         LenNodePrecision precision = LenNodePrecision::PRECISE; // start with precise and possibly change it later
 
         if (solution.length_sensitive_vars.empty() && this->not_contains.get_predicates().empty() 
-            && this->solution.disequations.get_predicates().empty()) {
+            && this->solution.postponed_disequations.get_predicates().empty()) {
             // There is not notcontains predicate to be solved and there are no length vars (which also means no
             // disequations nor conversions), it is not needed to create the lengths formula.
             return {LenNode(LenFormulaType::TRUE), precision};
@@ -581,7 +581,7 @@ namespace smt::noodler {
         if(this->m_params.m_ca_constr) {
             conjuncts.push_back(get_formula_for_ca_diseqs());
         }
-        if (!solution.disequations.get_predicates().empty()) {
+        if (!solution.postponed_disequations.get_predicates().empty()) {
             conjuncts.push_back(solution.get_disequations_length_formula());
             // For postponed disequations we currently encode only |lhs| != |rhs|.
             // This is an underapproximation of string disequality and must not be
@@ -838,7 +838,7 @@ namespace smt::noodler {
     }
 
     LenNode DecisionProcedure::get_formula_for_ca_diseqs() {
-        Formula proj_diseqs = this->solution.disequations;
+        Formula proj_diseqs = this->solution.postponed_disequations;
 
         STRACE(str, tout << "CA-DISEQS (original): " << std::endl << this->disequations.to_string() << std::endl;);
         STRACE(str, tout << "CA-DISEQS (substituted): " << std::endl << proj_diseqs.to_string() << std::endl;);
@@ -918,7 +918,7 @@ namespace smt::noodler {
             init_solving_state.aut_ass.erase(subs.first);
         }
         init_solving_state.substitution_map = std::move(this->init_substitution_map);
-        init_solving_state.disequations = this->disequations;
+        init_solving_state.postponed_disequations = this->disequations;
         init_solving_state.conversions = this->conversion_handler.get_conversions();
 
         // Replace disequalities using SolvingState::replace_disequality

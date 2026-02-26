@@ -132,7 +132,7 @@ namespace smt::noodler {
         };
 
         /// Gets a solution for which we want to compute the LIA formula (can be called multiple times to get formula for different solutions)
-        void initialize_solution(const SolvingState& solution);
+        void initialize_solution(SolvingState solution);
 
         /**
          * @brief Gets a LI(R)A formula encoding the conversions based on a given solution from initialize_solution

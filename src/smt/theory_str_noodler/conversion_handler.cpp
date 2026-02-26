@@ -4,9 +4,9 @@
 
 namespace smt::noodler {
 
-void ConversionHandler::initialize_solution(const SolvingState& solution) {
+void ConversionHandler::initialize_solution(SolvingState solution) {
     conversions = solution.conversions;
-    this->solution = solution;
+    this->solution = std::move(solution);
 
     code_subst_vars.clear();
     int_subst_vars.clear();
@@ -17,7 +17,7 @@ void ConversionHandler::initialize_solution(const SolvingState& solution) {
             case ConversionType::FROM_CODE:
             case ConversionType::TO_CODE:
             {
-                for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
+                for (const BasicTerm& var : this->solution.get_substituted_vars(conv.string_var)) {
                     code_subst_vars.insert(var);
                 }
                 break;
@@ -25,7 +25,7 @@ void ConversionHandler::initialize_solution(const SolvingState& solution) {
             case ConversionType::TO_INT:
             case ConversionType::FROM_INT:
             {
-                for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
+                for (const BasicTerm& var : this->solution.get_substituted_vars(conv.string_var)) {
                     int_subst_vars.insert(var);
                 }
                 break;
@@ -33,7 +33,7 @@ void ConversionHandler::initialize_solution(const SolvingState& solution) {
             case ConversionType::TO_REAL:
             case ConversionType::FROM_REAL:
             {
-                for (const BasicTerm& var : solution.get_substituted_vars(conv.string_var)) {
+                for (const BasicTerm& var : this->solution.get_substituted_vars(conv.string_var)) {
                     real_subst_vars.insert(var);
                 }
                 break;

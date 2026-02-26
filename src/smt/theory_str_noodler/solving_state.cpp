@@ -199,30 +199,26 @@ namespace smt::noodler {
         return new_eqs;
     }
 
-    bool SolvingState::translate_postponed_disequations_to_equations() {
+    void SolvingState::translate_postponed_disequations_to_equations() {
         Formula equations_from_diseqs;
         for (const Predicate& diseq : postponed_disequations.get_predicates()) {
             for (const Predicate& eq_from_diseq : replace_disequality(diseq)) {
-                equations_from_diseqs.add_predicate(eq_from_diseq);
+                // equations_from_diseqs.add_predicate(eq_from_diseq);
+                add_predicate(eq_from_diseq, false);
+                push_unique(eq_from_diseq, false);
             }
         }
 
-        if (equations_from_diseqs.get_predicates().empty()) {
-            postponed_disequations.get_predicates().clear();
-            return false;
-        }
-
-        FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);
-        for (const FormulaGraphNode& node : incl_graph.get_nodes()) {
-            Predicate node_pred = node.get_real_predicate();
-            SASSERT(node_pred.is_equation());
-            bool is_on_cycle = incl_graph.is_on_cycle(node);
-            add_predicate(node_pred, is_on_cycle);
-            push_unique(node_pred, is_on_cycle);
-        }
+        // FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);
+        // for (const FormulaGraphNode& node : incl_graph.get_nodes()) {
+        //     Predicate node_pred = node.get_real_predicate();
+        //     SASSERT(node_pred.is_equation());
+        //     bool is_on_cycle = incl_graph.is_on_cycle(node);
+        //     add_predicate(node_pred, is_on_cycle);
+        //     push_unique(node_pred, is_on_cycle);
+        // }
 
         postponed_disequations.get_predicates().clear();
-        return true;
     }
 
     lbool SolvingState::preprocess_disequations_for_unsat(const theory_str_noodler_params& params) {

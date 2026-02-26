@@ -424,10 +424,8 @@ namespace smt::noodler {
          * The created equations are inserted into an inclusion graph and then added
          * to this state as predicates, preserving cycle information and processing
          * order from the graph.
-         *
-         * @return true iff at least one equation was created and added.
          */
-        bool translate_postponed_disequations_to_equations();
+        void translate_postponed_disequations_to_equations();
 
         /**
          * @brief Run lightweight preprocessing focused on postponed disequations and

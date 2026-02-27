@@ -59,6 +59,9 @@ namespace smt::noodler {
             }
 
             if (element_to_process.predicates_to_process.empty()) {
+                // Now we are in the state with no equations or transducers left to process (but some postponed disequations might left). 
+                // First we in get_legths generate under-approximation of the disequations by length disequality
+                // If the length formula is unsat, we need to solve disequations precisely by translating them to equations and adding to the solving state.
                 if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.postponed_disequations.get_predicates().empty()) {
                     this->solution = element_to_process;
                     lbool underapprox_sat = check_lens(false);
@@ -886,9 +889,13 @@ namespace smt::noodler {
             if (pred.is_equation()) {
                 equations_and_transducers.add_predicate(pred);
             } else if (pred.is_inequation()) {
+                // if there are some disequations, we cannot use the heuristic for pruning solving 
+                // states based on lengths becase the heuristic performs over-approximation but the 
+                // postponing disequalities involves under-approximation
                 this->input_contains_disequations = true;
                 // If we solve diesquations using CA --> we store the disequations to be solved later on
                 if (this->m_params.m_ca_constr || this->m_params.m_postpone_diseqs_stabilization) {
+                    // we store postponed disequations to this->disequations
                     init_ca_diseq(pred);
                 } else {
                     disequalities_to_replace.push_back(pred);

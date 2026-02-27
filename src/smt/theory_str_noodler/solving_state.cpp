@@ -118,6 +118,19 @@ namespace smt::noodler {
         }
     }
 
+    /**
+     * Replace disequality @p diseq L != P by equalities L = x1a1y1 and R = x2a2y2
+     * where x1,x2,y1,y2 \in \Sigma* and a1,a2 \in \Sigma \cup {\epsilon} and
+     * also create arithmetic formula:
+     *   |x1| = |x2| && to_code(a1) != to_code(a2) && (|a1| = 0 => |y1| = 0) && (|a2| = 0 => |y2| = 0)
+     * The variables a1/a2 represent the characters on which the two sides differ
+     * (they have different code values). They have to occur on the same position,
+     * i.e. lengths of x1 and x2 are equal. The situation where one of the a1/a2
+     * is empty word (to_code returns -1) represents that one of the sides is
+     * longer than the other (they differ on the character just after the last
+     * character of the shorter side). We have to force that nothing is after
+     * the empty a1/a2, i.e. length of y1/y2 must be 0.
+     */
     std::vector<Predicate> SolvingState::replace_disequality(const Predicate& diseq) {
         // automaton accepting empty word or exactly one symbol
         std::shared_ptr<mata::nfa::Nfa> sigma_eps_automaton = std::make_shared<mata::nfa::Nfa>(aut_ass.sigma_eps_automaton());

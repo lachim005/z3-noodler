@@ -427,9 +427,7 @@ namespace smt::noodler {
          * @brief Expand postponed disequations into equations and enqueue them.
          *
          * Each postponed disequation is replaced by equations via replace_disequality().
-         * The created equations are inserted into an inclusion graph and then added
-         * to this state as predicates, preserving cycle information and processing
-         * order from the graph.
+         * The resulting equations are added to this state and also pushed for processing.
          */
         void translate_postponed_disequations_to_equations();
 
@@ -437,11 +435,17 @@ namespace smt::noodler {
          * @brief Run lightweight preprocessing focused on postponed disequations and
          *        detect whether they are immediately unsatisfiable in this state.
          *
-         * The method does not mutate this solving state; it only analyzes a local
-         * preprocessor instance built from current disequations and state data.
+         * This method runs a local FormulaPreprocessor over `postponed_disequations`
+         * using the current `aut_ass`, `length_sensitive_vars` and any conversion
+         * variables. If the preprocessor detects immediate unsatisfiability it
+         * returns `l_false` and does not change this state. Otherwise the method
+         * persists the preprocessor's simplified disequations and the refined
+         * automata/length information back into this `SolvingState` (it updates
+         * `postponed_disequations`, `aut_ass` and inserts any discovered length
+         * variables into `length_sensitive_vars`) and returns `l_true`.
          *
-         * @return l_false iff preprocessing proves some disequation branch unsat,
-         *         l_true otherwise.
+         * @return `l_false` iff preprocessing proves some disequation branch unsat,
+         *         `l_true` otherwise.
          */
         lbool preprocess_disequations_for_unsat(const theory_str_noodler_params& params);
 

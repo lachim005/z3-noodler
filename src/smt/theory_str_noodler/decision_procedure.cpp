@@ -70,9 +70,13 @@ namespace smt::noodler {
                             continue;
                         }
                         element_to_process.translate_postponed_disequations_to_equations();
-                    } else {
+                    } else if (underapprox_sat == l_true) {
                         solution = std::move(element_to_process);
                         return { l_true, false };
+                    } else {
+                        // underapprox_sat == l_undef: length under-approximation is inconclusive.
+                        // Do not assume satisfiability; instead, solve postponed disequations precisely.
+                        element_to_process.translate_postponed_disequations_to_equations();
                     }
                     push_to_worklist(element_to_process, true);
                     continue;

@@ -572,7 +572,7 @@ namespace smt::noodler {
         conjuncts.push_back(preprocessing_len_formula);
 
         // compute formula for vars in transducers (lengths and code-point conversions)
-        conjuncts.push_back(get_formula_for_transducers(conversion_handler));
+        conjuncts.push_back(get_formula_for_transducers());
         util::check_limit(m);
 
         // formula for encoding lengths
@@ -604,7 +604,7 @@ namespace smt::noodler {
         return {result, precision};
     }
 
-    LenNode DecisionProcedure::get_formula_for_transducers(ConversionHandler& conversion_handler_for_solution) {
+    LenNode DecisionProcedure::get_formula_for_transducers() {
         LenNode result(LenFormulaType::AND);
 
         length_vars_with_transducers = {};
@@ -687,7 +687,7 @@ namespace smt::noodler {
             
             // we build a parikh image for the transducer (first we collect all levels of code_vars)
             std::set<mata::nft::Level> levels_of_code_subst_vars;
-            std::set<BasicTerm> code_subst_vars = conversion_handler_for_solution.get_code_subst_vars();
+            std::set<BasicTerm> code_subst_vars = conversion_handler.get_code_subst_vars();
             for (size_t i = 0; i < vars_on_tapes.size(); ++i) {
                 const BasicTerm& var = vars_on_tapes[i];
                 length_vars_with_transducers.insert(var);
@@ -695,7 +695,7 @@ namespace smt::noodler {
                     code_subst_vars_handled_by_parikh.insert(var);
                     levels_of_code_subst_vars.insert(i);
                 }
-                if (conversion_handler_for_solution.get_int_subst_vars().contains(var) || conversion_handler_for_solution.get_real_subst_vars().contains(var)) {
+                if (conversion_handler.get_int_subst_vars().contains(var) || conversion_handler.get_real_subst_vars().contains(var)) {
                     // TODO add support (pretty hard, we need to remember the order of selected transitions by parikh)
                     util::throw_error("Integer/real conversions with transducers are not supported yet");
                 }
@@ -775,7 +775,7 @@ namespace smt::noodler {
                     if (!parikh_transducer.get_tape_var_used_symbols().contains(var)) {
                         // if we are here, this means there is no non-epsilon transition for this var in the transducer,
                         // |var| == 0 (this is encoded in parikh) which means that code_version_of(var) == -1
-                        result.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conversion_handler_for_solution.code_version_of(var),-1});
+                        result.succ.emplace_back(LenFormulaType::EQ, std::vector<LenNode>{conversion_handler.code_version_of(var),-1});
                     } else {
                         // If we are here, parikh_transducer.get_tape_var_used_symbols().at(var) contains all symbols
                         // that are on some transition in the transducer for this var. Therefore we need to create for
@@ -784,7 +784,7 @@ namespace smt::noodler {
 
                         // We first encode the formula that var is not one symbol
                         // (|var| != 1 && code_version_of(var) == -1)
-                        LenNode non_char_case(LenFormulaType::AND, { {LenFormulaType::NEQ, std::vector<LenNode>{var, 1}}, {LenFormulaType::EQ, std::vector<LenNode>{conversion_handler_for_solution.code_version_of(var),-1}} });
+                        LenNode non_char_case(LenFormulaType::AND, { {LenFormulaType::NEQ, std::vector<LenNode>{var, 1}}, {LenFormulaType::EQ, std::vector<LenNode>{conversion_handler.code_version_of(var),-1}} });
 
                         // We now continue with the case that |var| ==1
                         // (|var| == 1 && code_version_of(var) is code point of one of the symbols based on parikh)
@@ -804,7 +804,7 @@ namespace smt::noodler {
                             LenNode num_of_s_in_var_is_one{ LenFormulaType::NEQ, std::vector<LenNode>{num_of_s_in_var, 1} };
 
                             // code_version_of(var) == s
-                            LenNode code_version_is_equal_to_s(LenFormulaType::EQ, {conversion_handler_for_solution.code_version_of(var), s});
+                            LenNode code_version_is_equal_to_s(LenFormulaType::EQ, {conversion_handler.code_version_of(var), s});
 
                             // (num_of_s_in_var == 1) => (code_version_of(var) == s), i.e.
                             // (num_of_s_in_var != 1) || (code_version_of(var) == s)

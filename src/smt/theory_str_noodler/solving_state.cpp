@@ -213,23 +213,15 @@ namespace smt::noodler {
     }
 
     void SolvingState::translate_postponed_disequations_to_equations() {
-        Formula equations_from_diseqs;
+        // we can add equations from replacing disequations as they are. The right side of 
+        // each equation contains fresh variables only. Therefore, they cannot depend on 
+        // alredy processed equations.
         for (const Predicate& diseq : postponed_disequations.get_predicates()) {
             for (const Predicate& eq_from_diseq : replace_disequality(diseq)) {
-                // equations_from_diseqs.add_predicate(eq_from_diseq);
                 add_predicate(eq_from_diseq, false);
                 push_unique(eq_from_diseq, false);
             }
         }
-
-        // FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_from_diseqs);
-        // for (const FormulaGraphNode& node : incl_graph.get_nodes()) {
-        //     Predicate node_pred = node.get_real_predicate();
-        //     SASSERT(node_pred.is_equation());
-        //     bool is_on_cycle = incl_graph.is_on_cycle(node);
-        //     add_predicate(node_pred, is_on_cycle);
-        //     push_unique(node_pred, is_on_cycle);
-        // }
 
         postponed_disequations.get_predicates().clear();
     }

@@ -59,8 +59,8 @@ namespace smt::noodler {
             }
 
             if (element_to_process.predicates_to_process.empty()) {
-                // Now we are in the state with no equations or transducers left to process (but some postponed disequations might left). 
-                // First we in get_legths generate under-approximation of the disequations by length disequality
+                // Now we are in the state with no equations or transducers left to process (but some postponed disequations might be left). 
+                // First we in get_lengths generate under-approximation of the disequations by length disequality
                 // If the length formula is unsat, we need to solve disequations precisely by translating them to equations and adding to the solving state.
                 if (this->m_params.m_postpone_diseqs_stabilization && !element_to_process.postponed_disequations.get_predicates().empty()) {
                     this->solution = element_to_process;

@@ -317,6 +317,7 @@ namespace smt::noodler {
             auto [noodler_lengths, precision] = dec_proc->get_lengths();
 
             lengths = len_node_to_z3_formula(noodler_lengths);
+            m_rewrite(lengths);
 
             STRACE(str_print_notcontains_lia,
                 std::ofstream out_file("./not-contains-lia.smt2");

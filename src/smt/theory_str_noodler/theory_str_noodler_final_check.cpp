@@ -330,7 +330,15 @@ namespace smt::noodler {
             }
             return std::pair<lbool, LenNodePrecision>(sat, precision);
         };
-        auto check_lens = [&check_lens_with_precision]() { return check_lens_with_precision().first; };
+        auto check_lens = [&check_lens_with_precision, this, &lengths, &check_len_sat_with_context](bool add_to_block) -> lbool {
+            if (add_to_block) {
+                return check_lens_with_precision().first;
+            } else {
+                auto [noodler_lengths, _precision] = dec_proc->get_lengths();
+                lengths = len_node_to_z3_formula(noodler_lengths);
+                return check_len_sat(lengths, check_len_sat_with_context);
+            }
+        };
 
         while (true) {
             util::check_limit(m);
@@ -758,7 +766,7 @@ namespace smt::noodler {
         this->statistics.at("underapprox").num_start++;
 
         bool check_with_context = !init_length_sensitive_vars.empty();
-        auto check_lens = [this, &check_with_context]() {
+        auto check_lens = [this, &check_with_context](bool) {
             expr_ref lengths = len_node_to_z3_formula(dec_proc->get_lengths().first);
             return check_len_sat(lengths, check_with_context);
         };

@@ -1302,7 +1302,8 @@ namespace smt::noodler {
                 idx++;
             }
         );
-
+        
+        //Find all scc in inclusions 
         vector<vector<Predicate>> scc = findSCC(&adjacency_list);
                        
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
@@ -1322,21 +1323,23 @@ namespace smt::noodler {
                 std::map<BasicTerm, mata::Word> scc_solution;
 
                 //shortest words
-                std::map<BasicTerm, std::set<mata::Word>> vars_shortest_words = find_shortest_words(scc_list);
-                
-                //std::cout << "Creating atom equations!" << std::endl;
+                //std::map<BasicTerm, std::set<mata::Word>> vars_shortest_words = find_shortest_words(scc_list);
+                std::vector<BasicTerm> vars;
                 //create atom equations
                 for(Predicate incl: scc_list){
                     //Add # symbol
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Left)){ 
                         //is var
                         unsigned var_length = 0;
-                        std::set<mata::Word> words;
-                        auto it = vars_shortest_words.find(var);
-                        if (it != vars_shortest_words.end())
-                            words = it->second;
-                        if(var.is_variable())
-                                var_length = alph.get_string_from_mata_word(*words.begin()).length();
+                        if(var.is_variable()){
+                            const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
+                            mata::Word  w = get_shortest_word(var_nfa);
+                            var_length = alph.get_string_from_mata_word(w).length();
+                            scc_solution[var] = w;
+                            T_max_size += var_length;
+                            STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(w) << std::endl;);
+                            
+                        }
                         //is literal
                         else{
                             var_length = var.get_name().length();
@@ -1353,21 +1356,19 @@ namespace smt::noodler {
                     }
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
                         //is var
-                        const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                         unsigned var_length = 0;
-                        std::set<mata::Word> words;
-                        auto it = vars_shortest_words.find(var);
-                        if (it != vars_shortest_words.end())
-                            words = it->second;
-                        if(var.is_variable())
-                            var_length = alph.get_string_from_mata_word(*words.begin()).length();
-
+                        if(var.is_variable()){
+                            const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
+                            mata::Word  w = get_shortest_word(var_nfa);
+                            var_length = alph.get_string_from_mata_word(w).length();
+                            scc_solution[var] = w; 
+                            STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(w) << std::endl;);
+                        }
                         //is literal
                         else{
                             var_length = var.get_name().length();
                             if(!scc_solution.count(var)){
                                 scc_solution[var] = util::get_mata_word_zstring(var.get_name());
-                                T_max_size += var_length;
                             }
                         }
                         for(unsigned idx = 0; idx < var_length; idx++){
@@ -1376,15 +1377,7 @@ namespace smt::noodler {
                         }
                     }
                 }
-                
-                //assign random words to v
-                for (auto const& [var, words] : vars_shortest_words) {
-                    if (!words.empty()){
-                        scc_solution[var] = *words.begin(); 
-                        T_max_size += alph.get_string_from_mata_word(*words.begin()).length();
-                    }
-                }
-                
+                               
                 STRACE(scc_debug,
                     tout << "Random Assigment!" << std::endl;
                     for(auto const& [var, word] : scc_solution)
@@ -1440,7 +1433,7 @@ namespace smt::noodler {
 
                 STRACE(scc_debug, tout << "Var Assigment!" << std::endl;);
                 for(auto const& [var, word] : scc_solution){
-                    STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
+                    STRACE(scc_debug, if(var.is_variable()) tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
                     if(var.is_variable()){
                         update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
                     }
@@ -1451,7 +1444,7 @@ namespace smt::noodler {
 
     }
 
-    vector<vector<int>> DecisionProcedure::find_graph_edges(){
+    vector<vector<int>> DecisionProcedure::find_graph_edges() {
         vector<vector<int>> adjacency_list;
         //Look throught all inclusions for variable matches
         for (unsigned i = 0; i < solution.inclusions.size(); i++) {
@@ -1475,8 +1468,7 @@ namespace smt::noodler {
         return adjacency_list;
     }
 
-    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis)
-    {
+    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis) {
         // If curr node is destination return true
         if (curr == des) {
             return true;
@@ -1493,14 +1485,12 @@ namespace smt::noodler {
         return false;
     }
 
-    bool isPath(int src, int des, vector<vector<int>> *adj)
-    {
+    bool isPath(int src, int des, vector<vector<int>> *adj) {
         vector<int> vis(adj->size(), 0);
         return dfs(src, des, adj, &vis);
     }
 
-    vector<vector<Predicate>> DecisionProcedure::findSCC(vector<vector<int>> *adjacency_list)
-    {
+    vector<vector<Predicate>> DecisionProcedure::findSCC(vector<vector<int>> *adjacency_list) {
         vector<vector<Predicate>> predicate_ans;
         // Stores all the strongly connected components.
         vector<vector<int> > ans;
@@ -1541,7 +1531,7 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
-    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T){
+    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T) {
         Atom missing_atom = missing_left ? left_side[p] : right_side[p];
         
         // var that would be changed
@@ -1577,8 +1567,7 @@ namespace smt::noodler {
         }
     }
 
-    bool DecisionProcedure::isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T)
-    {
+    bool DecisionProcedure::isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T) {
         bool is_left_atom = T.count(left_side[idx]);
         bool is_right_atom = T.count(right_side[idx]);
         //std::cout << "Check halffull " << idx << " - " << is_left_atom << "," << is_right_atom << std::endl;
@@ -1588,8 +1577,7 @@ namespace smt::noodler {
             return false;
     }
 
-    std::map<BasicTerm, std::set<mata::Word>> DecisionProcedure::find_shortest_words(vector<Predicate> scc_list)
-    {
+    std::map<BasicTerm, std::set<mata::Word>> DecisionProcedure::find_shortest_words(vector<Predicate> scc_list) {
         //return var
         std::map<BasicTerm, std::set<mata::Word>> res_map;
 
@@ -1605,25 +1593,79 @@ namespace smt::noodler {
             for(BasicTerm var: incl_vars){           
                 if(res_map.count(var) == 0) 
                 {
-
-                    /*std::cout << "Checking: "<< var << std::endl;
-                    var_nfa.print_to_dot(std::cout);
-                    std::cout << "Print_to_mata " << std::endl;
-                    var_nfa.print_to_mata(std::cout);
-                    mata::nfa::builder::parse_from_mata(std::string{ R"()"});
-                    for(mata::Word w: words){
-                        std::cout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
-                    }*/
-
                     //add result to ans
                     const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                     std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
+                    STRACE(scc_debug, 
+                        tout << "Shortest words for: "<< var << std::endl;
+                    for(mata::Word w: words){
+                        tout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
+                    });
                     res_map.insert({var, words});
                 }
             }
         }
         return res_map;
     } 
+
+    mata::Word DecisionProcedure::get_shortest_word(const mata::nfa::Nfa& aut) {
+
+        struct Pred {
+            mata::nfa::State prev;
+            mata::Symbol sym;
+        };
+        mata::Word w;
+
+        const size_t n = aut.num_of_states();
+
+        std::queue<mata::nfa::State> q;
+        std::vector<int> dist(n, -1);
+        std::vector<Pred> pred(n);
+
+        // Initialize BFS from all initial states
+        for (mata::nfa::State s : aut.initial) {
+            dist[s] = 0;
+            q.push(s);
+
+            if (aut.final.contains(s)) {
+                return mata::Word{}; // empty word accepted
+            }
+        }
+
+        // BFS
+        while (!q.empty()) {
+           mata::nfa::State s = q.front();
+            q.pop();
+
+            int next_dist = dist[s] + 1;
+
+            // Iterate outgoing transitions
+            for (const auto& sym_post : aut.delta[s]) {
+               mata::Symbol a = sym_post.symbol;
+
+                for (mata::nfa::State t : sym_post.targets) {
+                    if (dist[t] != -1) continue;
+
+                    dist[t] = next_dist;
+                    pred[t] = { s, a };
+
+                    if (aut.final.contains(t)) {
+                        // reconstruct shortest word
+                        for (mata::nfa::State x = t; dist[x] > 0; x = pred[x].prev) {
+                            w.push_back(pred[x].sym);
+                        }
+                        std::reverse(w.begin(), w.end());
+                        return w;
+                    }
+
+                    q.push(t);
+                }
+            }
+        }
+
+        return w; // language empty
+    }
+
     
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {
         init_model(arith_model);

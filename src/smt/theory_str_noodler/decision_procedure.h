@@ -332,7 +332,8 @@ namespace smt::noodler {
 
         //get shortest words of all vars in scc 
         std::map<BasicTerm, std::set<mata::Word>> find_shortest_words(vector<Predicate> scc_list);    
-        
+        mata::Word get_shortest_word(const mata::nfa::Nfa& aut);
+
         bool isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T);
 
         // keeps already computed models

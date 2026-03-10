@@ -317,6 +317,7 @@ namespace smt::noodler {
             auto [noodler_lengths, precision] = dec_proc->get_lengths();
 
             lengths = len_node_to_z3_formula(noodler_lengths);
+            m_rewrite(lengths);
 
             STRACE(str_print_notcontains_lia,
                 std::ofstream out_file("./not-contains-lia.smt2");
@@ -336,6 +337,7 @@ namespace smt::noodler {
             } else {
                 auto [noodler_lengths, _precision] = dec_proc->get_lengths();
                 lengths = len_node_to_z3_formula(noodler_lengths);
+                m_rewrite(lengths);
                 return check_len_sat(lengths, check_len_sat_with_context);
             }
         };
@@ -1204,6 +1206,7 @@ namespace smt::noodler {
 
     void theory_str_noodler::sat_handling(expr_ref length_formula) {
         last_run_was_sat = true;
+        m_rewrite(length_formula);
         scope_with_last_run_was_sat = m_scope_level;
         if (m_params.m_produce_models && !len_vars.empty()) {
             // If we want to produce models, we would like to limit the lengths more significantly,
@@ -1227,11 +1230,12 @@ namespace smt::noodler {
             }
         }
         sat_length_formula = length_formula;
-        // It seems thare is problem if the length_formula has quantifiers. In that case we skip adding axioms.
+
+        // It seems there is problem if the length_formula has quantifiers. In that case we skip adding axioms.
         if(!expr_cases::has_quantifier(length_formula, m)) {
             // WARNING: the model generation is not supported for tag automata stuff. 
             // In order to add a support of model generation we need to handle adding axioms in the form of quantified formulae 
-            // (so-far the internal solver timeouts with quntified axioms)
+            // (so-far the internal solver timeouts with quantified axioms)
             if(this->input_has_quantifiers) {
                 // for the quantified formulae, we must avoid add_axiom as 
                 // adding axioms leads to unknown immediately (fails in the internalization). Probably add_axiom interferes with quantifier instantiation.

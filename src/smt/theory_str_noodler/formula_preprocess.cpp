@@ -376,6 +376,36 @@ namespace smt::noodler {
     }
 
     /**
+     * @brief Replace singleton variables with their unique literal word.
+     * This allows the align_literals mechanism in the length procedure to detect
+     * content incompatibilities between singleton-constrained variables and literals.
+     */
+    void FormulaPreprocessor::propagate_singletons() {
+        STRACE(str_prep, tout << "Preprocessing step - propagate_singletons\n";);
+        const regex::Alphabet& alph = aut_ass.get_alphabet();
+        std::set<BasicTerm> all_vars;
+        for (const Predicate& pr : this->formula.get_predicates_set()) {
+            auto vars = pr.get_vars();
+            all_vars.insert(vars.begin(), vars.end());
+        }
+        std::vector<BasicTerm> singletons;
+        for (const BasicTerm& v : all_vars) {
+            if (this->aut_ass.count(v) && this->aut_ass.is_singleton(v)) {
+                singletons.push_back(v);
+            }
+        }
+        for (const BasicTerm& v : singletons) {
+            auto maybe_word = this->aut_ass.at(v)->get_word();
+            if (!maybe_word.has_value()) continue;
+            zstring word_str = alph.get_string_from_mata_word(maybe_word.value());
+            BasicTerm lit(BasicTermType::Literal, word_str);
+            this->aut_ass[lit] = this->aut_ass.at(v);
+            this->formula.replace({v}, {lit});
+            substitute_var(v, {lit});
+        }
+    }
+
+    /**
      * @brief Propagate variables. Propagate all equations of the form X=Y
      * (find all Y in the formula and replace with X).
      */

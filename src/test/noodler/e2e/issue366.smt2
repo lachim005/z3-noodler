@@ -14,4 +14,3 @@
 (assert (= (str.substr x i j) "abba"))
 
 (check-sat)
-(get-model)

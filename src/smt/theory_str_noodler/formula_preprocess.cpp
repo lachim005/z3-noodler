@@ -382,22 +382,25 @@ namespace smt::noodler {
      */
     void FormulaPreprocessor::propagate_singletons() {
         STRACE(str_prep, tout << "Preprocessing step - propagate_singletons\n";);
-        const regex::Alphabet& alph = aut_ass.get_alphabet();
         std::set<BasicTerm> all_vars;
         for (const Predicate& pr : this->formula.get_predicates_set()) {
             auto vars = pr.get_vars();
             all_vars.insert(vars.begin(), vars.end());
         }
-        std::vector<BasicTerm> singletons;
+        std::vector<std::pair<BasicTerm, zstring>> singletons;
         for (const BasicTerm& v : all_vars) {
-            if (this->aut_ass.count(v) && this->aut_ass.is_singleton(v)) {
-                singletons.push_back(v);
+            if (!this->aut_ass.count(v)) continue;
+            mata::nfa::Nfa aut = *this->aut_ass.at(v);
+            aut.trim();
+            zstring found_literal;
+            // aut_encodes_literal rejects automata with dummy-symbol transitions,
+            // preventing false positives for variables constrained to re.allchar
+            // over a collapsed (dummy) alphabet.
+            if (AutAssignment::aut_encodes_literal(aut, found_literal)) {
+                singletons.push_back({v, found_literal});
             }
         }
-        for (const BasicTerm& v : singletons) {
-            auto maybe_word = this->aut_ass.at(v)->get_word();
-            if (!maybe_word.has_value()) continue;
-            zstring word_str = alph.get_string_from_mata_word(maybe_word.value());
+        for (const auto& [v, word_str] : singletons) {
             BasicTerm lit(BasicTermType::Literal, word_str);
             this->aut_ass[lit] = this->aut_ass.at(v);
             this->formula.replace({v}, {lit});

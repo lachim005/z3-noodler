@@ -406,6 +406,7 @@ namespace smt::noodler {
             this->formula.replace({v}, {lit});
             substitute_var(v, {lit});
         }
+        STRACE(str_prep, tout << print_info(is_trace_enabled(TraceTag::str_nfa)));
     }
 
     /**

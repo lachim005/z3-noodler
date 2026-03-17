@@ -1304,12 +1304,19 @@ namespace smt::noodler {
         );
         
         //Find all scc in inclusions 
-        vector<vector<Predicate>> scc = findSCC(&adjacency_list);
-                       
+        //vector<vector<Predicate>> scc = findSCC(&adjacency_list);
+        vector<vector<int>> sccs = tarjan(&adjacency_list);
+        STRACE(scc_debug,
+            int idx = 0;
+            for(vector<int> x : sccs){
+                tout << "scc - " << idx << " = " << x << std::endl;
+                idx++;
+            }
+        );
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
         //solve all SCC
-        for(vector<Predicate> scc_list : scc){
+        for(vector<int> scc_list : sccs){
             if(scc_list.size() > 1)
             {
                 vector<Atom> left_side;
@@ -1323,22 +1330,22 @@ namespace smt::noodler {
                 std::map<BasicTerm, mata::Word> scc_solution;
 
                 //shortest words
-                //std::map<BasicTerm, std::set<mata::Word>> vars_shortest_words = find_shortest_words(scc_list);
                 std::vector<BasicTerm> vars;
                 //create atom equations
-                for(Predicate incl: scc_list){
+                for(int inclIdx: scc_list){
+
+                    Predicate incl = *next(solution.inclusions.begin(), inclIdx);
                     //Add # symbol
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Left)){ 
                         //is var
                         unsigned var_length = 0;
                         if(var.is_variable()){
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            mata::Word  w = get_shortest_word(var_nfa);
+                            mata::Word w = get_shortest_word(var_nfa);
                             var_length = alph.get_string_from_mata_word(w).length();
                             scc_solution[var] = w;
                             T_max_size += var_length;
                             STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(w) << std::endl;);
-                            
                         }
                         //is literal
                         else{
@@ -1352,7 +1359,7 @@ namespace smt::noodler {
                         for(unsigned idx = 0; idx < var_length; idx++){
                             Atom a(var,idx);
                             left_side.push_back(a);
-                        } 
+                        }
                     }
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
                         //is var
@@ -1447,14 +1454,12 @@ namespace smt::noodler {
     vector<vector<int>> DecisionProcedure::find_graph_edges() {
         vector<vector<int>> adjacency_list;
         //Look throught all inclusions for variable matches
-        for (unsigned i = 0; i < solution.inclusions.size(); i++) {
-            adjacency_list.push_back({});
-        }
         int idxRight = 0;
         int idxLeft = 0;
         
         //foreach inclusions right side
         for (Predicate inclLeft : solution.inclusions) {
+            adjacency_list.push_back({});
             //foreach inclusions left side
             idxRight = 0;
            for(Predicate inclRight : solution.inclusions){
@@ -1468,70 +1473,63 @@ namespace smt::noodler {
         return adjacency_list;
     }
 
-    bool dfs(int curr, int des, vector<vector<int>>* adj, vector<int> *vis) {
-        // If curr node is destination return true
-        if (curr == des) {
-            return true;
-        }
-        //Loop throught all reachable verticles
-        (*vis)[curr] = 1;
-        for (int x : (*adj)[curr]) {
-            if (!(*vis)[x]) {
-                if (dfs(x, des, adj, vis)) {
-                    return true;
-                }
+    void strongconnect(int v, vector<vector<int>> *adj, vector<int> &index, vector<int> &lowlink, vector<bool> &onStack,
+                        std::stack<int> &S, int &currentIndex, vector<vector<int>> &sccs){
+
+        index[v] = currentIndex;
+        lowlink[v] = currentIndex;
+        currentIndex++;
+
+        S.push(v);
+        onStack[v] = true;
+
+        for (int w : (*adj)[v]) {
+            if (index[w] == -1) {
+                strongconnect(w, adj, index, lowlink, onStack, S, currentIndex, sccs);
+                lowlink[v] = std::min(lowlink[v], lowlink[w]);
+            }
+            else if (onStack[w]) {
+                lowlink[v] = std::min(lowlink[v], index[w]);
             }
         }
-        return false;
-    }
 
-    bool isPath(int src, int des, vector<vector<int>> *adj) {
-        vector<int> vis(adj->size(), 0);
-        return dfs(src, des, adj, &vis);
-    }
+        if (lowlink[v] == index[v]) {
+            vector<int> component;
+            int w;
 
-    vector<vector<Predicate>> DecisionProcedure::findSCC(vector<vector<int>> *adjacency_list) {
-        vector<vector<Predicate>> predicate_ans;
-        // Stores all the strongly connected components.
-        vector<vector<int> > ans;
-        // Stores whether a vertex is a part of any Strongly Connected Component
-        vector<int> is_scc(solution.inclusions.size(), 0);
-        int idx = 0;
-        for(Predicate incl: solution.inclusions){
-            //Check if the is part of scc
-            if (!is_scc[idx]) 
-            {
-                vector<int> scc;
-                scc.push_back(idx);
-                vector<Predicate> scc_predicate;
-                scc_predicate.push_back(incl);
-                //Check for all scc verticles
-                int idx2 = 0;
-                for (Predicate pr: solution.inclusions){
-                    if(idx2 <= idx){
-                        idx2++;
-                        continue;
-                    }
-                    //If there is an edge from p1 -> p2 and p2 -> p1
-                    bool path1 = isPath(idx, idx2, adjacency_list);
-                    bool path2 = isPath(idx2, idx, adjacency_list);
-                    if (!is_scc[idx2] && path1 && path2){
-                        is_scc[idx2] = 1;
-                        scc.push_back(idx2);
-                        scc_predicate.push_back(pr);
-                    }
-                    idx2++;
-                }
-                ans.push_back(scc);
-                predicate_ans.push_back(scc_predicate);
-            }
-            idx++;
+            do {
+                w = S.top();
+                S.pop();
+                onStack[w] = false;
+                component.push_back(w);
+            } while (w != v);
+
+            sccs.push_back(component);
         }
-        return predicate_ans;
+    }
+
+    vector<vector<int>> DecisionProcedure::tarjan(vector<vector<int>> *adjacency_list) {
+        int n = adjacency_list->size();
+
+        vector<int> index(n, -1);
+        vector<int> lowlink(n);
+        vector<bool> onStack(n, false);
+        std::stack<int> S;
+
+        int currentIndex = 0;
+        vector<vector<int>> sccs;
+
+        for (int v = 0; v < n; v++) {
+            if (index[v] == -1) {
+                strongconnect(v, adjacency_list, index, lowlink, onStack, S, currentIndex, sccs);
+            }
+        }
+
+        return sccs;
     }
 
     void DecisionProcedure::get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
-    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T) {
+                                            std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T) {
         Atom missing_atom = missing_left ? left_side[p] : right_side[p];
         
         // var that would be changed
@@ -1576,37 +1574,6 @@ namespace smt::noodler {
         else
             return false;
     }
-
-    std::map<BasicTerm, std::set<mata::Word>> DecisionProcedure::find_shortest_words(vector<Predicate> scc_list) {
-        //return var
-        std::map<BasicTerm, std::set<mata::Word>> res_map;
-
-        regex::Alphabet alph(solution.aut_ass.get_alphabet());
-        //Get shortest words for every var in scc
-        //std::cout << "Predicate SCC:" << std::endl;
-        for(Predicate incl: scc_list){
-            //std::cout << "\t" << incl << std::endl;
-
-            std::set<BasicTerm> incl_vars = incl.get_side_vars(Predicate::EquationSideType::Left);
-            incl_vars.merge(incl.get_side_vars(Predicate::EquationSideType::Right));
-            //Get words from left side
-            for(BasicTerm var: incl_vars){           
-                if(res_map.count(var) == 0) 
-                {
-                    //add result to ans
-                    const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                    std::set<mata::Word> words = mata::applications::strings::get_shortest_words(var_nfa);
-                    STRACE(scc_debug, 
-                        tout << "Shortest words for: "<< var << std::endl;
-                    for(mata::Word w: words){
-                        tout << "\t\t" << alph.get_string_from_mata_word(w) << std::endl;
-                    });
-                    res_map.insert({var, words});
-                }
-            }
-        }
-        return res_map;
-    } 
 
     mata::Word DecisionProcedure::get_shortest_word(const mata::nfa::Nfa& aut) {
 
@@ -1666,7 +1633,6 @@ namespace smt::noodler {
         return w; // language empty
     }
 
-    
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {
         init_model(arith_model);
 

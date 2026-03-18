@@ -396,7 +396,7 @@ namespace smt::noodler {
             // aut_encodes_literal rejects automata with dummy-symbol transitions,
             // preventing false positives for variables constrained to re.allchar
             // over a collapsed (dummy) alphabet.
-            if (AutAssignment::aut_encodes_literal(aut, found_literal)) {
+            if (AutAssignment::aut_encodes_literal(mata::nfa::reduce(aut), found_literal)) {
                 singletons.push_back({v, found_literal});
             }
         }

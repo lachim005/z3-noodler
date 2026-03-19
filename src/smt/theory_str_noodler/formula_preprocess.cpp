@@ -1899,8 +1899,8 @@ namespace smt::noodler {
                 nftNJ = mata::nft::compose(nft, trNJ, 0, 0, true, mata::nft::JumpMode::NoJump);
 
                 if (nftRS.num_of_states() < nftNJ.num_of_states()) {
-                    std::cout << "First compose left:\n" << lang_nft;
-                    std::cout << "First compose right:\n" << *trans[i];
+                    std::cout << "First compose left:\n" << lang_nft.print_to_dot();
+                    std::cout << "First compose right:\n" << trans[i]->print_to_dot();
                     std::cout << "Result of first compose repeat (second compose right):\n" << trRS.print_to_dot();
                     std::cout << "Result of first compose no jump (second compose right):\n" << trNJ.print_to_dot();
                     std::cout << "Repeat:\n" << nftRS;

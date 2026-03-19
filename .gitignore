@@ -118,3 +118,4 @@ genaisrc/genblogpost.genai.mts
 bazel-*
 # Local issue tracking
 .beads
+.claude

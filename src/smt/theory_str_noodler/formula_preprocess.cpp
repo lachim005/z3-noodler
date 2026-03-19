@@ -1882,8 +1882,8 @@ namespace smt::noodler {
             // compose first tapes of all transducers with identical parameters (and project out the synchronizing tape)
             // nft = [T_1(y), T_2(y), ...]
             for(size_t i = 1; i < trans.size(); i++) {
-                auto tr = mata::nft::compose(lang_nft, *trans[i], 0, 0, true);
-                nft = mata::nft::compose(nft, tr, 0, 0, true);
+                auto tr = mata::nft::compose(lang_nft, *trans[i], 0, 0, true, mata::nft::JumpMode::NoJump);
+                nft = mata::nft::compose(nft, tr, 0, 0, true, mata::nft::JumpMode::NoJump);
             }
 
             if(util::contains_trans_identity(nft, 4) == l_false) {

@@ -422,6 +422,10 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         SASSERT(num_args == 3);
         st = mk_str_update(args[0], args[1], args[2], result);
         break;
+    case OP_STRING_TRIM:
+        SASSERT(num_args == 1);
+        st = mk_str_trim(args[0], result);
+        break;
     case OP_STRING_IS_DIGIT:
         SASSERT(num_args == 1);
         st = mk_str_is_digit(args[0], result);
@@ -2437,6 +2441,29 @@ br_status seq_rewriter::mk_str_update(expr* a, expr* b, expr* c, expr_ref& resul
         }
         result = str().mk_string(r);
 
+        return BR_DONE;
+    }
+    return BR_FAILED;
+}
+
+br_status seq_rewriter::mk_str_trim(expr* a, expr_ref& result) {
+    zstring s;
+    const static std::set<uint32_t> whitespace_chars{ U' ', U'\f', U'\n', U'\r', U'\t', U'\v' };
+    if (str().is_string(a, s)) {
+        unsigned start, end;
+        for (start = 0; start < s.length(); start++) {
+            if (!whitespace_chars.contains(s[start])) break;
+        }
+        for (end = s.length(); end > 0; end--) {
+            if (!whitespace_chars.contains(s[end - 1])) break;
+        }
+        if (start >= end) {
+            result = str().mk_string("");
+            return BR_DONE;
+        }
+
+        unsigned length = end - start;
+        result = str().mk_string(s.extract(start, length));
         return BR_DONE;
     }
     return BR_FAILED;

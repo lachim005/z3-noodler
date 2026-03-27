@@ -213,7 +213,8 @@ namespace smt::noodler {
             m_util_s.str.is_replace_all(ex) ||
             m_util_s.str.is_replace_re_all(ex) ||
             m_util_s.str.is_replace_re(ex) ||
-            m_util_s.str.is_update(ex)
+            m_util_s.str.is_update(ex) ||
+            m_util_s.str.is_trim(ex)
         )) {
             ctx.mark_as_relevant(ex);
         }
@@ -437,6 +438,8 @@ namespace smt::noodler {
             handle_replace_re_all(n);
         } else if(m_util_s.str.is_update(n)) {
             handle_update(n);
+        } else if(m_util_s.str.is_trim(n)) {
+            handle_trim(n);
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             handle_is_digit(n);
         } else if (
@@ -1549,6 +1552,64 @@ namespace smt::noodler {
         mark_expression_as_length(u2);
         mark_expression_as_length(r);
         mark_expression_as_length(w);
+    }
+
+    /**
+     * @brief Handling of str.trim(w)
+     * Trims the whitespace at the edges of w
+     *
+     * str.trim(w) = u
+     * w = tl u tr
+     * tl, tr ∈ WS*
+     * u ∈ (Σ\WS)* + (Σ\WS)Σ*(Σ\WS) (u must not start and end with whitespace)
+     * WS = " " + "\f" + "\n" + "\r" + "\t" + "\v"
+     *
+     * @param e The str.trim(w) term
+     */
+    void theory_str_noodler::handle_trim(expr *e) {
+        if (axiomatized_persist_terms.contains(e)) { return; }
+        axiomatized_persist_terms.insert(e);
+
+        expr *w = nullptr;
+        VERIFY(m_util_s.str.is_trim(e, w));
+
+        expr_ref tl = mk_str_var_fresh("trim_left");
+        expr_ref tr = mk_str_var_fresh("trim_right");
+
+        expr_ref u = get_fresh_var_for_string_function("trim", e);
+
+        expr_ref tl_u_tr = mk_concat(tl, mk_concat(u, tr));
+
+        // WS = " " + "\f" + "\n" + "\r" + "\t" + "\v"
+        expr_ref whitespace_re(m_util_s.re.mk_to_re(m_util_s.str.mk_string(" ")), m);
+        for (auto ws : { "\f", "\n", "\r", "\t", "\v" }) {
+            whitespace_re = expr_ref(m_util_s.re.mk_union(
+                        whitespace_re,
+                        m_util_s.re.mk_to_re(m_util_s.str.mk_string(ws))), m);
+        }
+        // sigma \ WS
+        expr_ref sigma_minus_ws(m_util_s.re.mk_diff(m_util_s.re.mk_full_char(nullptr), whitespace_re), m);
+        // sigma*
+        expr_ref sigma_star(m_util_s.re.mk_star(m_util_s.re.mk_full_char(nullptr)), m);
+        // WS*
+        expr_ref ws_star(m_util_s.re.mk_star(whitespace_re), m);
+        // (sigma \ WS)* + ((sigma \ WS) . sigma_star . (sigma \ WS))
+        expr_ref middle_regex(m_util_s.re.mk_union(
+                    // u is either in (sigma\WS)* - covers if u is eps or one character long
+                    m_util_s.re.mk_star(sigma_minus_ws),
+                    // or u is in (sigma\WS)sigma*(sigma\WS) - sigma star surrounded with non whitespace characters
+                    m_util_s.re.mk_concat(sigma_minus_ws, m_util_s.re.mk_concat(sigma_star, sigma_minus_ws))
+                    ), m);
+
+
+        // w = tl u tr
+        add_axiom({mk_eq(w, tl_u_tr, false)});
+        // tl is whitespace
+        add_axiom({mk_literal(m_util_s.re.mk_in_re(tl, ws_star))});
+        // tr is whitespace
+        add_axiom({mk_literal(m_util_s.re.mk_in_re(tr, ws_star))});
+        // u does not begin and end with whitespace characters
+        add_axiom({mk_literal(m_util_s.re.mk_in_re(u, middle_regex))});
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {

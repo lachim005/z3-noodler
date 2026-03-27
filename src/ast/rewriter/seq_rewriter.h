@@ -259,6 +259,7 @@ class seq_rewriter {
     br_status mk_str_to_lower(expr* a, expr_ref& result);
     br_status mk_str_to_upper(expr* a, expr_ref& result);
     br_status mk_str_update(expr* a, expr* b, expr* c, expr_ref& result);
+    br_status mk_str_trim(expr* a, expr_ref& result);
     br_status mk_str_is_digit(expr* a, expr_ref& result);
     br_status mk_re_concat(expr* a, expr* b, expr_ref& result);
     br_status mk_re_union(expr* a, expr* b, expr_ref& result);

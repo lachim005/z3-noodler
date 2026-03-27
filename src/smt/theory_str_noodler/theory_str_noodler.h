@@ -331,6 +331,9 @@ namespace smt::noodler {
         void handle_lex_lt(expr *e);
         void handle_replace_all(expr *e);
         void handle_replace_re_all(expr *e);
+        void handle_update(expr *e);
+        void handle_trim(expr *e);
+        void handle_delete(expr *e);
 
         /**
          * @brief Marks a string term @p e as length-aware

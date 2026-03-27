@@ -77,33 +77,16 @@ To run tests for Z3-Noodler:
 ./test-noodler
 ```
 
-## Aditional string functions
-Other than the constraints defined in the [SMT-LIB theory of strings](https://smt-lib.org/theories-UnicodeStrings.shtml), Z3-Noodler can handle the following functions:
-
-**`(str.to_real String Real)`**  
-Converts a string representation of a (positive) real number to the corresponding number. The string representation can either be a positive integer with leading zeros (similarly as in `str.to_int`) or it can contain one decimal separator `.`. It evaluates to `-1.0` otherwise.  
-Examples:
- - `(str.to_real "4562")` → `4562.0`
- - `(str.to_real "-4562")` → `-1.0`
- - `(str.to_real "45.62")` → `45.62`
- - `(str.to_real "00045.620000")` → `45.62`
- - `(str.to_real "")` → `-1.0`
- - `(str.to_real ".456")` → `0.456`
- - `(str.to_real "8494.")` → `8494.0`
- - `(str.to_real ".")` → `-1.0`
- - `(str.to_real "4564a")` → `-1.0`
- - `(str.to_real "4564e3")` → `-1.0`
-
-**`(str.from_real Real Int String)`**  
-Transforms a positive real number `r` to a string `s` with a corresponding number of decimal places `n`. If either `n` or `r` is negative, it evaluates to the empty string.  
-Examples:
- - `(str.from_real 4.56 5)` → `"4.56000"`
- - `(str.from_real 4.56 0)` → `"4"`
- - `(str.from_real 4.56 1)` → `"4.5"`
- - `(str.from_real -4.56 -5)` → `""`
- - `(str.from_real -4.56 5)` → `""`
- - `(str.from_real 4.56 -5)` → `""`
-
+## Additional string functions
+Other than the constraints defined in the [SMT-LIB theory of strings](https://smt-lib.org/theories-UnicodeStrings.shtml), Z3-Noodler can handle some additional functions
+(defined in [ADDITIONAL_FUNCTIONS.md](ADDITIONAL_FUNCTIONS.md)):
+ - `str.to_real`
+ - `str.from_real`
+ - `str.to_lower`
+ - `str.to_upper`
+ - `str.update`
+ - `str.trim`
+ - `str.delete`
 
 ## Publications
 - Y. Chen, V. Havlena, M.Hečko, L.Holík, and O. Lengál. [A Uniform Framework for Handling Position Constraints in String Solving](https://dl.acm.org/doi/10.1145/3729273). In *Proc. of PLDI'25*, volume 9, pages 550-575, 2025. ACM.

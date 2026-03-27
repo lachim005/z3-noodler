@@ -418,6 +418,10 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         SASSERT(num_args == 1);
         st = mk_str_to_upper(args[0], result);
         break;
+    case OP_STRING_UPDATE:
+        SASSERT(num_args == 3);
+        st = mk_str_update(args[0], args[1], args[2], result);
+        break;
     case OP_STRING_IS_DIGIT:
         SASSERT(num_args == 1);
         st = mk_str_is_digit(args[0], result);
@@ -2406,6 +2410,36 @@ br_status seq_rewriter::mk_str_to_upper(expr* a, expr_ref& result) {
     }
     result = a;
     return BR_REWRITE_FULL;
+}
+
+br_status seq_rewriter::mk_str_update(expr* a, expr* b, expr* c, expr_ref& result) {
+    zstring s1, s2;
+    rational start;
+    if (str().is_string(a, s1) &&
+        m_autil.is_numeral(b, start) &&
+        start.is_int() &&
+        str().is_string(c, s2)) {
+
+        // index outside range
+        if (start.is_neg() || start >= s1.length()) {
+            result = str().mk_string(s1);
+            return BR_DONE;
+        }
+
+        zstring r;
+        unsigned start_u = start.get_unsigned();
+        for (unsigned i = 0; i < s1.length(); i++) {
+            if (i >= start_u && i - start_u < s2.length()) {
+                r += s2[i - start_u];
+            } else {
+                r += s1[i];
+            }
+        }
+        result = str().mk_string(r);
+
+        return BR_DONE;
+    }
+    return BR_FAILED;
 }
 
 br_status seq_rewriter::mk_str_is_digit(expr* a, expr_ref& result) {

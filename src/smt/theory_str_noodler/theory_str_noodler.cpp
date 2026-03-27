@@ -206,12 +206,14 @@ namespace smt::noodler {
         // on higher decision level than 0 (otherwise the axioms are lost).
         // String propagation of the input formula works on level 0.
         if(init && (
-            m_util_s.str.is_index(ex) || 
+            m_util_s.str.is_index(ex) ||
             m_util_s.str.is_at(ex) ||
             m_util_s.str.is_extract(ex) ||
-            m_util_s.str.is_replace(ex) || 
+            m_util_s.str.is_replace(ex) ||
             m_util_s.str.is_replace_all(ex) ||
-            m_util_s.str.is_replace_re_all(ex)
+            m_util_s.str.is_replace_re_all(ex) ||
+            m_util_s.str.is_replace_re(ex) ||
+            m_util_s.str.is_update(ex)
         )) {
             ctx.mark_as_relevant(ex);
         }
@@ -433,6 +435,8 @@ namespace smt::noodler {
             handle_replace_re(n);
         } else if(m_util_s.str.is_replace_re_all(n)) { // str.replace_re_all
             handle_replace_re_all(n);
+        } else if(m_util_s.str.is_update(n)) {
+            handle_update(n);
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             handle_is_digit(n);
         } else if (
@@ -1465,6 +1469,86 @@ namespace smt::noodler {
         VERIFY(m_util_s.str.is_replace_re_all(e, s, i, l));
 
         expr_ref v = get_fresh_var_for_string_function("replace_re_all", e);
+    }
+
+    /**
+     * @brief Handling of str.update(w, i, r)
+     * Starts replacing characters in w at index i with characters in r
+     * The resulting string will always have the same length as w,
+     * meaning if r is too long to fit into w, it will get truncated
+     * (e.g. str.update("aaaa", 2, "bbbb") = "aabb")
+     *
+     * 0 <= i < |w| && |r| > 0  ->  str.update(w, i, r) = u1 u2 u3
+     * 0 <= i < |w| && |r| > 0  ->  w = u1 x u3
+     * 0 <= i < |w| && |r| > 0  ->  |u1| = i
+     * 0 <= i < |w| && |r| > 0  ->  |x| = |u2|
+     * 0 <= i < |w| && |r| > 0  ->  r = u2 y
+     * 0 <= i < |w| && |r| > 0 && |r| >  |w| - i  ->  |u2| = |w| - i
+     * 0 <= i < |w| && |r| > 0 && |r| <= |w| - i  ->  |u2| = |r|
+     *
+     * i < 0   -> str.update(w, i, r) = w;
+     * i >=|w| -> str.update(w, i, r) = w;
+     * |r| <= 0 -> str.update = w (not completely necessary, helps z3)
+     *
+     * @param e The str.update(w, i, r) term
+     */
+    void theory_str_noodler::handle_update(expr *e) {
+        if (axiomatized_persist_terms.contains(e)) { return; }
+        axiomatized_persist_terms.insert(e);
+
+        expr *w = nullptr, *i = nullptr, *r = nullptr;
+        VERIFY(m_util_s.str.is_update(e, w, i, r));
+
+        expr_ref x = mk_str_var_fresh("update_removing");
+        expr_ref y = mk_str_var_fresh("update_overflow");
+        expr_ref u1 = mk_str_var_fresh("update_left");
+        expr_ref u2 = mk_str_var_fresh("update_center");
+        expr_ref u3 = mk_str_var_fresh("update_right");
+
+        expr_ref result = get_fresh_var_for_string_function("update", e);
+
+        expr_ref u1_x_u3 = mk_concat(u1, mk_concat(x, u3));
+        expr_ref u2_y = mk_concat(u2, y);
+        expr_ref u1_u2_u3 = mk_concat(u1, mk_concat(u2, u3));
+
+        // |r| > |w| - i
+        literal will_overflow = mk_literal(m_util_a.mk_gt(m_util_s.str.mk_length(r), m_util_a.mk_sub(m_util_s.str.mk_length(w), i)));
+
+        expr_ref zero(m_util_a.mk_int(0), m);
+        // i >= 0
+        literal i_ge_zero = mk_literal(m_util_a.mk_ge(i, zero));
+        // i < |w|
+        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(i, m_util_s.str.mk_length(w)));
+        // |r| <= 0
+        literal r_len_le_zero = mk_literal(m_util_a.mk_le(m_util_s.str.mk_length(r), zero));
+
+        // 0 <= i < |w| && |r| > 0  ->  str.update(w, i, r) = u1 u2 u3
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, mk_eq(u1_u2_u3, result, false)});
+        // 0 <= i < |w| && |r| > 0  ->  w = u1 x u3
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, mk_eq(u1_x_u3, w, false)});
+        // 0 <= i < |w| && |r| > 0  ->  |u1| = i
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, mk_eq(i, m_util_s.str.mk_length(u1), false)});
+        // 0 <= i < |w| && |r| > 0  ->  |x| = |u2|
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, mk_eq(m_util_s.str.mk_length(x), m_util_s.str.mk_length(u2), false)});
+        // 0 <= i < |w| && |r| > 0  ->  r = u2 y
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, mk_eq(u2_y, r, false)});
+        // 0 <= i < |w| && |r| > 0 && |r| >  |w| - i ->  |u2| = |w| - i
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, ~will_overflow, mk_eq(m_util_s.str.mk_length(u2), m_util_a.mk_sub(m_util_s.str.mk_length(w), i), false)});
+        // 0 <= i < |w| && |r| > 0 && |r| <= |w| - i ->  |u2| = |r|
+        add_axiom({~i_ge_zero, ~i_lt_len_w, r_len_le_zero, will_overflow, mk_eq(m_util_s.str.mk_length(u2), m_util_s.str.mk_length(r) , false)});
+
+        // i < 0   -> str.update(w, i, r) = w;
+        add_axiom({i_ge_zero, mk_eq(result, w, false)});
+        // i >=|w| -> str.update(w, i, r) = w;
+        add_axiom({i_lt_len_w, mk_eq(result, w, false)});
+        // |r| <= 0 -> str.update = w (not completely necessary, helps z3)
+        add_axiom({~r_len_le_zero, mk_eq(result, w, false)});
+
+        mark_expression_as_length(u1);
+        mark_expression_as_length(x);
+        mark_expression_as_length(u2);
+        mark_expression_as_length(r);
+        mark_expression_as_length(w);
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {

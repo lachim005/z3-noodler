@@ -91,6 +91,7 @@ enum seq_op_kind {
     OP_STRING_LE,
     OP_STRING_TO_LOWER,
     OP_STRING_TO_UPPER,
+    OP_STRING_UPDATE,
     OP_STRING_IS_DIGIT,
     OP_STRING_TO_CODE,
     OP_STRING_FROM_CODE,
@@ -336,6 +337,7 @@ public:
         app* mk_from_code(expr* e) const { return m.mk_app(m_fid, OP_STRING_FROM_CODE, 1, &e); }
         app* mk_to_lower(expr* e) const { return m.mk_app(m_fid, OP_STRING_TO_LOWER, 1, &e); }
         app* mk_to_upper(expr* e) const { return m.mk_app(m_fid, OP_STRING_TO_UPPER, 1, &e); }
+        app* mk_update(expr* a, expr* b, expr* c) const { expr* es[3] = { a, b, c }; return m.mk_app(m_fid, OP_STRING_UPDATE, 3, es); }
         app* mk_is_digit(expr* e) const { return m.mk_app(m_fid, OP_STRING_IS_DIGIT, 1, &e); }
 
 
@@ -383,6 +385,7 @@ public:
         bool is_le(expr const* n)       const { return is_app_of(n, m_fid, OP_STRING_LE); }
         bool is_to_lower(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_TO_LOWER); }
         bool is_to_upper(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_TO_UPPER); }
+        bool is_update(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_UPDATE); }
         bool is_is_digit(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_IS_DIGIT); }
         bool is_from_code(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_FROM_CODE); }
         bool is_to_code(expr const* n) const { return is_app_of(n, m_fid, OP_STRING_TO_CODE); }
@@ -434,6 +437,7 @@ public:
         MATCH_UNARY(is_sbv2s);
         MATCH_UNARY(is_to_lower);
         MATCH_UNARY(is_to_upper);
+        MATCH_TERNARY(is_update);
         MATCH_UNARY(is_is_digit);
         MATCH_UNARY(is_from_code);
         MATCH_UNARY(is_to_code);

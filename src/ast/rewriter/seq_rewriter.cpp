@@ -410,6 +410,14 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         SASSERT(num_args == 1);
         st = mk_str_to_code(args[0], result);
         break;
+    case OP_STRING_TO_LOWER:
+        SASSERT(num_args == 1);
+        st = mk_str_to_lower(args[0], result);
+        break;
+    case OP_STRING_TO_UPPER:
+        SASSERT(num_args == 1);
+        st = mk_str_to_upper(args[0], result);
+        break;
     case OP_STRING_IS_DIGIT:
         SASSERT(num_args == 1);
         st = mk_str_is_digit(args[0], result);
@@ -2342,6 +2350,62 @@ br_status seq_rewriter::mk_str_to_code(expr* a, expr_ref& result) {
         return BR_DONE;
     }    
     return BR_FAILED;
+}
+
+br_status seq_rewriter::mk_str_to_lower(expr* a, expr_ref& result) {
+    zstring s;
+
+    constexpr int case_diff = 'A' - 'a';
+
+    if (str().is_string(a, s)) {
+        zstring lowercase;
+        for(unsigned i = 0; i < s.length(); i++) {
+            auto ch = s[i];
+            if (ch >= 'A' && ch <= 'Z') {
+                ch -= case_diff;
+            }
+            lowercase += ch;
+        }
+        result = str().mk_string(lowercase);
+        return BR_DONE;
+    }
+
+    for (char ch = 'A'; ch <= 'Z'; ch++) {
+        a = str().mk_replace_all(
+                a,
+                str().mk_string(zstring(ch)),
+                str().mk_string(zstring(ch - case_diff)));
+    }
+    result = a;
+    return BR_REWRITE_FULL;
+}
+
+br_status seq_rewriter::mk_str_to_upper(expr* a, expr_ref& result) {
+    zstring s;
+
+    constexpr int case_diff = 'A' - 'a';
+
+    if (str().is_string(a, s)) {
+        zstring uppercase;
+        for(unsigned i = 0; i < s.length(); i++) {
+            auto ch = s[i];
+            if (ch >= 'a' && ch <= 'z') {
+                ch += case_diff;
+            }
+            uppercase += ch;
+        }
+        result = str().mk_string(uppercase);
+        return BR_DONE;
+    }
+
+    for (char ch = 'a'; ch <= 'z'; ch++) {
+        a = str().mk_replace_all(
+                a,
+                str().mk_string(zstring(ch)),
+                str().mk_string(zstring(ch + case_diff)));
+    }
+    result = a;
+    return BR_REWRITE_FULL;
 }
 
 br_status seq_rewriter::mk_str_is_digit(expr* a, expr_ref& result) {

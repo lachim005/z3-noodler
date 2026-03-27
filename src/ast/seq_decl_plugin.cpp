@@ -257,6 +257,8 @@ void seq_decl_plugin::init() {
     m_sigs[OP_STRING_STOR]		 = alloc(psig, m, "str.to_real", 0, 1, &strT, realT);
     m_sigs[OP_STRING_LT]         = alloc(psig, m, "str.<", 0, 2, str2T, boolT);
     m_sigs[OP_STRING_LE]         = alloc(psig, m, "str.<=", 0, 2, str2T, boolT);
+    m_sigs[OP_STRING_TO_LOWER]   = alloc(psig, m, "str.to_lower", 0, 1, &strT, strT);
+    m_sigs[OP_STRING_TO_UPPER]   = alloc(psig, m, "str.to_upper", 0, 1, &strT, strT);
     m_sigs[OP_STRING_IS_DIGIT]   = alloc(psig, m, "str.is_digit", 0, 1, &strT, boolT);
     m_sigs[OP_STRING_TO_CODE]    = alloc(psig, m, "str.to_code", 0, 1, &strT, intT);
     m_sigs[OP_STRING_FROM_CODE]  = alloc(psig, m, "str.from_code", 0, 1, &intT, strT);
@@ -425,6 +427,8 @@ func_decl* seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, p
 	case OP_STRING_STOR:
     case OP_STRING_LT:
     case OP_STRING_LE:
+    case OP_STRING_TO_LOWER:
+    case OP_STRING_TO_UPPER:
     case OP_STRING_IS_DIGIT:
     case OP_STRING_TO_CODE:
     case OP_STRING_FROM_CODE:

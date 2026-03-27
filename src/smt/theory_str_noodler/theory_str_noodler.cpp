@@ -214,7 +214,8 @@ namespace smt::noodler {
             m_util_s.str.is_replace_re_all(ex) ||
             m_util_s.str.is_replace_re(ex) ||
             m_util_s.str.is_update(ex) ||
-            m_util_s.str.is_trim(ex)
+            m_util_s.str.is_trim(ex) ||
+            m_util_s.str.is_delete(ex)
         )) {
             ctx.mark_as_relevant(ex);
         }
@@ -440,6 +441,8 @@ namespace smt::noodler {
             handle_update(n);
         } else if(m_util_s.str.is_trim(n)) {
             handle_trim(n);
+        } else if(m_util_s.str.is_delete(n)) {
+            handle_delete(n);
         } else if (m_util_s.str.is_is_digit(n)) { // str.is_digit
             handle_is_digit(n);
         } else if (
@@ -1610,6 +1613,73 @@ namespace smt::noodler {
         add_axiom({mk_literal(m_util_s.re.mk_in_re(tr, ws_star))});
         // u does not begin and end with whitespace characters
         add_axiom({mk_literal(m_util_s.re.mk_in_re(u, middle_regex))});
+    }
+
+    /**
+     * @brief Handling of str.delete(w, i, l)
+     * Deletes a substring of length l from w at index i
+     *
+     * l <= 0   ->  str.delete(w, i, l) = w
+     * i <  0   ->  str.delete(w, i, l) = w
+     * i >= |w| ->  str.delete(w, i, l) = w
+     *
+     * 0 <= i < |w| && l > 0 -> str.delete(w, i, l) = u1 u2
+     * 0 <= i < |w| && l > 0 -> w = u1 x u2
+     * 0 <= i < |w| && l > 0 -> |u1| = i
+     * 0 <= i < |w| && l > 0 && i + l >= |w| -> u2 = ε
+     * 0 <= i < |w| && l > 0 && i + l <  |w| -> |x| = l
+     *
+     * @param e The str.delete(w, i, l) term
+     */
+    void theory_str_noodler::handle_delete(expr *e) {
+        if (axiomatized_persist_terms.contains(e)) { return; }
+        axiomatized_persist_terms.insert(e);
+
+        expr *w = nullptr, *i = nullptr, *l = nullptr;
+        VERIFY(m_util_s.str.is_delete(e, w, i, l));
+
+        STRACE(str, tout << "handle delete: " << mk_pp(e, m) << '\n';);
+
+        expr_ref u1 = mk_str_var_fresh("delete_left");
+        expr_ref u2 = mk_str_var_fresh("delete_right");
+        expr_ref x = mk_str_var_fresh("delete_remove");
+
+        expr_ref result = get_fresh_var_for_string_function("delete", e);
+
+        expr_ref u1_x_u2 = mk_concat(u1, mk_concat(x, u2));
+        expr_ref u1_u2 = mk_concat(u1, u2);
+
+        expr_ref zero(m_util_a.mk_int(0), m);
+        // i >= 0
+        literal i_ge_zero = mk_literal(m_util_a.mk_ge(i, zero));
+        // i < |w|
+        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(i, m_util_s.str.mk_length(w)));
+        // l > 0
+        literal l_gt_zero = mk_literal(m_util_a.mk_gt(l, zero));
+        // i + l >= |w|
+        literal i_plus_l_ge_len_w = mk_literal(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(w)));
+
+        // l <= 0   ->  str.delete(w, i, l) = w
+        add_axiom({l_gt_zero, mk_eq(result, w, false)});
+        // i <  0   ->  str.delete(w, i, l) = w
+        add_axiom({i_ge_zero, mk_eq(result, w, false)});
+        // i >= |w| ->  str.delete(w, i, l) = w
+        add_axiom({i_lt_len_w, mk_eq(result, w, false)});
+
+        // 0 <= i < |w| && l > 0 -> str.delete(w, i, l) = u1 u2
+        add_axiom({~i_ge_zero, ~i_lt_len_w, ~l_gt_zero, mk_eq(result, u1_u2, false)});
+        // 0 <= i < |w| && l > 0 -> w = u1 x u2
+        add_axiom({~i_ge_zero, ~i_lt_len_w, ~l_gt_zero, mk_eq(w, u1_x_u2, false)});
+        // 0 <= i < |w| && l > 0 -> |u1| = i
+        add_axiom({~i_ge_zero, ~i_lt_len_w, ~l_gt_zero, mk_eq(m_util_s.str.mk_length(u1), i, false)});
+        // 0 <= i < |w| && l > 0 && i + l >= |w| -> u2 = ε
+        add_axiom({~i_ge_zero, ~i_lt_len_w, ~l_gt_zero, ~i_plus_l_ge_len_w, mk_eq(u2, m_util_s.str.mk_string(""), false)});
+        // 0 <= i < |w| && l > 0 && i + l <  |w| -> |x| = l
+        add_axiom({~i_ge_zero, ~i_lt_len_w, ~l_gt_zero, i_plus_l_ge_len_w, mk_eq(l, m_util_s.str.mk_length(x), false)});
+
+        mark_expression_as_length(w);
+        mark_expression_as_length(u1);
+        mark_expression_as_length(x);
     }
 
     expr_ref theory_str_noodler::mk_concat(expr* e1, expr* e2) {

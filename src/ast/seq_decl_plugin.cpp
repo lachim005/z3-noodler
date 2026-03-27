@@ -262,6 +262,7 @@ void seq_decl_plugin::init() {
     m_sigs[OP_STRING_TO_UPPER]   = alloc(psig, m, "str.to_upper", 0, 1, &strT, strT);
     m_sigs[OP_STRING_UPDATE]     = alloc(psig, m, "str.update", 0, 3, strTintTstrT, strT);
     m_sigs[OP_STRING_TRIM]       = alloc(psig, m, "str.trim", 0, 1, &strT, strT);
+    m_sigs[OP_STRING_DELETE]     = alloc(psig, m, "str.delete", 0, 3, strTint2T, strT);
     m_sigs[OP_STRING_IS_DIGIT]   = alloc(psig, m, "str.is_digit", 0, 1, &strT, boolT);
     m_sigs[OP_STRING_TO_CODE]    = alloc(psig, m, "str.to_code", 0, 1, &strT, intT);
     m_sigs[OP_STRING_FROM_CODE]  = alloc(psig, m, "str.from_code", 0, 1, &intT, strT);
@@ -434,6 +435,7 @@ func_decl* seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, p
     case OP_STRING_TO_UPPER:
     case OP_STRING_UPDATE:
     case OP_STRING_TRIM:
+    case OP_STRING_DELETE:
     case OP_STRING_IS_DIGIT:
     case OP_STRING_TO_CODE:
     case OP_STRING_FROM_CODE:

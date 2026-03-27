@@ -426,6 +426,10 @@ br_status seq_rewriter::mk_app_core(func_decl * f, unsigned num_args, expr * con
         SASSERT(num_args == 1);
         st = mk_str_trim(args[0], result);
         break;
+    case OP_STRING_DELETE:
+        SASSERT(num_args == 3);
+        st = mk_str_delete(args[0], args[1], args[2], result);
+        break;
     case OP_STRING_IS_DIGIT:
         SASSERT(num_args == 1);
         st = mk_str_is_digit(args[0], result);
@@ -2464,6 +2468,38 @@ br_status seq_rewriter::mk_str_trim(expr* a, expr_ref& result) {
 
         unsigned length = end - start;
         result = str().mk_string(s.extract(start, length));
+        return BR_DONE;
+    }
+    return BR_FAILED;
+}
+
+br_status seq_rewriter::mk_str_delete(expr* a, expr* b, expr* c, expr_ref& result) {
+    zstring s;
+    rational start, len;
+    if (str().is_string(a, s) &&
+        m_autil.is_numeral(b, start) &&
+        start.is_int() &&
+        m_autil.is_numeral(c, len) &&
+        len.is_int()) {
+
+        if (start.is_neg() || start >= s.length() || len <= 0) {
+            result = str().mk_string(s);
+            return BR_DONE;
+        }
+
+        zstring r;
+        unsigned start_u = start.get_unsigned();
+        for (unsigned i = 0; i < s.length(); i++) {
+            if (i == start_u) {
+                // Skip the deleted part
+                if (len + i >= s.length()) break;
+                i += len.get_unsigned() - 1;
+                continue;
+            }
+            r += s[i];
+        }
+        result = str().mk_string(r);
+
         return BR_DONE;
     }
     return BR_FAILED;

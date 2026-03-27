@@ -31,6 +31,18 @@
 (assert (str.in_re v (re.* (str.to_re "a"))))
 (assert (= (str.len v) 8))
 
+; more complicated example
+(declare-const i Int)
+(declare-const o String)
+(declare-const res String)
+(declare-const p String)
+(assert (str.in_re o (re.* (str.to_re "a"))))
+(assert (= (str.len o) 8))
+(assert (= (str.len p) 20))
+(assert (> i 3))
+(assert (= (str.update o (div i 2) p) res))
+(assert (str.in_re res (re.++ (re.* (str.to_re "a")) (re.+ (str.to_re "b")) (str.to_re "aa"))))
+
 ; rewriter
 (assert (= (str.update "aaaaaaaa" 3 "bb") "aaabbaaa"))
 (assert (= (str.update "aaaaaaaa" 3 "bcdefghijklmn") "aaabcdef"))

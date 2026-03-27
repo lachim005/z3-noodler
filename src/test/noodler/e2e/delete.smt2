@@ -24,6 +24,14 @@
 (assert (= (str.delete x 9 2) "aaaabbbb"))
 (assert (= (str.delete x 2 -2) "aaaabbbb"))
 
+; variable index and length
+(declare-const i Int)
+(declare-const j Int)
+(declare-const u String)
+(assert (= u (str.++ a b)))
+; u = aaaabbbb
+(assert (= (str.delete u i j) "aabb"))
+
 ; rewriter
 (assert (= (str.delete "aaxxxxbb" 2 4) "aabb"))
 (assert (= (str.delete "xxxxaabb" 0 4) "aabb"))

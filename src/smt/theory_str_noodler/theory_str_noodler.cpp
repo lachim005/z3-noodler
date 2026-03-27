@@ -1517,14 +1517,14 @@ namespace smt::noodler {
         expr_ref u2_y = mk_concat(u2, y);
         expr_ref u1_u2_u3 = mk_concat(u1, mk_concat(u2, u3));
 
-        // |r| > |w| - i
-        literal will_overflow = mk_literal(m_util_a.mk_gt(m_util_s.str.mk_length(r), m_util_a.mk_sub(m_util_s.str.mk_length(w), i)));
-
         expr_ref zero(m_util_a.mk_int(0), m);
+
+        // |r| > |w| - i
+        literal will_overflow = mk_literal(m_util_a.mk_gt(mk_sub(m_util_s.str.mk_length(r), m_util_a.mk_sub(m_util_s.str.mk_length(w), i)), zero));
         // i >= 0
         literal i_ge_zero = mk_literal(m_util_a.mk_ge(i, zero));
         // i < |w|
-        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(i, m_util_s.str.mk_length(w)));
+        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(mk_sub(i, m_util_s.str.mk_length(w)), zero));
         // |r| <= 0
         literal r_len_le_zero = mk_literal(m_util_a.mk_le(m_util_s.str.mk_length(r), zero));
 
@@ -1653,11 +1653,11 @@ namespace smt::noodler {
         // i >= 0
         literal i_ge_zero = mk_literal(m_util_a.mk_ge(i, zero));
         // i < |w|
-        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(i, m_util_s.str.mk_length(w)));
+        literal i_lt_len_w = mk_literal(m_util_a.mk_lt(mk_sub(i, m_util_s.str.mk_length(w)), zero));
         // l > 0
         literal l_gt_zero = mk_literal(m_util_a.mk_gt(l, zero));
         // i + l >= |w|
-        literal i_plus_l_ge_len_w = mk_literal(m_util_a.mk_ge(m_util_a.mk_add(i, l), m_util_s.str.mk_length(w)));
+        literal i_plus_l_ge_len_w = mk_literal(m_util_a.mk_ge(mk_sub(m_util_a.mk_add(i, l), m_util_s.str.mk_length(w)), zero));
 
         // l <= 0   ->  str.delete(w, i, l) = w
         add_axiom({l_gt_zero, mk_eq(result, w, false)});

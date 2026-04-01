@@ -1901,8 +1901,8 @@ namespace smt::noodler {
                 if (nftRS.num_of_states() < nftNJ.num_of_states()) {
                     std::cout << "First compose left:\n" << lang_nft;
                     std::cout << "First compose right:\n" << *trans[i];
-                    std::cout << "Result of first compose repeat (second compose right):\n" << trRS.print_to_dot();
-                    std::cout << "Result of first compose no jump (second compose right):\n" << trNJ.print_to_dot();
+                    std::cout << "Result of first compose repeat (second compose right):\n" << trRS;
+                    std::cout << "Result of first compose no jump (second compose right):\n" << trNJ;
                     std::cout << "Repeat:\n" << nftRS;
                     std::cout << "No jump:\n" << nftNJ << std::endl;
                 }

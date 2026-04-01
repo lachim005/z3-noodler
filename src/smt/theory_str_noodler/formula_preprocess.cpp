@@ -1877,8 +1877,8 @@ namespace smt::noodler {
 
             // restrict the input variable --> T_1(Aut(x), y)
             // it is not necessary for correctness, but it makes the heuristics later more succesful
-            mata::nft::Nft lang_nft(*nfa, 2);
-            nft = mata::nft::compose(lang_nft, nft, 0, 0, true);
+            mata::nft::Nft lang_nft(*nfa);
+            nft = mata::nft::compose(lang_nft, nft, 0, 0, false, mata::nft::JumpMode::NoJump);
             // compose first tapes of all transducers with identical parameters (and project out the synchronizing tape)
             // nft = [T_1(y), T_2(y), ...]
             for(size_t i = 1; i < trans.size(); i++) {

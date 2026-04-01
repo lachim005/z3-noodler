@@ -1873,40 +1873,17 @@ namespace smt::noodler {
             }
             mata::nft::Nft nft = *(trans[0]);
 
-            mata::nft::Nft nftRS, nftNJ;
-
             auto nfa = this->aut_ass.at(pred.get_left_side()[0]);
 
             // restrict the input variable --> T_1(Aut(x), y)
             // it is not necessary for correctness, but it makes the heuristics later more succesful
             mata::nft::Nft lang_nft(*nfa, 2);
-            nftRS = mata::nft::compose(lang_nft, nft, 0, 0, true, mata::nft::JumpMode::RepeatSymbol);
-            nftNJ = mata::nft::compose(lang_nft, nft, 0, 0, true, mata::nft::JumpMode::NoJump);
-            if (nftRS.num_of_states() < nftNJ.num_of_states()) {
-                std::cout << "Left:\n" << lang_nft;
-                std::cout << "Right:\n" << nft;
-                std::cout << "Repeat:\n" << nftRS;
-                std::cout << "No jump:\n" << nftNJ << std::endl;
-            }
-            nft = nftRS;
+            nft = mata::nft::compose(lang_nft, nft, 0, 0, true);
             // compose first tapes of all transducers with identical parameters (and project out the synchronizing tape)
             // nft = [T_1(y), T_2(y), ...]
             for(size_t i = 1; i < trans.size(); i++) {
-                auto trRS = mata::nft::compose(lang_nft, *trans[i], 0, 0, true, mata::nft::JumpMode::RepeatSymbol);
-                nftRS = mata::nft::compose(nft, trRS, 0, 0, true, mata::nft::JumpMode::RepeatSymbol);
-
-                auto trNJ = mata::nft::compose(lang_nft, *trans[i], 0, 0, true, mata::nft::JumpMode::NoJump);
-                nftNJ = mata::nft::compose(nft, trNJ, 0, 0, true, mata::nft::JumpMode::NoJump);
-
-                if (nftRS.num_of_states() < nftNJ.num_of_states()) {
-                    std::cout << "First compose left:\n" << lang_nft;
-                    std::cout << "First compose right:\n" << *trans[i];
-                    std::cout << "Result of first compose repeat (second compose right):\n" << trRS;
-                    std::cout << "Result of first compose no jump (second compose right):\n" << trNJ;
-                    std::cout << "Repeat:\n" << nftRS;
-                    std::cout << "No jump:\n" << nftNJ << std::endl;
-                }
-                nft = nftRS;
+                auto tr = mata::nft::compose(lang_nft, *trans[i], 0, 0, true, mata::nft::JumpMode::NoJump);
+                nft = mata::nft::compose(nft, tr, 0, 0, true, mata::nft::JumpMode::NoJump);
             }
 
             if(util::contains_trans_identity(nft, 4) == l_false) {

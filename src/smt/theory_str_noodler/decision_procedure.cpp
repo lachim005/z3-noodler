@@ -1,4 +1,10 @@
+#include <array>
+#include <iostream>
+#include <mata/nfa/nfa.hh>
+#include <memory>
+#include <optional>
 #include <queue>
+#include <unordered_map>
 #include <utility>
 #include <algorithm>
 #include <functional>
@@ -6,11 +12,13 @@
 #include <numeric> 
 
 #include <mata/applications/strings.hh>
+#include <vector>
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
 #include "regex.h"
 #include "conversion_handler.h"
+#include "util/vector.h"
 
 namespace smt::noodler {
     lbool DecisionProcedure::compute_next_solution() {
@@ -125,6 +133,155 @@ namespace smt::noodler {
         // there are no solving states left, which means nothing led to solution -> it must be unsatisfiable
         STRACE(str_noodle_dot, tout << "}\n";);
         return { l_false, some_skipped };
+    }
+
+    using Nfa = mata::nfa::Nfa;
+
+    unsigned int_map(const Nfa &r, unsigned il, unsigned ir) { return il * r.num_of_states() + ir; }
+
+    Nfa full_intersection(const Nfa &l, const Nfa &r) {
+        mata::nfa::Nfa i(l.num_of_states() * r.num_of_states());
+
+        for (unsigned il = 0; il < l.num_of_states(); il++) {
+            for (unsigned ir = 0; ir < r.num_of_states(); ir++) {
+                auto new_state = il*r.num_of_states() + ir;
+                for (auto letter : l.delta[il]) {
+                    for (auto dl : l.post(il, letter.symbol)) {
+                        for (auto dr : r.post(ir, letter.symbol)) {
+                            auto dst = dl * r.num_of_states() + dr;
+                            i.delta.add(new_state, letter.symbol, dst);
+                        }
+                    }
+                }
+            }
+        }
+
+        return i;
+    }
+
+    using Noodle = std::vector<std::pair<std::shared_ptr<mata::nfa::Nfa>, std::vector<unsigned>>>;
+    using MyNoodle = std::tuple<Noodle, mata::nfa::State, bool>;
+    using ProdMap = std::unordered_map<std::pair<mata::nfa::State, mata::nfa::State>, mata::nfa::State>;
+    using Bubble = std::shared_ptr<mata::nfa::Nfa>;
+
+    std::vector<Noodle> perhaps_better_noodlification(std::vector<std::shared_ptr<mata::nfa::Nfa>> left, std::vector<std::shared_ptr<mata::nfa::Nfa>> right) {
+        if (left.size() == 1 && right.size() == 1) {
+            return {{{std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*left[0], *right[0]).trim()), {0, 0}}}};
+        }
+
+        std::vector<std::vector<std::optional<Bubble>>> bubbles(left.size(), std::vector<std::optional<Bubble>>(right.size(), std::nullopt));
+        std::vector<Noodle> result{};
+
+        std::vector<MyNoodle> stack;
+
+        // Create bubble
+        auto bubble = std::make_shared<mata::nfa::Nfa>(full_intersection(*left[0], *right[0]));
+        for (auto l : left[0]->initial) {
+            for (auto r : right[0]->initial) {
+                bubble->initial.insert(int_map(*right[0], l, r));
+            }
+        }
+        bubbles[0][0] = { bubble };
+        if (right.size() > 1) {
+            for (mata::nfa::State i : left[0]->get_reachable_states()) {
+                bubble->final.clear();
+                for (auto f : right[0]->final) {
+                        bubble->final.insert(int_map(*right[0], i, f));
+                }
+                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
+                if (aut->num_of_states() == 0) {
+                    continue;
+                }
+                stack.push_back({{{aut, {0, 0}}}, i, true});
+            }
+        }
+        if (left.size() > 1) {
+            for (mata::nfa::State i : right[0]->get_reachable_states()) {
+                bubble->final.clear();
+                for (auto f : left[0]->final) {
+                    bubble->final.insert(int_map(*right[0], f, i));
+                }
+                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
+                if (aut->num_of_states() == 0) {
+                    continue;
+                }
+                stack.push_back({{{aut, {0, 0}}}, i, false});
+            }
+        }
+
+        while (!stack.empty()) {
+            auto [noodle, level, crossed_right] = std::move(stack.back());
+            stack.pop_back();
+            auto pos_l = noodle.back().second[0];
+            auto pos_r = noodle.back().second[1];
+
+            if (crossed_right) pos_r++; else pos_l++;
+
+            if (!bubbles[pos_l][pos_r].has_value()) {
+                // Create bubble
+                ProdMap map;
+                auto aut = std::make_shared<mata::nfa::Nfa>(full_intersection(*left[pos_l], *right[pos_r]));
+                bubbles[pos_l][pos_r] = aut;
+            }
+            auto& bubble = bubbles[pos_l][pos_r].value();
+            bubble->initial.clear();
+            if (crossed_right) {
+                for (auto f : right[pos_r]->initial) {
+                    bubble->initial.insert(int_map(*right[pos_r], level, f));
+                }
+            } else {
+                for (auto f : left[pos_l]->initial) {
+                    bubble->initial.insert(int_map(*right[pos_r], f, level));
+                }
+            }
+            if (pos_l + 1 == left.size() && pos_r + 1 == right.size()) {
+                bubble->final.clear();
+                for (auto l : left[pos_l]->final) {
+                    for (auto r : right[pos_r]->final) {
+                        bubble->final.insert(int_map(*right[pos_r], l, r));
+                    }
+                }
+                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
+                if (aut->num_of_states() == 0) {
+                    continue;
+                }
+                Noodle new_noodle{noodle};
+                new_noodle.push_back({aut, {pos_l, pos_r}});
+                result.push_back(new_noodle);
+                continue;
+            }
+            if (pos_r + 1 < right.size()) {
+                for (mata::nfa::State i : left[pos_l]->get_reachable_states()) {
+                    bubble->final.clear();
+                    for (auto f : right[pos_r]->final) {
+                        bubble->final.insert(int_map(*right[pos_r], i, f));
+                    }
+                    auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
+                    if (aut->num_of_states() == 0) {
+                        continue;
+                    }
+                    Noodle n{noodle};
+                    n.push_back({aut, {pos_l, pos_r}});
+                    stack.push_back({n, i, true});
+                }
+            }
+            if (pos_l + 1 < left.size()) {
+                for (mata::nfa::State i : right[pos_r]->get_reachable_states()) {
+                    bubble->final.clear();
+                    for (auto f : left[pos_l]->final) {
+                        bubble->final.insert(int_map(*right[pos_r], f, i));
+                    }
+                    auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
+                    if (aut->num_of_states() == 0) {
+                        continue;
+                    }
+                    Noodle n{noodle};
+                    n.push_back({aut, {pos_l, pos_r}});
+                    stack.push_back({n, i, false});
+                }
+            }
+        }
+        return result;
     }
 
     void DecisionProcedure::process_inclusion(const Predicate& inclusion_to_process, SolvingState& solving_state) {
@@ -251,10 +408,14 @@ namespace smt::noodler {
          * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
          * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
          **/
-        auto noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
+        auto old_noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
                                                                     right_side_automata,
                                                                     false,
                                                                     {{"reduce", "forward"}});
+        auto noodles = perhaps_better_noodlification(left_side_automata, right_side_automata);
+
+        // std::cerr << "== Old: " << old_noodles.size() << " New: " << noodles.size() << " ==\n";
+
         bool more_than_one_noodle = noodles.size() > 1;
 
         for (const auto &noodle : noodles) {

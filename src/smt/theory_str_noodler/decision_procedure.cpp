@@ -1,4 +1,5 @@
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <mata/nfa/nfa.hh>
 #include <memory>
@@ -13,6 +14,7 @@
 
 #include <mata/applications/strings.hh>
 #include <vector>
+#include "smt/theory_str_noodler/formula.h"
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -159,14 +161,29 @@ namespace smt::noodler {
         return i;
     }
 
-    using Noodle = std::vector<std::pair<std::shared_ptr<mata::nfa::Nfa>, std::vector<unsigned>>>;
-    using MyNoodle = std::tuple<Noodle, mata::nfa::State, bool>;
+    // using Noodle = std::vector<std::pair<std::shared_ptr<mata::nfa::Nfa>, std::vector<unsigned>>>;
+    using Noodle = mata::applications::strings::seg_nfa::NoodleWithEpsilonsCounter;
+    using MyNoodle = std::tuple<Noodle, mata::nfa::State, bool, unsigned, unsigned>;
     using ProdMap = std::unordered_map<std::pair<mata::nfa::State, mata::nfa::State>, mata::nfa::State>;
     using Bubble = std::shared_ptr<mata::nfa::Nfa>;
 
+    bool operator==(const Nfa& nfa1, const Nfa& nfa2) {
+        return nfa1.is_identical(nfa2);
+    }
+
     std::vector<Noodle> perhaps_better_noodlification(std::vector<std::shared_ptr<mata::nfa::Nfa>> left, std::vector<std::shared_ptr<mata::nfa::Nfa>> right) {
+        // auto start = std::chrono::system_clock::now();
+        // bool set_first = false;
+        // auto first = start;
+        if (left.size() == 0 || right.size() == 0) {
+            return {};
+        }
         if (left.size() == 1 && right.size() == 1) {
-            return {{{std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*left[0], *right[0]).trim()), {0, 0}}}};
+            auto aut = mata::nfa::intersection(*left[0], *right[0]).trim();
+            if (aut.num_of_states() == 0) {
+                return {};
+            }
+            return {{{std::make_shared<mata::nfa::Nfa>(aut), {0, 0}}}};
         }
 
         std::vector<std::vector<std::optional<Bubble>>> bubbles(left.size(), std::vector<std::optional<Bubble>>(right.size(), std::nullopt));
@@ -183,7 +200,7 @@ namespace smt::noodler {
         }
         bubbles[0][0] = { bubble };
         if (right.size() > 1) {
-            for (mata::nfa::State i : left[0]->get_reachable_states()) {
+            for (unsigned i = 0; i < left[0]->num_of_states(); i++) {
                 bubble->final.clear();
                 for (auto f : right[0]->final) {
                         bubble->final.insert(int_map(*right[0], i, f));
@@ -192,11 +209,14 @@ namespace smt::noodler {
                 if (aut->num_of_states() == 0) {
                     continue;
                 }
-                stack.push_back({{{aut, {0, 0}}}, i, true});
+                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
+                    stack.push_back({{{aut, {0, 0}}}, i, true, 0, 0});
+                else
+                    stack.push_back({{}, i, true, 0, 0});
             }
         }
         if (left.size() > 1) {
-            for (mata::nfa::State i : right[0]->get_reachable_states()) {
+            for (unsigned i = 0; i < right[0]->num_of_states(); i++) {
                 bubble->final.clear();
                 for (auto f : left[0]->final) {
                     bubble->final.insert(int_map(*right[0], f, i));
@@ -205,15 +225,16 @@ namespace smt::noodler {
                 if (aut->num_of_states() == 0) {
                     continue;
                 }
-                stack.push_back({{{aut, {0, 0}}}, i, false});
+                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
+                    stack.push_back({{ {aut, {0, 0}} }, i, false, 0, 0});
+                else
+                    stack.push_back({{}, i, false, 0, 0});
             }
         }
 
         while (!stack.empty()) {
-            auto [noodle, level, crossed_right] = std::move(stack.back());
+            auto [noodle, level, crossed_right, pos_l, pos_r] = std::move(stack.back());
             stack.pop_back();
-            auto pos_l = noodle.back().second[0];
-            auto pos_r = noodle.back().second[1];
 
             if (crossed_right) pos_r++; else pos_l++;
 
@@ -246,12 +267,38 @@ namespace smt::noodler {
                     continue;
                 }
                 Noodle new_noodle{noodle};
-                new_noodle.push_back({aut, {pos_l, pos_r}});
-                result.push_back(new_noodle);
+                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
+                    new_noodle.push_back({aut, {pos_l, pos_r}});
+
+                bool contains = false;
+                for (auto s : result) {
+                    bool match = true;
+                    if (new_noodle.size() != s.size()) continue;
+                    for (unsigned i = 0; i < new_noodle.size(); i++) {
+                        if (new_noodle[i].second[0] != s[i].second[0] || new_noodle[i].second[1] != s[i].second[1]) {
+                            match = false;
+                            break;
+                        }
+                        if (!new_noodle[i].first->is_identical(*s[i].first)) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        contains =true;
+                        break;
+                    }
+                }
+                if (!contains)
+                    result.push_back(new_noodle);
+                // if (!set_first) {
+                //     first = std::chrono::system_clock::now();
+                //     set_first = true;
+                // }
                 continue;
             }
             if (pos_r + 1 < right.size()) {
-                for (mata::nfa::State i : left[pos_l]->get_reachable_states()) {
+                for (unsigned i = 0; i < left[pos_l]->num_of_states(); i++) {
                     bubble->final.clear();
                     for (auto f : right[pos_r]->final) {
                         bubble->final.insert(int_map(*right[pos_r], i, f));
@@ -261,12 +308,13 @@ namespace smt::noodler {
                         continue;
                     }
                     Noodle n{noodle};
-                    n.push_back({aut, {pos_l, pos_r}});
-                    stack.push_back({n, i, true});
+                    if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
+                        n.push_back({aut, {pos_l, pos_r}});
+                    stack.push_back({n, i, true, pos_l, pos_r});
                 }
             }
             if (pos_l + 1 < left.size()) {
-                for (mata::nfa::State i : right[pos_r]->get_reachable_states()) {
+                for (unsigned i = 0; i < right[pos_r]->num_of_states(); i++) {
                     bubble->final.clear();
                     for (auto f : left[pos_l]->final) {
                         bubble->final.insert(int_map(*right[pos_r], f, i));
@@ -276,11 +324,23 @@ namespace smt::noodler {
                         continue;
                     }
                     Noodle n{noodle};
-                    n.push_back({aut, {pos_l, pos_r}});
-                    stack.push_back({n, i, false});
+                    if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
+                        n.push_back({aut, {pos_l, pos_r}});
+                    stack.push_back({n, i, false, pos_l, pos_r});
                 }
             }
         }
+        // auto end = std::chrono::system_clock::now();
+        // if (!set_first) {
+        //     first = end;
+        // }
+        // auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        // auto fdur = std::chrono::duration_cast<std::chrono::microseconds>(first - start);
+        // static unsigned total = 0;
+        // static unsigned total_first = 0;
+        // total += dur.count();
+        // total_first += fdur.count();
+        // std::cerr << "total:\t" << total << "\tfirst:\t" << total_first << "\t(" << unsigned(((double)total_first / total)*100) << "%)\n";
         return result;
     }
 
@@ -408,13 +468,32 @@ namespace smt::noodler {
          * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
          * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
          **/
-        auto old_noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
-                                                                    right_side_automata,
-                                                                    false,
-                                                                    {{"reduce", "forward"}});
+        // auto old_noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
+        //                                                             right_side_automata,
+        //                                                             false,
+        //                                                             {{"reduce", "forward"}});
         auto noodles = perhaps_better_noodlification(left_side_automata, right_side_automata);
 
+        // std::cerr << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
         // std::cerr << "== Old: " << old_noodles.size() << " New: " << noodles.size() << " ==\n";
+        // std::cerr << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+        //
+        // for (auto n : noodles) {
+        //     std::cerr << "###################################\n";
+        //     for (auto seg : n) {
+        //         std::cerr << seg.first->print_to_dot();
+        //         std::cerr << "-------------------------------\n";
+        //         std::cerr << "(" << seg.second[0] << ", " << seg.second[1] << ")\n";
+        //     }
+        // }
+        // for (auto n : old_noodles) {
+        //     std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+        //     for (auto seg : n) {
+        //         std::cerr << seg.first->print_to_dot();
+        //         std::cerr << "-------------------------------\n";
+        //         std::cerr << "(" << seg.second[0] << ", " << seg.second[1] << ")\n";
+        //     }
+        // }
 
         bool more_than_one_noodle = noodles.size() > 1;
 

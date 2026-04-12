@@ -15,6 +15,7 @@
 #include <mata/applications/strings.hh>
 #include <vector>
 #include "smt/theory_str_noodler/formula.h"
+#include "smt/theory_str_noodler/noodlification_state.h"
 #include "util.h"
 #include "aut_assignment.h"
 #include "decision_procedure.h"
@@ -46,7 +47,9 @@ namespace smt::noodler {
 
         while (!is_worklist_empty()) {
             util::check_limit(m);
-            SolvingState element_to_process = pop_from_worklist();
+            auto elopt = pop_from_worklist();
+            if (!elopt.has_value()) break;
+            SolvingState element_to_process = elopt.value();
 
             if (len_checks_enabled &&
                 !element_to_process.predicates_to_process.empty() &&
@@ -137,213 +140,6 @@ namespace smt::noodler {
         return { l_false, some_skipped };
     }
 
-    using Nfa = mata::nfa::Nfa;
-
-    unsigned int_map(const Nfa &r, unsigned il, unsigned ir) { return il * r.num_of_states() + ir; }
-
-    Nfa full_intersection(const Nfa &l, const Nfa &r) {
-        mata::nfa::Nfa i(l.num_of_states() * r.num_of_states());
-
-        for (unsigned il = 0; il < l.num_of_states(); il++) {
-            for (unsigned ir = 0; ir < r.num_of_states(); ir++) {
-                auto new_state = il*r.num_of_states() + ir;
-                for (auto letter : l.delta[il]) {
-                    for (auto dl : l.post(il, letter.symbol)) {
-                        for (auto dr : r.post(ir, letter.symbol)) {
-                            auto dst = dl * r.num_of_states() + dr;
-                            i.delta.add(new_state, letter.symbol, dst);
-                        }
-                    }
-                }
-            }
-        }
-
-        return i;
-    }
-
-    // using Noodle = std::vector<std::pair<std::shared_ptr<mata::nfa::Nfa>, std::vector<unsigned>>>;
-    using Noodle = mata::applications::strings::seg_nfa::NoodleWithEpsilonsCounter;
-    using MyNoodle = std::tuple<Noodle, mata::nfa::State, bool, unsigned, unsigned>;
-    using ProdMap = std::unordered_map<std::pair<mata::nfa::State, mata::nfa::State>, mata::nfa::State>;
-    using Bubble = std::shared_ptr<mata::nfa::Nfa>;
-
-    bool operator==(const Nfa& nfa1, const Nfa& nfa2) {
-        return nfa1.is_identical(nfa2);
-    }
-
-    std::vector<Noodle> perhaps_better_noodlification(std::vector<std::shared_ptr<mata::nfa::Nfa>> left, std::vector<std::shared_ptr<mata::nfa::Nfa>> right) {
-        // auto start = std::chrono::system_clock::now();
-        // bool set_first = false;
-        // auto first = start;
-        if (left.size() == 0 || right.size() == 0) {
-            return {};
-        }
-        if (left.size() == 1 && right.size() == 1) {
-            auto aut = mata::nfa::intersection(*left[0], *right[0]).trim();
-            if (aut.num_of_states() == 0) {
-                return {};
-            }
-            return {{{std::make_shared<mata::nfa::Nfa>(aut), {0, 0}}}};
-        }
-
-        std::vector<std::vector<std::optional<Bubble>>> bubbles(left.size(), std::vector<std::optional<Bubble>>(right.size(), std::nullopt));
-        std::vector<Noodle> result{};
-
-        std::vector<MyNoodle> stack;
-
-        // Create bubble
-        auto bubble = std::make_shared<mata::nfa::Nfa>(full_intersection(*left[0], *right[0]));
-        for (auto l : left[0]->initial) {
-            for (auto r : right[0]->initial) {
-                bubble->initial.insert(int_map(*right[0], l, r));
-            }
-        }
-        bubbles[0][0] = { bubble };
-        if (right.size() > 1) {
-            for (unsigned i = 0; i < left[0]->num_of_states(); i++) {
-                bubble->final.clear();
-                for (auto f : right[0]->final) {
-                        bubble->final.insert(int_map(*right[0], i, f));
-                }
-                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
-                if (aut->num_of_states() == 0) {
-                    continue;
-                }
-                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
-                    stack.push_back({{{aut, {0, 0}}}, i, true, 0, 0});
-                else
-                    stack.push_back({{}, i, true, 0, 0});
-            }
-        }
-        if (left.size() > 1) {
-            for (unsigned i = 0; i < right[0]->num_of_states(); i++) {
-                bubble->final.clear();
-                for (auto f : left[0]->final) {
-                    bubble->final.insert(int_map(*right[0], f, i));
-                }
-                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
-                if (aut->num_of_states() == 0) {
-                    continue;
-                }
-                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
-                    stack.push_back({{ {aut, {0, 0}} }, i, false, 0, 0});
-                else
-                    stack.push_back({{}, i, false, 0, 0});
-            }
-        }
-
-        while (!stack.empty()) {
-            auto [noodle, level, crossed_right, pos_l, pos_r] = std::move(stack.back());
-            stack.pop_back();
-
-            if (crossed_right) pos_r++; else pos_l++;
-
-            if (!bubbles[pos_l][pos_r].has_value()) {
-                // Create bubble
-                ProdMap map;
-                auto aut = std::make_shared<mata::nfa::Nfa>(full_intersection(*left[pos_l], *right[pos_r]));
-                bubbles[pos_l][pos_r] = aut;
-            }
-            auto& bubble = bubbles[pos_l][pos_r].value();
-            bubble->initial.clear();
-            if (crossed_right) {
-                for (auto f : right[pos_r]->initial) {
-                    bubble->initial.insert(int_map(*right[pos_r], level, f));
-                }
-            } else {
-                for (auto f : left[pos_l]->initial) {
-                    bubble->initial.insert(int_map(*right[pos_r], f, level));
-                }
-            }
-            if (pos_l + 1 == left.size() && pos_r + 1 == right.size()) {
-                bubble->final.clear();
-                for (auto l : left[pos_l]->final) {
-                    for (auto r : right[pos_r]->final) {
-                        bubble->final.insert(int_map(*right[pos_r], l, r));
-                    }
-                }
-                auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
-                if (aut->num_of_states() == 0) {
-                    continue;
-                }
-                Noodle new_noodle{noodle};
-                if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
-                    new_noodle.push_back({aut, {pos_l, pos_r}});
-
-                bool contains = false;
-                for (auto s : result) {
-                    bool match = true;
-                    if (new_noodle.size() != s.size()) continue;
-                    for (unsigned i = 0; i < new_noodle.size(); i++) {
-                        if (new_noodle[i].second[0] != s[i].second[0] || new_noodle[i].second[1] != s[i].second[1]) {
-                            match = false;
-                            break;
-                        }
-                        if (!new_noodle[i].first->is_identical(*s[i].first)) {
-                            match = false;
-                            break;
-                        }
-                    }
-                    if (match) {
-                        contains =true;
-                        break;
-                    }
-                }
-                if (!contains)
-                    result.push_back(new_noodle);
-                // if (!set_first) {
-                //     first = std::chrono::system_clock::now();
-                //     set_first = true;
-                // }
-                continue;
-            }
-            if (pos_r + 1 < right.size()) {
-                for (unsigned i = 0; i < left[pos_l]->num_of_states(); i++) {
-                    bubble->final.clear();
-                    for (auto f : right[pos_r]->final) {
-                        bubble->final.insert(int_map(*right[pos_r], i, f));
-                    }
-                    auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
-                    if (aut->num_of_states() == 0) {
-                        continue;
-                    }
-                    Noodle n{noodle};
-                    if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
-                        n.push_back({aut, {pos_l, pos_r}});
-                    stack.push_back({n, i, true, pos_l, pos_r});
-                }
-            }
-            if (pos_l + 1 < left.size()) {
-                for (unsigned i = 0; i < right[pos_r]->num_of_states(); i++) {
-                    bubble->final.clear();
-                    for (auto f : left[pos_l]->final) {
-                        bubble->final.insert(int_map(*right[pos_r], f, i));
-                    }
-                    auto aut = std::make_shared<mata::nfa::Nfa>(mata::nfa::Nfa(*bubble).trim());
-                    if (aut->num_of_states() == 0) {
-                        continue;
-                    }
-                    Noodle n{noodle};
-                    if (aut->num_of_states() != 1 || aut->delta.num_of_transitions() > 0)
-                        n.push_back({aut, {pos_l, pos_r}});
-                    stack.push_back({n, i, false, pos_l, pos_r});
-                }
-            }
-        }
-        // auto end = std::chrono::system_clock::now();
-        // if (!set_first) {
-        //     first = end;
-        // }
-        // auto dur = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        // auto fdur = std::chrono::duration_cast<std::chrono::microseconds>(first - start);
-        // static unsigned total = 0;
-        // static unsigned total_first = 0;
-        // total += dur.count();
-        // total_first += fdur.count();
-        // std::cerr << "total:\t" << total << "\tfirst:\t" << total_first << "\t(" << unsigned(((double)total_first / total)*100) << "%)\n";
-        return result;
-    }
-
     void DecisionProcedure::process_inclusion(const Predicate& inclusion_to_process, SolvingState& solving_state) {
         // this will decide whether we will continue in our search by DFS or by BFS
         bool is_inclusion_to_process_on_cycle = solving_state.is_predicate_on_cycle(inclusion_to_process);
@@ -359,8 +155,9 @@ namespace smt::noodler {
             tout << std::endl;
         );
 
-        const auto &left_side_vars = inclusion_to_process.get_left_side();
-        const auto &right_side_vars = inclusion_to_process.get_right_side();
+        solving_state.left_side_vars = {inclusion_to_process.get_left_side()};
+        auto &left_side_vars = solving_state.left_side_vars.value();
+        auto &right_side_vars = inclusion_to_process.get_right_side();
 
         /********************************************************************************************************/
         /****************************************** One side is empty *******************************************/
@@ -414,6 +211,7 @@ namespace smt::noodler {
         // Get automata of the variables on the left side
         STRACE(str_nfa, tout << "Left automata:" << std::endl);
         auto [left_side_automata, left_side_division] = solving_state.get_automata_and_division_of_concatenation(left_side_vars, false);
+        solving_state.left_side_division = left_side_division;
         SASSERT(left_side_division.size() == left_side_vars.size()); // each division should contain exactly one left variable
         SASSERT(left_side_automata.size() == left_side_division.size()); // we have one automaton for each division
 
@@ -423,6 +221,7 @@ namespace smt::noodler {
         // side automaton the variables whose concatenation it represents.
         STRACE(str_nfa, tout << "Right automata:" << std::endl);
         auto [right_side_automata, right_side_division] = solving_state.get_automata_and_division_of_concatenation(right_side_vars, true);
+        solving_state.right_side_division = right_side_division;
         SASSERT(right_side_automata.size() == right_side_division.size()); // we have one automaton for each division
 
 
@@ -468,111 +267,10 @@ namespace smt::noodler {
          * i_l-th left var (i.e. left_side_vars[i_l]) and the second element i_r = noodle[i].second[1] tell us that
          * it belongs to the i_r-th division of the right side (i.e. right_side_division[i_r])
          **/
-        // auto old_noodles = mata::applications::strings::seg_nfa::noodlify_for_equation(left_side_automata,
-        //                                                             right_side_automata,
-        //                                                             false,
-        //                                                             {{"reduce", "forward"}});
-        auto noodles = perhaps_better_noodlification(left_side_automata, right_side_automata);
+        solving_state.is_inclusion_to_process_on_cycle = is_inclusion_to_process_on_cycle;
+        solving_state.noodlification_state = NoodlificationState(left_side_automata, right_side_automata, solving_state.disequations_len_formula_conjuncts.empty());
 
-        // std::cerr << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-        // std::cerr << "== Old: " << old_noodles.size() << " New: " << noodles.size() << " ==\n";
-        // std::cerr << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-        //
-        // for (auto n : noodles) {
-        //     std::cerr << "###################################\n";
-        //     for (auto seg : n) {
-        //         std::cerr << seg.first->print_to_dot();
-        //         std::cerr << "-------------------------------\n";
-        //         std::cerr << "(" << seg.second[0] << ", " << seg.second[1] << ")\n";
-        //     }
-        // }
-        // for (auto n : old_noodles) {
-        //     std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
-        //     for (auto seg : n) {
-        //         std::cerr << seg.first->print_to_dot();
-        //         std::cerr << "-------------------------------\n";
-        //         std::cerr << "(" << seg.second[0] << ", " << seg.second[1] << ")\n";
-        //     }
-        // }
-
-        bool more_than_one_noodle = noodles.size() > 1;
-
-        for (const auto &noodle : noodles) {
-            util::check_limit(m);
-            STRACE(str, tout << "Processing noodle" << (is_trace_enabled(TraceTag::str_nfa) ? " with automata:" : "") << std::endl;);
-            SolvingState new_element = solving_state;
-
-            /* Explanation of the next code on an example:
-             * Left side has variables x_1, x_2, x_3, x_2 while the right side has variables x_4, x_1, x_5, x_6, where x_1
-             * and x_4 are length-aware (i.e. there is one automaton for concatenation of x_5 and x_6 on the right side).
-             * Assume that noodle represents the case where it was split like this:
-             *              | x_1 |    x_2    | x_3 |       x_2       |
-             *              | t_1 | t_2 | t_3 | t_4 | t_5 |    t_6    |
-             *              |    x_4    |       x_1       | x_5 | x_6 |
-             * In the following for loop, we create the vars t1, t2, ..., t6 and prepare two vectors left_side_vars_to_new_vars
-             * and right_side_divisions_to_new_vars which map left vars and right divisions into the concatenation of the new
-             * vars. So for example left_side_vars_to_new_vars[1] = t_2 t_3, because second left var is x_2 and we map it to t_2 t_3,
-             * while right_side_divisions_to_new_vars[2] = t_6, because the third division on the right represents the automaton for
-             * concatenation of x_5 and x_6 and we map it to t_6.
-             */
-            std::vector<std::vector<BasicTerm>> left_side_vars_to_new_vars(left_side_vars.size());
-            std::vector<std::vector<BasicTerm>> right_side_divisions_to_new_vars(right_side_division.size());
-            for (unsigned i = 0; i < noodle.size(); ++i) {
-                // we add a fresh var for each segment of noodle (TODO: do not make new var if we can replace it from one side by one var)
-                BasicTerm new_var = new_element.add_fresh_var(
-                                                        noodle[i].first, // we assign to it the automaton from the segment
-                                                        std::string("align_") + std::to_string(noodlification_no), // the prefix of the new var
-                                                        // the var is length if the corresponding variable on the left or right is length too
-                                                        new_element.length_sensitive_vars.contains(left_side_vars[noodle[i].second[0]])
-                                                            || new_element.contains_length_var(right_side_division[noodle[i].second[1]]),
-                                                        true);
-                left_side_vars_to_new_vars[noodle[i].second[0]].push_back(new_var);
-                right_side_divisions_to_new_vars[noodle[i].second[1]].push_back(new_var);
-                STRACE(str_nfa, tout << new_var << std::endl << *noodle[i].first;);
-            }
-
-            /* Following the example from before, the following will create these inclusions from the right side divisions:
-             *         t_1 t_2 ⊆ x_4
-             *     t_3 t_4 t_5 ⊆ x_1
-             *             t_6 ⊆ x_5 x_6
-             */
-            std::vector<Predicate> right_side_inclusions = util::create_inclusions_from_multiple_sides(right_side_divisions_to_new_vars, right_side_division);
-            /*
-             * However, we do not add the first two inclusions into the inclusion graph but use them for substitution, i.e.
-             *        substitution_map[x_4] = t_1 t_2
-             *        substitution_map[x_1] = t_3 t_4 t_5
-             * because they are length-aware vars and we only add the inclusion t_6 ⊆ x_5 x_6.
-             * The following function does this and it also add new inclusions/transducers to processing if needed.
-             */
-            std::set<BasicTerm> newly_substituted_vars_from_right = new_element.process_substituting_inclusions_from_right(right_side_inclusions, is_inclusion_to_process_on_cycle);
-
-            /* Following the example from before, the following will create these inclusions from the left side:
-             *           x_1 ⊆ t_1
-             *           x_2 ⊆ t_2 t_3
-             *           x_3 ⊆ t_4
-             *           x_2 ⊆ t_5 t_6
-             */
-             std::vector<Predicate> left_side_inclusions = util::create_inclusions_from_multiple_sides(left_side_division, left_side_vars_to_new_vars);
-             /* Again, we want to use the inclusions for substitutions, but we replace only those variables which were
-             * not substituted yet, so the first inclusion stays (x_1 was substituted from the right side) and the
-             * fourth inclusion stays (as we substitute x_2 using the second inclusion). So from the second and third
-             * inclusion we get:
-             *        substitution_map[x_2] = t_2 t_3
-             *        substitution_map[x_3] = t_4
-             * and we only add inclusions x_1 ⊆ t_1 and t_2 t_3 ⊆ t_5 t_6.
-             * The following function does this and it also add new inclusions/transducers to processing if needed.
-             */
-            std::set<BasicTerm> newly_substituted_vars_from_left = new_element.process_substituting_inclusions_from_left(left_side_inclusions, is_inclusion_to_process_on_cycle);
-
-            // Remove unneccesary variables that were substituted (we do it here, because we the code before depends on the newly substituted vars to be in subtitution_map)
-            new_element.remove_vars(newly_substituted_vars_from_right, initial_variables); // remove unneccesary variables that were substituted
-            new_element.remove_vars(newly_substituted_vars_from_left, initial_variables); // remove unneccesary variables that were substituted
-
-            // we push to front when the inclusion is not on cycle, because we want to get to the result as fast as possible
-            // and if there is no cycle, we do not need to do BFS, the algorithm should end
-            new_element.has_siblings = more_than_one_noodle;
-            push_to_worklist(std::move(new_element), is_inclusion_to_process_on_cycle);
-        }
+        worklist.push_front(std::move(solving_state));
 
         ++noodlification_no; // TODO: when to do this increment?? maybe noodlification_no should be part of SolvingState?
         /********************************************************************************************************/
@@ -1356,7 +1054,7 @@ namespace smt::noodler {
             return l_false;
         } else if (this->formula.get_predicates().empty()) {
             // preprocessing solved all (dis)equations => we set the solution (for lengths check)
-            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, {}, false);
+            this->solution = SolvingState(this->init_aut_ass, {}, {}, {}, {}, this->init_length_sensitive_vars, std::nullopt, {}, false);
             return l_true;
         } else {
             // preprocessing was not able to solve it

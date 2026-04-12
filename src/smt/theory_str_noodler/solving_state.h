@@ -4,10 +4,12 @@
 #include <memory>
 #include <deque>
 #include <algorithm>
+#include <optional>
 
 #include "params/theory_str_noodler_params.h"
 #include "formula.h"
 #include "aut_assignment.h"
+#include "noodlification_state.h"
 #include "util.h"
 
 namespace smt::noodler {
@@ -43,6 +45,13 @@ namespace smt::noodler {
         // the variables that have length constraint on them in the rest of formula
         std::unordered_set<BasicTerm> length_sensitive_vars;
 
+        // NoodlificationState noodlification_state;
+        std::optional<NoodlificationState> noodlification_state = std::nullopt;
+        std::optional<std::vector<BasicTerm>> left_side_vars = std::nullopt;
+        std::optional<std::vector<std::vector<BasicTerm>>> left_side_division = std::nullopt;
+        std::optional<std::vector<std::vector<BasicTerm>>> right_side_division = std::nullopt;
+        bool is_inclusion_to_process_on_cycle = false;
+
         // disequations postponed to be handled after finding stable solutions
         Formula postponed_disequations;
 
@@ -62,6 +71,7 @@ namespace smt::noodler {
                      std::set<Predicate> transducers,
                      std::set<Predicate> predicates_not_on_cycle,
                      std::unordered_set<BasicTerm> length_sensitive_vars,
+                     std::optional<NoodlificationState> noodlification_state,
                      std::unordered_map<BasicTerm, std::vector<BasicTerm>> substitution_map,
                      bool has_siblings,
                      Formula disequations = {},
@@ -73,6 +83,7 @@ namespace smt::noodler {
                           predicates_not_on_cycle(predicates_not_on_cycle),
                           predicates_to_process(predicates_to_process),
                           length_sensitive_vars(length_sensitive_vars),
+                          noodlification_state(noodlification_state),
                           postponed_disequations(disequations),
                           conversions(conversions),
                           has_siblings(has_siblings) {}

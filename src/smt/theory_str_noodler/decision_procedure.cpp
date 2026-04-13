@@ -386,7 +386,7 @@ namespace smt::noodler {
 
         if (one_side_is_literal) {
             // we apply the literal to the corresponding tape of the transducer, getting the NFA for the nonliteral side
-            mata::nfa::Nfa application_to_literal = transducer_to_process.get_transducer()->apply(util::get_mata_word_zstring(literal), level_of_literal_side).to_nfa_move();
+            mata::nfa::Nfa application_to_literal = transducer_to_process.get_transducer()->apply(util::get_mata_word_zstring(literal), level_of_literal_side, true, mata::nft::JumpMode::NoJump).to_nfa_move();
             application_to_literal = mata::nfa::reduce(mata::nfa::remove_epsilon(application_to_literal.trim()));
             
             if (application_to_literal.is_lang_empty()) {
@@ -436,7 +436,7 @@ namespace smt::noodler {
         // this would not work, after processing the inclusion, the fresh_var (which would need to be length) would be substituted and then "fresh_var = T(input_vars)"
         // would be processed again, but input_vars still lead to one automaton so we would repeat this and get stuck.
         if (input_vars_automata.size() == 1 && !solving_state.contains_length_var(input_vars)) {
-            mata::nfa::Nfa application_to_input_automaton = transducer_to_process.get_transducer()->apply(*input_vars_automata[0], 0).to_nfa_move();
+            mata::nfa::Nfa application_to_input_automaton = transducer_to_process.get_transducer()->apply(*input_vars_automata[0], 0, true, mata::nft::JumpMode::NoJump).to_nfa_move();
             application_to_input_automaton = mata::nfa::reduce(mata::nfa::remove_epsilon(application_to_input_automaton.trim()));
             
             if (application_to_input_automaton.is_lang_empty()) {
@@ -656,12 +656,12 @@ namespace smt::noodler {
                     auto [input_trans, vars_on_tapes_of_input_trans] = get_composed_trans_with_tapes(transducers[i].get_input()[0]);
                     SASSERT(!vars_on_tapes_of_input_trans.empty() && vars_on_tapes_of_input_trans[0] == transducers[i].get_input()[0]);
                     // we compose Ti and Ti' on input_var, getting transducer output_var = Ti''(input_var, x1, x2, ...., xn)
-                    mata::nft::Nft composed_input = mata::nft::compose(invert_trans, input_trans, 1, 0, false).trim();
+                    mata::nft::Nft composed_input = mata::nft::compose(invert_trans, input_trans, 1, 0, false, mata::nft::JumpMode::NoJump).trim();
                     SASSERT(!composed_input.contains_jump_transitions());
                     SASSERT(composed_input.num_of_states() > 0);
                     // we have a transducer output_var = T(y1, y2, ..., ym) computed from previous Tj's, j < i, and we compose here on output_var with Ti''
                     // getting transducer output_var = T'(y1, y2, ..., ym, input_var, x1, x2, ..., xn)
-                    final_trans = mata::nft::compose(final_trans, composed_input, 0, 0, false).trim();
+                    final_trans = mata::nft::compose(final_trans, composed_input, 0, 0, false, mata::nft::JumpMode::NoJump).trim();
                     SASSERT(!final_trans.contains_jump_transitions());
                     SASSERT(final_trans.num_of_states() > 0);
                     // we had vars_on_tapes = {output_var, y1, y2, ..., ym} we add to it vars_on_tapes_of_input_trans getting
@@ -1703,7 +1703,7 @@ namespace smt::noodler {
                     SASSERT(predicate_with_var_on_right_side.get_input().size() == 1 && predicate_with_var_on_right_side.get_input()[0] == var);
 
                     // we get the possible inputs of transducer when output is model of output_var
-                    mata::nfa::Nfa possible_inputs = predicate_with_var_on_right_side.get_transducer()->apply(util::get_mata_word_zstring(output_var_model), 1).to_nfa_move();
+                    mata::nfa::Nfa possible_inputs = predicate_with_var_on_right_side.get_transducer()->apply(util::get_mata_word_zstring(output_var_model), 1, true, mata::nft::JumpMode::NoJump).to_nfa_move();
                     possible_inputs = mata::nfa::reduce(mata::nfa::remove_epsilon(possible_inputs.trim()));
                     // the model of var is then some word from possible_inputs and the langauge of var
                     mata::Word accepted_word = mata::nfa::intersection(possible_inputs, *solution.aut_ass.at(var)).get_word().value();

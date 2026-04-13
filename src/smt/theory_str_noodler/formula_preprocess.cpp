@@ -1871,22 +1871,19 @@ namespace smt::noodler {
             if(pred.get_left_side().size() > 1 || pred.get_left_side().empty()) {
                 continue;
             }
-            mata::nft::Nft nft = *(trans[0]);
 
-            auto nfa = this->aut_ass.at(pred.get_left_side()[0]);
-
-            // restrict the input variable --> T_1(Aut(x), y)
-            // it is not necessary for correctness, but it makes the heuristics later more succesful
-            mata::nft::Nft lang_nft(*nfa, 2);
-            nft = mata::nft::compose(lang_nft, nft, 0, 0, true);
-            // compose first tapes of all transducers with identical parameters (and project out the synchronizing tape)
-            // nft = [T_1(y), T_2(y), ...]
-            for(size_t i = 1; i < trans.size(); i++) {
-                auto tr = mata::nft::compose(lang_nft, *trans[i], 0, 0, true);
-                nft = mata::nft::compose(nft, tr, 0, 0, true);
+            // Taking
+            //    T_1(x,y), T_2(x,y), T_3(x,y), ...
+            // we construct T_y(y_1, y_2, ...) by intersecting on the input variable of
+            // each T_i starting with the automaton for x.
+            mata::nft::Nft nft_for_y_tapes(*(this->aut_ass.at(pred.get_left_side()[0])));
+            for(size_t i = 0; i < trans.size()-1; i++) {
+                nft_for_y_tapes = mata::nft::compose(nft_for_y_tapes, *trans[i], 0, 0, false, mata::nft::JumpMode::NoJump);
             }
+            // last composition will remove the x tape
+            nft_for_y_tapes = mata::nft::compose(nft_for_y_tapes, *trans.back(), 0, 0, true, mata::nft::JumpMode::NoJump);
 
-            if(util::contains_trans_identity(nft, 4) == l_false) {
+            if(util::contains_trans_identity(nft_for_y_tapes, 4) == l_false) {
                 return true;
             }
         }

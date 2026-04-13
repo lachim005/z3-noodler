@@ -1295,19 +1295,20 @@ namespace smt::noodler {
         //Look for all egdes in the inclusion graph
         vector<vector<int>> adjacency_list = find_graph_edges();
     
-        STRACE(scc_debug,
+        STRACE(str_scc_debug,
             int idx = 0;
+            tout << "Adjacency of all inclusions:" << std::endl;
             for(vector<int> x : adjacency_list){
-                tout << "Adjacency - " << idx << " = " << x << std::endl;
+                tout << idx << " = " << x << std::endl;
                 idx++;
             }
         );
         
         //Find all scc in inclusions 
-        //vector<vector<Predicate>> scc = findSCC(&adjacency_list);
         vector<vector<int>> sccs = tarjan(&adjacency_list);
-        STRACE(scc_debug,
+        STRACE(str_scc_debug,
             int idx = 0;
+            tout << "Found strongly connected components" << std::endl;
             for(vector<int> x : sccs){
                 tout << "scc - " << idx << " = " << x << std::endl;
                 idx++;
@@ -1324,7 +1325,7 @@ namespace smt::noodler {
 
                 // T
                 std::set<Atom> T;
-                int T_max_size = 0;
+                unsigned int T_max_size = 0;
 
                 // v
                 std::map<BasicTerm, mata::Word> scc_solution;
@@ -1332,6 +1333,7 @@ namespace smt::noodler {
                 //shortest words
                 std::vector<BasicTerm> vars;
                 //create atom equations
+                STRACE(str_scc_debug, tout << "Creating atomic equations." << std::endl;);
                 for(int inclIdx: scc_list){
 
                     Predicate incl = *next(solution.inclusions.begin(), inclIdx);
@@ -1345,7 +1347,6 @@ namespace smt::noodler {
                             var_length = alph.get_string_from_mata_word(w).length();
                             scc_solution[var] = w;
                             T_max_size += var_length;
-                            STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(w) << std::endl;);
                         }
                         //is literal
                         else{
@@ -1369,7 +1370,6 @@ namespace smt::noodler {
                             mata::Word  w = get_shortest_word(var_nfa);
                             var_length = alph.get_string_from_mata_word(w).length();
                             scc_solution[var] = w; 
-                            STRACE(scc_debug, tout << var.get_name() << " - " << alph.get_string_from_mata_word(w) << std::endl;);
                         }
                         //is literal
                         else{
@@ -1384,19 +1384,35 @@ namespace smt::noodler {
                         }
                     }
                 }
-                               
-                STRACE(scc_debug,
-                    tout << "Random Assigment!" << std::endl;
+                       
+                STRACE(str_scc_debug, 
+                    int idx;
+                    tout << "Left side: " << std::endl;
+                    for(const Atom atom : left_side)
+                    {
+                        tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
+                    }
+                    tout << std::endl;
+                    tout << "Right side: " << std::endl;
+                    for(const Atom atom : right_side)
+                    {
+                        tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
+                    }
+                );
+
+
+                STRACE(str_scc_debug,
+                    tout << "Random Assigment for all variables:" << std::endl;
                     for(auto const& [var, word] : scc_solution)
                     {
                         tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
                     }
                 );
-
+                tout << "Starting resolving equetions" << std::endl;
                 //find correct words
                 while(T.size() < T_max_size){
                     //leftmost half full
-                    int left_most_index = -1;
+                    unsigned int left_most_index = -1;
                     for (int i = 0; i < left_side.size(); i++) {
                         if (isHalfFull(left_side, right_side, i, T))
                         {
@@ -1438,9 +1454,9 @@ namespace smt::noodler {
                     }                   
                 }
 
-                STRACE(scc_debug, tout << "Var Assigment!" << std::endl;);
+                STRACE(str_scc_debug, tout << "Var Assigment!" << std::endl;);
                 for(auto const& [var, word] : scc_solution){
-                    STRACE(scc_debug, if(var.is_variable()) tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
+                    STRACE(str_scc_debug, if(var.is_variable()) tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
                     if(var.is_variable()){
                         update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
                     }
@@ -1539,10 +1555,10 @@ namespace smt::noodler {
         vector<Atom> opposite_side = missing_left ? right_side : left_side;
         mata::Word opposite_word;
 
-        for (const auto atom : opposite_side) {
+        for (const Atom &atom_at_idx : opposite_side) {
             //concat word
-            const mata::Word& word = (*scc_solution)[atom.var];
-            opposite_word.push_back(word[atom.index]);
+            const mata::Word& word = (*scc_solution)[atom_at_idx.var];
+            opposite_word.push_back(word[atom_at_idx.index]);
         }
         
         //get word for var (change scc_solution)

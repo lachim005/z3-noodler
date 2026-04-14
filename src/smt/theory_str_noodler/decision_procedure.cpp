@@ -1291,7 +1291,6 @@ namespace smt::noodler {
                 tout << std::endl;
             }
         );
-
         //Look for all egdes in the inclusion graph
         vector<vector<int>> adjacency_list = find_graph_edges();
     
@@ -1330,8 +1329,6 @@ namespace smt::noodler {
                 // v
                 std::map<BasicTerm, mata::Word> scc_solution;
 
-                //shortest words
-                std::vector<BasicTerm> vars;
                 //create atom equations
                 STRACE(str_scc_debug, tout << "Creating atomic equations." << std::endl;);
                 for(int inclIdx: scc_list){
@@ -1345,8 +1342,10 @@ namespace smt::noodler {
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                             mata::Word w = get_shortest_word(var_nfa);
                             var_length = alph.get_string_from_mata_word(w).length();
-                            scc_solution[var] = w;
-                            T_max_size += var_length;
+                            if(!scc_solution.count(var)){
+                                scc_solution[var] = w;
+                                T_max_size += var_length;
+                            }
                         }
                         //is literal
                         else{
@@ -1369,7 +1368,10 @@ namespace smt::noodler {
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
                             mata::Word  w = get_shortest_word(var_nfa);
                             var_length = alph.get_string_from_mata_word(w).length();
-                            scc_solution[var] = w; 
+                            if(!scc_solution.count(var)){
+                                scc_solution[var] = w;
+                                T_max_size += var_length;
+                            }
                         }
                         //is literal
                         else{
@@ -1398,6 +1400,7 @@ namespace smt::noodler {
                     {
                         tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
                     }
+                    tout << std::endl;
                 );
 
 
@@ -1407,12 +1410,14 @@ namespace smt::noodler {
                     {
                         tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
                     }
+                
+                    tout << "Started resolving atomic equations" << std::endl;
                 );
-                tout << "Starting resolving equetions" << std::endl;
                 //find correct words
                 while(T.size() < T_max_size){
                     //leftmost half full
-                    unsigned int left_most_index = -1;
+                    STRACE(str_scc_debug, tout << "T: "<< T.size() << "/" << T_max_size << std::endl;);
+                    int left_most_index = -1;
                     for (int i = 0; i < left_side.size(); i++) {
                         if (isHalfFull(left_side, right_side, i, T))
                         {
@@ -1421,6 +1426,12 @@ namespace smt::noodler {
                         }
                     }
 
+                    STRACE(str_scc_debug, tout << "left_most_index: " << left_most_index << std::endl;);
+                    STRACE(str_scc_debug, 
+                         tout << "Elements in T: " << left_most_index << std::endl;
+                        for (const auto& atom : T) {
+                            tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
+                        });
                     if (left_most_index != -1) {
                         // Lemma 4
                         Atom add_atom = right_side[0];
@@ -1441,6 +1452,7 @@ namespace smt::noodler {
 
                     } else {
                         // Lemma 3
+                        //TODO: Check if it is not finished 
                         for (unsigned pos = 0; pos < left_side.size(); pos++) {
                             if (!T.count(left_side[pos])) {
                                 T.insert(left_side[pos]);

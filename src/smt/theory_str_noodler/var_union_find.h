@@ -132,7 +132,7 @@ namespace smt::noodler {
                         continue;
                     }
                     BasicTerm bvar = util::get_variable_basic_term(var);
-                    if (len > 1) {
+                    if (len > 1 && aut_ass.contains(bvar)) {
                         std::set<std::pair<int, int>> aut_constr = mata::applications::strings::get_word_lengths(*aut_ass.at(bvar));
                         if (aut_constr.size() > 1 || !aut_constr.contains({len, 0})) {
                             continue;

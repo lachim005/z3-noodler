@@ -13,7 +13,7 @@ namespace smt::noodler::util {
 
     namespace {
         bool enable_throw_error_warnings() {
-            return gparams::get_ref().get_bool("smt.str.enable_warnings", false);
+            return gparams::get_module("smt").get_bool("str.enable_warnings", false);
         }
     }
 

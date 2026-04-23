@@ -1,7 +1,6 @@
 #include <cassert>
 
 #include "util/gparams.h"
-#include "util/warning.h"
 #include "util/z3_exception.h"
 
 #include "util.h"

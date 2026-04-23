@@ -21,6 +21,7 @@ struct theory_str_noodler_params {
     bool m_ca_constr = false;
     bool m_postpone_diseqs_stabilization = true;
     bool m_try_premature_len_checks = true;
+    bool m_enable_warnings = false;
 
     theory_str_noodler_params(params_ref const & p = params_ref()) {
         updt_params(p);

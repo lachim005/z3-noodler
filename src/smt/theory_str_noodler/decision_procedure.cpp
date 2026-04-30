@@ -1291,36 +1291,44 @@ namespace smt::noodler {
                 tout << std::endl;
             }
         );
-        //Look for all egdes in the inclusion graph
-        vector<vector<int>> adjacency_list = find_graph_edges();
+
+        //Look for all edges in the inclusion graph
+        std::vector<std::vector<int>> adjacency_list = find_graph_edges();
     
         STRACE(str_scc_debug,
             int idx = 0;
             tout << "Adjacency of all inclusions:" << std::endl;
-            for(vector<int> x : adjacency_list){
-                tout << idx << " = " << x << std::endl;
+            for(std::vector<int> x : adjacency_list){
+                tout << idx << " = ";
+                for (const auto& val : x) {
+                    tout << val << " ";
+                }
+                tout << std::endl; 
                 idx++;
             }
         );
         
         //Find all scc in inclusions 
-        vector<vector<int>> sccs = tarjan(&adjacency_list);
+        std::vector<std::vector<int>> sccs = tarjan(&adjacency_list);
         STRACE(str_scc_debug,
             int idx = 0;
             tout << "Found strongly connected components" << std::endl;
-            for(vector<int> x : sccs){
-                tout << "scc - " << idx << " = " << x << std::endl;
+            for(std::vector<int> x : sccs){
+                tout << "scc - " << idx << " = ";
+                for (const auto& val : x) {
+                    tout << val << " ";
+                }
+                tout << std::endl;
                 idx++;
             }
         );
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
         //solve all SCC
-        for(vector<int> scc_list : sccs){
-            if(scc_list.size() > 1)
-            {
-                vector<Atom> left_side;
-                vector<Atom> right_side;
+        for(std::vector<int> scc_list : sccs){
+            if(scc_list.size() > 1){
+                std::vector<Atom> left_side;
+                std::vector<Atom> right_side;
 
                 // T
                 std::set<Atom> T;
@@ -1378,6 +1386,7 @@ namespace smt::noodler {
                             var_length = var.get_name().length();
                             if(!scc_solution.count(var)){
                                 scc_solution[var] = util::get_mata_word_zstring(var.get_name());
+                                T_max_size += var_length;
                             }
                         }
                         for(unsigned idx = 0; idx < var_length; idx++){
@@ -1403,9 +1412,8 @@ namespace smt::noodler {
                     tout << std::endl;
                 );
 
-
                 STRACE(str_scc_debug,
-                    tout << "Random Assigment for all variables:" << std::endl;
+                    tout << "Random Assignment for all variables:" << std::endl;
                     for(auto const& [var, word] : scc_solution)
                     {
                         tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
@@ -1452,7 +1460,6 @@ namespace smt::noodler {
 
                     } else {
                         // Lemma 3
-                        //TODO: Check if it is not finished 
                         for (unsigned pos = 0; pos < left_side.size(); pos++) {
                             if (!T.count(left_side[pos])) {
                                 T.insert(left_side[pos]);
@@ -1479,8 +1486,8 @@ namespace smt::noodler {
 
     }
 
-    vector<vector<int>> DecisionProcedure::find_graph_edges() {
-        vector<vector<int>> adjacency_list;
+    std::vector<std::vector<int>> DecisionProcedure::find_graph_edges() {
+        std::vector<std::vector<int>> adjacency_list;
         //Look throught all inclusions for variable matches
         int idxRight = 0;
         int idxLeft = 0;
@@ -1501,8 +1508,9 @@ namespace smt::noodler {
         return adjacency_list;
     }
 
-    void strongconnect(int v, vector<vector<int>> *adj, vector<int> &index, vector<int> &lowlink, vector<bool> &onStack,
-                        std::stack<int> &S, int &currentIndex, vector<vector<int>> &sccs){
+    static void strongconnect(int v, std::vector<std::vector<int>> *adj, std::vector<int> &index,
+                        std::vector<int> &lowlink, std::vector<bool> &onStack, std::stack<int> &S,
+                        int &currentIndex, std::vector<std::vector<int>> &sccs){
 
         index[v] = currentIndex;
         lowlink[v] = currentIndex;
@@ -1522,7 +1530,7 @@ namespace smt::noodler {
         }
 
         if (lowlink[v] == index[v]) {
-            vector<int> component;
+            std::vector<int> component;
             int w;
 
             do {
@@ -1536,16 +1544,16 @@ namespace smt::noodler {
         }
     }
 
-    vector<vector<int>> DecisionProcedure::tarjan(vector<vector<int>> *adjacency_list) {
+    std::vector<std::vector<int>> DecisionProcedure::tarjan(std::vector<std::vector<int>> *adjacency_list) {
         int n = adjacency_list->size();
 
-        vector<int> index(n, -1);
-        vector<int> lowlink(n);
-        vector<bool> onStack(n, false);
+        std::vector<int> index(n, -1);
+        std::vector<int> lowlink(n);
+        std::vector<bool> onStack(n, false);
         std::stack<int> S;
 
         int currentIndex = 0;
-        vector<vector<int>> sccs;
+        std::vector<std::vector<int>> sccs;
 
         for (int v = 0; v < n; v++) {
             if (index[v] == -1) {
@@ -1556,15 +1564,15 @@ namespace smt::noodler {
         return sccs;
     }
 
-    void DecisionProcedure::get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
-                                            std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom>* T) {
+    void DecisionProcedure::get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side,
+        const std::vector<Atom>& right_side, std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T) {
         Atom missing_atom = missing_left ? left_side[p] : right_side[p];
         
         // var that would be changed
         BasicTerm changed_var = missing_atom.var;
 
         //get word from opposite side
-        vector<Atom> opposite_side = missing_left ? right_side : left_side;
+        std::vector<Atom> opposite_side = missing_left ? right_side : left_side;
         mata::Word opposite_word;
 
         for (const Atom &atom_at_idx : opposite_side) {
@@ -1575,10 +1583,10 @@ namespace smt::noodler {
         
         //get word for var (change scc_solution)
         int start_in_pattern = p - missing_atom.index;
-        int var_lenght = (*scc_solution)[changed_var].size(); 
+        int var_length = (*scc_solution)[changed_var].size(); 
 
         mata::Word new_word_for_var;
-        for (int i = 0; i < var_lenght; i++) {
+        for (int i = 0; i < var_length; i++) {
             new_word_for_var.push_back(opposite_word[start_in_pattern + i]);
         }
         (*scc_solution)[changed_var] = new_word_for_var;
@@ -1593,7 +1601,8 @@ namespace smt::noodler {
         }
     }
 
-    bool DecisionProcedure::isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T) {
+    bool DecisionProcedure::isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
+         int idx, const std::set<Atom>& T) {
         bool is_left_atom = T.count(left_side[idx]);
         bool is_right_atom = T.count(right_side[idx]);
         //std::cout << "Check halffull " << idx << " - " << is_left_atom << "," << is_right_atom << std::endl;

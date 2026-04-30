@@ -308,13 +308,15 @@ namespace smt::noodler {
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
         //SCC helper functions
-        vector<vector<int>> find_graph_edges();
-        vector<vector<int>> tarjan(vector<vector<int>> *adjacency_list);
+        std::vector<std::vector<int>> find_graph_edges();
+        std::vector<std::vector<int>> tarjan(std::vector<std::vector<int>> *adjacency_list);
 
         //struct for atoms in cycled inclusions
         struct Atom {
             BasicTerm var;
             int index;
+
+            Atom(BasicTerm v, int i) : var(v), index(i) {}
 
             bool operator==(const Atom& other) const {
                 return var == other.var && index == other.index;
@@ -326,9 +328,9 @@ namespace smt::noodler {
                 return index < other.index;
             }
         };
-        void get_assignment(int p, bool missing_left, vector<Atom> left_side, vector<Atom> right_side,
+        void get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
                     std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
-        bool isHalfFull(vector<Atom> left_side, vector<Atom> right_side, int idx, std::set<Atom> T);
+        bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
 
         //get shortest words of all vars in scc 
         mata::Word get_shortest_word(const mata::nfa::Nfa& aut);

@@ -636,6 +636,7 @@ namespace smt::noodler {
         m_membership_todo.push_scope();
         m_not_contains_todo.push_scope();
         m_conversion_todo.push_scope();
+        var_eqs.push_scope();
         STRACE(str, tout << "push_scope: " << m_scope_level << '\n';);
     }
 
@@ -651,6 +652,7 @@ namespace smt::noodler {
         m_membership_todo.pop_scope(num_scopes);
         m_not_contains_todo.pop_scope(num_scopes);
         m_conversion_todo.pop_scope(num_scopes);
+        var_eqs.pop_scope(num_scopes);
         m_rewrite.reset();
         // for incremental solving, we assume (TODO: should be done differently?) that if we added another assert, then pop must have been called and the satisfiability of the last run does not matter
         if (m_scope_level < scope_with_last_run_was_sat) {

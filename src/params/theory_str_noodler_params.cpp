@@ -18,6 +18,7 @@ void theory_str_noodler_params::updt_params(params_ref const & _p) {
     m_ca_constr = p.str_ca_constr();
     m_postpone_diseqs_stabilization = p.str_postpone_diseqs_stabilization();
     m_try_premature_len_checks = p.str_try_premature_length_checks();
+    m_enable_warnings = p.str_enable_warnings();
     m_produce_models = gparams::get_ref().get_bool("model", false);
 }
 
@@ -37,4 +38,5 @@ void theory_str_noodler_params::display(std::ostream & out) const {
     DISPLAY_PARAM(m_produce_models);
     DISPLAY_PARAM(m_ca_constr);
     DISPLAY_PARAM(m_postpone_diseqs_stabilization);
+    DISPLAY_PARAM(m_enable_warnings);
 }

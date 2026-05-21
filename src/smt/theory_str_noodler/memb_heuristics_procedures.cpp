@@ -28,11 +28,11 @@ namespace smt::noodler {
                 regex::extract_symbols(regex, m_util_s, alph);
                 alph.insert_dummy_if_not_full();
 
-                mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
+                std::shared_ptr<mata::nfa::Nfa> nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
 
                 if (produce_model) {
                     mata::nfa::Run model_run;
-                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.get_mata_alphabet(), &model_run)) {
+                    if(mata::nfa::algorithms::is_universal_antichains(*nfa, alph.get_mata_alphabet(), &model_run)) {
                         // x does not belong to universal automaton -> it must be unsat
                         return l_false;
                     } else {
@@ -41,7 +41,7 @@ namespace smt::noodler {
                         return l_true;
                     }
                 } else {
-                    if(mata::nfa::algorithms::is_universal_antichains(nfa, alph.get_mata_alphabet(), nullptr)) {
+                    if(mata::nfa::algorithms::is_universal_antichains(*nfa, alph.get_mata_alphabet(), nullptr)) {
                         return l_false;
                     } else {
                         return l_true;
@@ -73,13 +73,13 @@ namespace smt::noodler {
         regex::extract_symbols(regex, m_util_s, alph);
         alph.insert_dummy_if_not_full();
 
-        mata::nfa::Nfa reg_nfa = regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false);
+    std::shared_ptr<mata::nfa::Nfa> reg_nfa = regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false);
 
         mata::Word word;
         if (is_regex_positive) {
-            word = reg_nfa.get_word().value();
+            word = reg_nfa->get_word().value();
         } else {
-            word = reg_nfa.get_word_from_complement(&alph.get_mata_alphabet()).value();
+            word = reg_nfa->get_word_from_complement(&alph.get_mata_alphabet()).value();
         }
         return alph.get_string_from_mata_word(word);
     }
@@ -110,7 +110,7 @@ namespace smt::noodler {
 
             bool first = true;
             for (auto& reg : list_of_normal_regs) {
-                intersection = mata::nfa::intersection(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
+                intersection = mata::nfa::intersection(*regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && intersection.num_of_states() < regex::RED_BOUND)
                 {
@@ -127,7 +127,7 @@ namespace smt::noodler {
             mata::nfa::Nfa unionn; // initialize to empty automaton
             first = true;
             for (auto& reg : list_of_compl_regs) {
-                unionn = mata::nfa::union_nondet(regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
+                unionn = mata::nfa::union_nondet(*regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && unionn.num_of_states() < regex::RED_BOUND)
                 {

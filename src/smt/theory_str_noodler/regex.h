@@ -54,6 +54,15 @@ namespace smt::noodler::regex {
     private:
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
+        std::size_t hash = 0;
+        void recalculate_hash() {
+            size_t hash = 0;
+            auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
+            for (auto s : this->get_set_alphabet()) {
+                hash ^= 1 << s % size_t_bits;
+            }
+            this->hash = hash;
+        }
 
     public:
         Alphabet() = default;
@@ -61,20 +70,26 @@ namespace smt::noodler::regex {
         Alphabet(Alphabet&&) = default;
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
+        bool operator==(const Alphabet &b) const {
+            return alphabet == b.alphabet;
+        }
+        inline std::size_t get_hash() const { return hash; }
 
         Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
                 alphabet.insert(s);
             }
+            recalculate_hash();
         }
         
         Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(symbol);
             }
+            recalculate_hash();
         }
 
-        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { }
+        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { recalculate_hash(); }
 
         const std::set<mata::Symbol>& get_set_alphabet() const { return alphabet; }
         const mata::EnumAlphabet& get_mata_alphabet() const { return mata_alphabet; }
@@ -82,6 +97,7 @@ namespace smt::noodler::regex {
         void clear() {
             alphabet.clear();
             mata_alphabet.clear();
+            recalculate_hash();
         }
 
         size_t size() const { return alphabet.size(); }
@@ -92,6 +108,7 @@ namespace smt::noodler::regex {
             SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
             alphabet.insert(s);
             mata_alphabet.add_new_symbol(s);
+            recalculate_hash();
         }
 
         template<class InputIt>
@@ -100,6 +117,7 @@ namespace smt::noodler::regex {
                 "Iterator must yield mata::Symbol or a type convertible to mata::Symbol");
 
             for (; first != last; ++first) { insert(*first); }
+            recalculate_hash();
         }
 
         bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
@@ -107,6 +125,7 @@ namespace smt::noodler::regex {
         void erase(const mata::Symbol s) {
             alphabet.erase(s);
             mata_alphabet.erase(s);
+            recalculate_hash();
         }
 
         using const_iterator = std::set<mata::Symbol>::const_iterator;
@@ -126,6 +145,7 @@ namespace smt::noodler::regex {
                 return false;
             } else {
                 insert(util::get_dummy_symbol());
+                recalculate_hash();
                 return true;
             }
         }
@@ -162,7 +182,7 @@ namespace smt::noodler::regex {
      * @param[in] make_complement Whether to make complement of the passed @p expr instead.
      * @return The resulting regex.
      */
-    [[nodiscard]] mata::nfa::Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] std::shared_ptr<mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
                                              const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
 
     /**
@@ -310,5 +330,19 @@ namespace smt::noodler::regex {
     void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, Formula& transducer_preds);
 
 }
+
+template<>
+struct std::hash<smt::noodler::regex::Alphabet> {
+    std::size_t operator()(const smt::noodler::regex::Alphabet& k) const {
+        // size_t hash = 0;
+        // auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
+        // for (auto s : k.get_set_alphabet()) {
+        //     hash ^= 1 << s % size_t_bits;
+        // }
+        // return hash;
+        return k.get_hash();
+    }
+};
+
 
 #endif

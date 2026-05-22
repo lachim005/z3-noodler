@@ -55,14 +55,7 @@ namespace smt::noodler::regex {
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
         std::size_t hash = 0;
-        void recalculate_hash() {
-            size_t hash = 0;
-            auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
-            for (auto s : this->get_set_alphabet()) {
-                hash ^= 1 << s % size_t_bits;
-            }
-            this->hash = hash;
-        }
+        static auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
 
     public:
         Alphabet() = default;
@@ -77,19 +70,19 @@ namespace smt::noodler::regex {
 
         Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
-                alphabet.insert(s);
+                auto symb = alphabet.insert(s);
+                if (symb.second) hash ^= 1 << s % size_t_bits;
             }
-            recalculate_hash();
         }
         
         Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(symbol);
+                hash ^= 1 << symbol % size_t_bits;
             }
-            recalculate_hash();
         }
 
-        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { recalculate_hash(); }
+        Alphabet(std::initializer_list<mata::Symbol> init) : Alphabet(std::set<mata::Symbol>(init)) { }
 
         const std::set<mata::Symbol>& get_set_alphabet() const { return alphabet; }
         const mata::EnumAlphabet& get_mata_alphabet() const { return mata_alphabet; }
@@ -97,7 +90,7 @@ namespace smt::noodler::regex {
         void clear() {
             alphabet.clear();
             mata_alphabet.clear();
-            recalculate_hash();
+            hash = 0;
         }
 
         size_t size() const { return alphabet.size(); }
@@ -106,9 +99,8 @@ namespace smt::noodler::regex {
 
         void insert(const mata::Symbol s) {
             SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
-            alphabet.insert(s);
+            if (alphabet.insert(s).second) hash ^= 1 << s % size_t_bits;
             mata_alphabet.add_new_symbol(s);
-            recalculate_hash();
         }
 
         template<class InputIt>
@@ -117,15 +109,13 @@ namespace smt::noodler::regex {
                 "Iterator must yield mata::Symbol or a type convertible to mata::Symbol");
 
             for (; first != last; ++first) { insert(*first); }
-            recalculate_hash();
         }
 
         bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
 
         void erase(const mata::Symbol s) {
-            alphabet.erase(s);
+            if (alphabet.erase(s) > 0) hash ^= 1 << s % size_t_bits;
             mata_alphabet.erase(s);
-            recalculate_hash();
         }
 
         using const_iterator = std::set<mata::Symbol>::const_iterator;
@@ -145,7 +135,6 @@ namespace smt::noodler::regex {
                 return false;
             } else {
                 insert(util::get_dummy_symbol());
-                recalculate_hash();
                 return true;
             }
         }

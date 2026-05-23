@@ -64,7 +64,7 @@ namespace smt::noodler::regex {
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
         bool operator==(const Alphabet &b) const {
-            return alphabet == b.alphabet;
+            return hash == b.hash;
         }
         inline std::size_t get_hash() const { return hash; }
 

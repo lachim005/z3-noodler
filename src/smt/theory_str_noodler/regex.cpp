@@ -199,22 +199,21 @@ namespace smt::noodler::regex {
         }
 
         if ((determinize || make_complement) && normal_cache.contains(expression)) {
-            Nfa final_result;
+            std::shared_ptr<Nfa> final_result;
             if(determinize && !make_complement) { // if we need to complement, we will determinize anyway
-                final_result = mata::nfa::minimize(*normal_cache[expression]);
+                final_result = std::make_shared<Nfa>(mata::nfa::minimize(*normal_cache[expression]));
             }
 
             // Whether to create complement of the final automaton.
             if (make_complement) {
                 STRACE(str_create_nfa, tout << "Complemented NFA:" << std::endl;);
-                final_result = mata::nfa::complement(*normal_cache[expression], alphabet.get_mata_alphabet(), { 
+                final_result = std::make_shared<Nfa>(mata::nfa::complement(*normal_cache[expression], alphabet.get_mata_alphabet(), { 
                     {"algorithm", "classical"},
                     //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
-                    });
+                    }));
             }
-            auto final_ptr = std::make_shared<Nfa>(final_result);
-            aut_cache[expression] = final_ptr;
-            return final_ptr;
+            aut_cache[expression] = final_result;
+            return final_result;
         }
 
         // to simulate recursive calls of conv_to_nfa on arguments of expression, we use postorder
@@ -490,31 +489,30 @@ namespace smt::noodler::regex {
 
         SASSERT(results_stack.size() == 1);
 
-        mata::nfa::Nfa final_result = std::move(results_stack.top());
-        auto p = std::make_shared<Nfa>(final_result);
-        normal_cache[expression] = p;
-        if (!determinize && !make_complement) return p;
+        std::shared_ptr<mata::nfa::Nfa> final_result = std::make_shared<mata::nfa::Nfa>(std::move(results_stack.top()));
+        normal_cache[expression] = final_result;
+        if (!determinize && !make_complement) return final_result;
 
         if(determinize && !make_complement) { // if we need to complement, we will determinize anyway
             STRACE(str_create_nfa_reduce, 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
                 tout << final_result;
             );
-            final_result = mata::nfa::minimize(final_result);
+            final_result = std::make_shared<mata::nfa::Nfa>(mata::nfa::minimize(*final_result));
         }
 
         // Whether to create complement of the final automaton.
         if (make_complement) {
             STRACE(str_create_nfa, tout << "Complemented NFA:" << std::endl;);
-            final_result = mata::nfa::complement(final_result, alphabet.get_mata_alphabet(), { 
+            final_result = std::make_shared<mata::nfa::Nfa>(mata::nfa::complement(*final_result, alphabet.get_mata_alphabet(), { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
-                });
+                }));
         }
 
-        STRACE(str_create_nfa, tout << final_result;);
-        aut_cache[expression] = std::make_shared<Nfa>(final_result);
-        return aut_cache[expression];
+        STRACE(str_create_nfa, tout << *final_result;);
+        aut_cache[expression] = final_result;
+        return final_result;
     }
 
     [[nodiscard]] RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s) {

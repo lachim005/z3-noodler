@@ -54,8 +54,6 @@ namespace smt::noodler::regex {
     private:
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
-        std::size_t hash = 0;
-        static auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
 
     public:
         Alphabet() = default;
@@ -63,22 +61,16 @@ namespace smt::noodler::regex {
         Alphabet(Alphabet&&) = default;
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
-        bool operator==(const Alphabet &b) const {
-            return hash == b.hash;
-        }
-        inline std::size_t get_hash() const { return hash; }
 
         Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
-                auto symb = alphabet.insert(s);
-                if (symb.second) hash ^= 1 << s % size_t_bits;
+                alphabet.insert(s);
             }
         }
         
         Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(symbol);
-                hash ^= 1 << symbol % size_t_bits;
             }
         }
 
@@ -90,7 +82,6 @@ namespace smt::noodler::regex {
         void clear() {
             alphabet.clear();
             mata_alphabet.clear();
-            hash = 0;
         }
 
         size_t size() const { return alphabet.size(); }
@@ -99,7 +90,7 @@ namespace smt::noodler::regex {
 
         void insert(const mata::Symbol s) {
             SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
-            if (alphabet.insert(s).second) hash ^= 1 << s % size_t_bits;
+            alphabet.insert(s);
             mata_alphabet.add_new_symbol(s);
         }
 
@@ -114,7 +105,7 @@ namespace smt::noodler::regex {
         bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
 
         void erase(const mata::Symbol s) {
-            if (alphabet.erase(s) > 0) hash ^= 1 << s % size_t_bits;
+            alphabet.erase(s);
             mata_alphabet.erase(s);
         }
 
@@ -319,19 +310,5 @@ namespace smt::noodler::regex {
     void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, Formula& transducer_preds);
 
 }
-
-template<>
-struct std::hash<smt::noodler::regex::Alphabet> {
-    std::size_t operator()(const smt::noodler::regex::Alphabet& k) const {
-        // size_t hash = 0;
-        // auto constexpr size_t_bits = sizeof(size_t) * CHAR_BIT;
-        // for (auto s : k.get_set_alphabet()) {
-        //     hash ^= 1 << s % size_t_bits;
-        // }
-        // return hash;
-        return k.get_hash();
-    }
-};
-
 
 #endif

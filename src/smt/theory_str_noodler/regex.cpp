@@ -170,7 +170,7 @@ namespace smt::noodler::regex {
     }
 
 
-    static std::unordered_map<Alphabet, std::array<std::unordered_map<app*, std::shared_ptr<Nfa>>, 3>> aut_caches;
+    static std::array<std::unordered_map<app*, std::shared_ptr<Nfa>>, 3> aut_caches;
 
     [[nodiscard]] std::shared_ptr<Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const Alphabet& alphabet, bool determinize, bool make_complement) {
@@ -186,13 +186,9 @@ namespace smt::noodler::regex {
 
         SASSERT(m_util_s.is_re(expression));
 
-        if (!aut_caches.contains(alphabet)) {
-            aut_caches[alphabet] = {};
-        }
-
         auto cache_idx = make_complement ? 2 : determinize ? 1 : 0;
-        auto &aut_cache = aut_caches[alphabet][cache_idx];
-        auto &normal_cache = aut_caches[alphabet][0];
+        auto &aut_cache = aut_caches[cache_idx];
+        auto &normal_cache = aut_caches[0];
 
         if (aut_cache.contains(expression)) {
             return aut_cache[expression];

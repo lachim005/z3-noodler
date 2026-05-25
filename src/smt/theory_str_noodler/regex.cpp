@@ -326,17 +326,7 @@ namespace smt::noodler::regex {
                         body_nfa.unify_initial();
 
                         body_nfa = mata::nfa::reduce(body_nfa);
-                        result = mata::nfa::builder::create_empty_string_nfa();
-                    
-                        if(low >= LOOP_BOUND) {
-                            result = create_large_concat(body_nfa, low);
-                        } else {
-                            // we need to repeat body_nfa at least low times
-                            for (unsigned i = 0; i < low; ++i) {
-                                result.concatenate(body_nfa);
-                                result.trim();
-                            }
-                        }
+                        result = mata::nfa::concatenate_exponent(body_nfa, low);
 
                         // we will now either repeat body_nfa high-low times (if is_high_set) or
                         // unlimited times (if it is not set), but we have to accept after each loop,
@@ -350,10 +340,7 @@ namespace smt::noodler::regex {
 
                         if (is_high_set) {
                             // if high is set, we repeat body_nfa another high-low times
-                            for (unsigned i = 0; i < high - low; ++i) {
-                                result.concatenate(body_nfa);
-                                result.trim();
-                            }
+                            result.concatenate(concatenate_exponent(std::move(body_nfa), high - low));
                         } else {
                             // if high is not set, we can repeat body_nfa unlimited more times
                             // so we do star operation on body_nfa and add it to end of nfa

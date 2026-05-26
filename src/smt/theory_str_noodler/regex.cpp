@@ -673,29 +673,6 @@ namespace smt::noodler::regex {
         return RegexInfo{.min_length = 0, .universal = l_undef, .empty = l_undef};
     }
 
-    mata::nfa::Nfa create_large_concat(const mata::nfa::Nfa& body_nfa, unsigned count) {
-        mata::nfa::Nfa nfa_part = mata::nfa::builder::create_empty_string_nfa();
-        mata::nfa::Nfa nfa = mata::nfa::builder::create_empty_string_nfa();
-        const unsigned CONCAT = 100;
-
-        for(unsigned i = 0; i < CONCAT; i++) {
-            nfa_part.concatenate(body_nfa);
-            nfa_part.trim();
-        }
-        unsigned cnt = 0;
-        for(unsigned i = 0; i < count / CONCAT; i++) {
-            nfa.concatenate(nfa_part);
-            nfa.trim();
-            cnt += CONCAT;
-        }
-        for(; cnt <= count; cnt++) {
-            nfa.concatenate(body_nfa);
-            nfa.trim();
-        }
-
-        return nfa;
-    }
-
     unsigned get_loop_sum(const app* reg, const seq_util& m_util_s) {
         expr* body;
         unsigned lo, hi;

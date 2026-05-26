@@ -326,7 +326,7 @@ namespace smt::noodler::regex {
                         body_nfa.unify_initial();
 
                         body_nfa = mata::nfa::reduce(body_nfa);
-                        result = mata::nfa::concatenate_exponent(body_nfa, low);
+                        result = mata::nfa::concatenate_nth_power(body_nfa, low);
                         result.trim();
 
                         // we will now either repeat body_nfa high-low times (if is_high_set) or
@@ -342,7 +342,7 @@ namespace smt::noodler::regex {
 
                         if (is_high_set) {
                             // if high is set, we repeat body_nfa another high-low times
-                            result.concatenate(concatenate_exponent(std::move(body_nfa), high - low));
+                            result.concatenate(concatenate_nth_power(std::move(body_nfa), high - low));
                             result.trim();
                         } else {
                             // if high is not set, we can repeat body_nfa unlimited more times

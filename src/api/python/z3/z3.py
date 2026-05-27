@@ -2804,6 +2804,17 @@ class ArithRef(ExprRef):
         a, b = _coerce_exprs(self, other)
         return BoolRef(Z3_mk_ge(self.ctx_ref(), a.as_ast(), b.as_ast()), self.ctx)
 
+    def __abs__(self):
+        """Return an expression representing `abs(self)`.
+
+        >>> x = Int('x')
+        >>> abs(x)
+        If(x > 0, x, -x)
+        >>> eq(abs(x), Abs(x))
+        True
+        """
+        return Abs(self)
+
 
 def is_arith(a):
     """Return `True` if `a` is an arithmetical expression.
@@ -3365,6 +3376,9 @@ def RatVal(a, b, ctx=None):
     """Return a Z3 rational a/b.
 
     If `ctx=None`, then the global context is used.
+    
+    Note: Division by zero (b == 0) is allowed in Z3 symbolic expressions.
+    Z3 can reason about such expressions symbolically.
 
     >>> RatVal(3,5)
     3/5
@@ -3374,8 +3388,7 @@ def RatVal(a, b, ctx=None):
     if z3_debug():
         _z3_assert(_is_int(a) or isinstance(a, str), "First argument cannot be converted into an integer")
         _z3_assert(_is_int(b) or isinstance(b, str), "Second argument cannot be converted into an integer")
-    if b == 0:
-        pass # division by 0 is legal in z3 expressions.
+    # Division by 0 is intentionally allowed - Z3 handles it symbolically
     return simplify(RealVal(a, ctx) / RealVal(b, ctx))
 
 
@@ -6849,7 +6862,7 @@ class ModelRef(Z3PPObject):
         if isinstance(idx, SortRef):
             return self.get_universe(idx)
         if z3_debug():
-            _z3_assert(False, "Integer, Z3 declaration, or Z3 constant expected")
+            _z3_assert(False, "Integer, Z3 declaration, or Z3 constant expected. Use model.eval instead for complicated expressions")
         return None
 
     def decls(self):
@@ -7651,13 +7664,6 @@ class Solver(Z3PPObject):
 
     def sexpr(self):
         """Return a formatted string (in Lisp-like format) with all added constraints.
-        We say the string is in s-expression format.
-
-        >>> x = Int('x')
-        >>> s = Solver()
-        >>> s.add(x > 0)
-        >>> s.add(x < 2)
-        >>> r = s.sexpr()
         """
         return Z3_solver_to_string(self.ctx.ref(), self.solver)
 
@@ -7682,6 +7688,39 @@ class Solver(Z3PPObject):
         return Z3_benchmark_to_smtlib_string(
             self.ctx.ref(), "benchmark generated from python API", "", "unknown", "", sz1, v, e,
         )
+
+    def solutions(self, t):
+        """Returns an iterator over solutions that satisfy the constraints.
+
+        The parameter `t` is an expression whose values should be returned.
+
+        >>> s = Solver()
+        >>> x, y, z = Ints("x y z")
+        >>> s.add(x * x == 4)
+        >>> print(list(s.solutions(x)))
+        [-2, 2]
+        >>> s.reset()
+        >>> s.add(x >= 0, x < 10)
+        >>> print(list(s.solutions(x)))
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        >>> s.reset()
+        >>> s.add(x >= 0, y < 10, y == 2*x)
+        >>> print(list(s.solutions([x, y])))
+        [[0, 0], [1, 2], [2, 4], [3, 6], [4, 8]]
+        """
+        s = Solver()
+        s.add(self.assertions())
+        t = _get_args(t)
+        if isinstance(t, (list, tuple)):
+            while s.check() == sat:
+                result = [s.model().eval(t_, model_completion=True) for t_ in t]
+                yield result
+                s.add(*(t_ != result_ for t_, result_ in zip(t, result)))
+        else:
+            while s.check() == sat:
+                result = s.model().eval(t, model_completion=True)
+                yield result
+                s.add(t != result)
 
 
 def SolverFor(logic, ctx=None, logFile=None):

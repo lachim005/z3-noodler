@@ -1,14 +1,13 @@
 ---
 on:
-  schedule:
-    - cron: "0 0 * * 0"  # Weekly on Sundays at midnight UTC
+  schedule: weekly on sunday
   workflow_dispatch:  # Allow manual trigger
 permissions:
   contents: read
   issues: read
   pull-requests: read
 network:
-  allowed: [default, python]
+  allowed: [defaults, python]
 safe-outputs:
   create-issue:
     labels:
@@ -21,11 +20,6 @@ name: A3 Python Code Analysis
 strict: true
 timeout-minutes: 45
 tracker-id: a3-python-analysis
-steps:
-  - name: Checkout Python source files
-    run: |
-      git sparse-checkout add src
-      echo "Python source files checked out from src directory"
 ---
 
 # A3 Python Code Analysis Agent
@@ -35,7 +29,6 @@ You are an expert Python code analyst using the a3-python tool to identify bugs 
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
-- **Analysis Date**: $(date +%Y-%m-%d)
 - **Workspace**: ${{ github.workspace }}
 
 ## Phase 1: Install and Setup a3-python

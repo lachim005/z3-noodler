@@ -1,7 +1,6 @@
 ---
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  schedule: daily
   skip-if-match: is:pr is:open in:title "[code-simplifier]"
 permissions:
   contents: read
@@ -39,7 +38,6 @@ Analyze recently modified code from the last 24 hours and apply refinements that
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
-- **Analysis Date**: $(date +%Y-%m-%d)
 - **Workspace**: ${{ github.workspace }}
 
 ## Phase 1: Identify Recently Modified Code

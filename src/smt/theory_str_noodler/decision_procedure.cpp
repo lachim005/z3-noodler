@@ -1308,8 +1308,9 @@ namespace smt::noodler {
             }
         );
         
-        //Find all scc in inclusions 
+        //Find all scc in depentent inclusions 
         std::vector<std::vector<int>> sccs = tarjan(&adjacency_list);
+
         STRACE(str_scc_debug,
             int idx = 0;
             tout << "Found strongly connected components" << std::endl;
@@ -1322,73 +1323,93 @@ namespace smt::noodler {
                 idx++;
             }
         );
+
+        //Get used alphabet
         regex::Alphabet alph(solution.aut_ass.get_alphabet());
 
-        //solve all SCC
+        //Solve all SCC
         for(std::vector<int> scc_list : sccs){
             if(scc_list.size() > 1){
                 std::vector<Atom> left_side;
                 std::vector<Atom> right_side;
 
-                // T
-                std::set<Atom> T;
+                std::set<Atom> T; //Atom subset for tracking progress
                 unsigned int T_max_size = 0;
 
-                // v
+                // Resulting assigment for each term in scc
                 std::map<BasicTerm, mata::Word> scc_solution;
 
-                //create atom equations
+                // Create atomic equations
                 STRACE(str_scc_debug, tout << "Creating atomic equations." << std::endl;);
                 for(int inclIdx: scc_list){
 
                     Predicate incl = *next(solution.inclusions.begin(), inclIdx);
-                    //Add # symbol
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Left)){ 
                         //is var
                         unsigned var_length = 0;
                         if(var.is_variable()){
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            mata::Word w = get_shortest_word(var_nfa);
-                            var_length = alph.get_string_from_mata_word(w).length();
-                            if(!scc_solution.count(var)){
-                                scc_solution[var] = w;
-                                T_max_size += var_length;
+                            std::optional<mata::Word> possible_w = get_some_shortest_word(var_nfa);
+                            if (possible_w.has_value()) {
+                                mata::Word w = possible_w.value(); 
+                                
+                                //Add var to solution and inc T_max_size
+                                var_length = alph.get_string_from_mata_word(w).length();
+                                if(!scc_solution.count(var)){
+                                    scc_solution[var] = w;
+                                    T_max_size += var_length;
+                                }
+                            } else {
+                                STRACE(str_scc_debug, tout << "No shortest word exists!" << std::endl;);
+                                continue;
                             }
                         }
                         //is literal
                         else{
+                            //add literal to solution and inc T_max_size
                             var_length = var.get_name().length();
-                            //add literal to solution
                             if(!scc_solution.count(var)){
                                 scc_solution[var] = util::get_mata_word_zstring(var.get_name());
                                 T_max_size += var_length;
                             }
                         }
+                        //Add atom to atomic equation (left side)
                         for(unsigned idx = 0; idx < var_length; idx++){
                             Atom a(var,idx);
                             left_side.push_back(a);
                         }
                     }
+
                     for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
                         //is var
                         unsigned var_length = 0;
                         if(var.is_variable()){
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            mata::Word  w = get_shortest_word(var_nfa);
-                            var_length = alph.get_string_from_mata_word(w).length();
-                            if(!scc_solution.count(var)){
-                                scc_solution[var] = w;
-                                T_max_size += var_length;
+                            std::optional<mata::Word> possible_w = get_some_shortest_word(var_nfa);
+                            if (possible_w.has_value()) {
+                                mata::Word w = possible_w.value(); 
+                                
+                                //Add var to solution and inc T_max_size
+                                var_length = alph.get_string_from_mata_word(w).length();
+                                if(!scc_solution.count(var)){
+                                    scc_solution[var] = w;
+                                    T_max_size += var_length;
+                                }
+                            } else {
+                                STRACE(str_scc_debug, tout << "No shortest word exists!" << std::endl;);
+                                continue;
                             }
                         }
                         //is literal
                         else{
+                            //Add literal to solution and inc T_max_size
                             var_length = var.get_name().length();
                             if(!scc_solution.count(var)){
                                 scc_solution[var] = util::get_mata_word_zstring(var.get_name());
                                 T_max_size += var_length;
                             }
                         }
+                        //Add atom to atomic equation (right side)
                         for(unsigned idx = 0; idx < var_length; idx++){
                             Atom a(var,idx);
                             right_side.push_back(a);
@@ -1421,10 +1442,12 @@ namespace smt::noodler {
                 
                     tout << "Started resolving atomic equations" << std::endl;
                 );
-                //find correct words
+                
+                // Find correct words
                 while(T.size() < T_max_size){
-                    //leftmost half full
                     STRACE(str_scc_debug, tout << "T: "<< T.size() << "/" << T_max_size << std::endl;);
+                    
+                    // Get leftmost half full atom pair's index
                     int left_most_index = -1;
                     for (int i = 0; i < left_side.size(); i++) {
                         if (isHalfFull(left_side, right_side, i, T))
@@ -1440,26 +1463,26 @@ namespace smt::noodler {
                         for (const auto& atom : T) {
                             tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
                         });
+                    
+                    // If there is a half full atom pair
                     if (left_most_index != -1) {
-                        // Lemma 4
-                        Atom add_atom = right_side[0];
-                        bool left_side_atom = true;
-                        if(T.count(left_side[left_most_index]))
-                            add_atom = right_side[left_most_index];
-                        else{
-                            add_atom = left_side[left_most_index];
-                            left_side_atom = false;
-                        }
+                        bool missing_left = !T.count(left_side[left_most_index]);
+                        Atom add_atom = missing_left
+                            ? left_side[left_most_index]
+                            : right_side[left_most_index];
                         
-                        //perform algoritm
-                        get_assignment(left_most_index, left_side_atom, left_side, right_side,
+                        // update the variable's word by copying from the opposite side,
+                        // then mark the newly resolved atom as part of T.
+                        get_assignment(left_most_index, missing_left, left_side, right_side,
                                         &scc_solution, &T);
                         
-                        // add atom to T
+                        // Insert atom to T
                         T.insert(add_atom);
 
-                    } else {
-                        // Lemma 3
+                    } 
+                    // If there is no half full pair in the equation
+                    else {
+                        // Add any unresolved atom — consistency is preserved regardless of which atom we pick here.
                         for (unsigned pos = 0; pos < left_side.size(); pos++) {
                             if (!T.count(left_side[pos])) {
                                 T.insert(left_side[pos]);
@@ -1492,10 +1515,11 @@ namespace smt::noodler {
         int idxRight = 0;
         int idxLeft = 0;
         
-        //foreach inclusions right side
+        //foreach inclusion's right side
         for (Predicate inclLeft : solution.inclusions) {
             adjacency_list.push_back({});
-            //foreach inclusions left side
+
+            //pair with each inclusion's left side
             idxRight = 0;
            for(Predicate inclRight : solution.inclusions){
                 //Is there an edge from L -> R
@@ -1508,80 +1532,82 @@ namespace smt::noodler {
         return adjacency_list;
     }
 
-    static void strongconnect(int v, std::vector<std::vector<int>> *adj, std::vector<int> &index,
-                        std::vector<int> &lowlink, std::vector<bool> &onStack, std::stack<int> &S,
-                        int &currentIndex, std::vector<std::vector<int>> &sccs){
+    static void tarjan_visit(int v, const std::vector<std::vector<int>> *adj_list,
+                            std::vector<int> &disc, std::vector<int> &lowlink,
+                            std::vector<bool> &on_stack, std::stack<int> &dfs_stack,
+                            int &visit_counter, std::vector<std::vector<int>> &result) {
+        // Initialise discovery time and lowlink
+        disc[v] = lowlink[v] = visit_counter++;
 
-        index[v] = currentIndex;
-        lowlink[v] = currentIndex;
-        currentIndex++;
+        // Push v so descendants can detect back-edges to it via on_stack.
+        dfs_stack.push(v);
+        on_stack[v] = true;
 
-        S.push(v);
-        onStack[v] = true;
-
-        for (int w : (*adj)[v]) {
-            if (index[w] == -1) {
-                strongconnect(w, adj, index, lowlink, onStack, S, currentIndex, sccs);
+        for (int w : (*adj_list)[v]) {
+            if (disc[w] == -1) {
+                // Tree edge: recurse then pull up the lowest reachable index from w's subtree.
+                tarjan_visit(w, adj_list, disc, lowlink, on_stack, dfs_stack, visit_counter, result);
                 lowlink[v] = std::min(lowlink[v], lowlink[w]);
             }
-            else if (onStack[w]) {
-                lowlink[v] = std::min(lowlink[v], index[w]);
+            else if (on_stack[w]) {
+                // Back-edge to an ancestor: use disc[w], not lowlink[w], to avoid merging separate SCCs.
+                lowlink[v] = std::min(lowlink[v], disc[w]);
             }
+            // Visited and off the stack means w belongs to a finalised SCC — ignore.
         }
 
-        if (lowlink[v] == index[v]) {
+        // if v is an SCC root then pop the stack to collect the component.
+        if (lowlink[v] == disc[v]) {
             std::vector<int> component;
             int w;
-
             do {
-                w = S.top();
-                S.pop();
-                onStack[w] = false;
+                w = dfs_stack.top();
+                dfs_stack.pop();
+                on_stack[w] = false;
                 component.push_back(w);
             } while (w != v);
-
-            sccs.push_back(component);
+            result.push_back(component);
         }
     }
 
-    std::vector<std::vector<int>> DecisionProcedure::tarjan(std::vector<std::vector<int>> *adjacency_list) {
+    std::vector<std::vector<int>> DecisionProcedure::tarjan(const std::vector<std::vector<int>> *adjacency_list) {
         int n = adjacency_list->size();
 
-        std::vector<int> index(n, -1);
-        std::vector<int> lowlink(n);
-        std::vector<bool> onStack(n, false);
-        std::stack<int> S;
+        std::vector<int> disc(n, -1);
+        std::vector<int> lowlink(n, 0);    // Lowest disc reachable from each vertex's subtree
+        std::vector<bool> on_stack(n, false);
+        std::stack<int> dfs_stack;
+        int visit_counter = 0;
+        std::vector<std::vector<int>> result;
 
-        int currentIndex = 0;
-        std::vector<std::vector<int>> sccs;
-
-        for (int v = 0; v < n; v++) {
-            if (index[v] == -1) {
-                strongconnect(v, adjacency_list, index, lowlink, onStack, S, currentIndex, sccs);
-            }
+        // Start from every vertex to handle disconnected graphs.
+        for (int vertex = 0; vertex < n; vertex++) {
+            if (disc[vertex] == -1)
+                tarjan_visit(vertex, adjacency_list, disc, lowlink,
+                            on_stack, dfs_stack, visit_counter, result);
         }
 
-        return sccs;
+        return result;
     }
 
     void DecisionProcedure::get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side,
         const std::vector<Atom>& right_side, std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T) {
         Atom missing_atom = missing_left ? left_side[p] : right_side[p];
         
-        // var that would be changed
+        // Var that would be changed
         BasicTerm changed_var = missing_atom.var;
 
-        //get word from opposite side
+        // Get word from opposite side
         std::vector<Atom> opposite_side = missing_left ? right_side : left_side;
         mata::Word opposite_word;
 
         for (const Atom &atom_at_idx : opposite_side) {
-            //concat word
+            // Concat word
             const mata::Word& word = (*scc_solution)[atom_at_idx.var];
             opposite_word.push_back(word[atom_at_idx.index]);
         }
         
-        //get word for var (change scc_solution)
+        // Get word for var (change scc_solution)
         int start_in_pattern = p - missing_atom.index;
         int var_length = (*scc_solution)[changed_var].size(); 
 
@@ -1591,7 +1617,7 @@ namespace smt::noodler {
         }
         (*scc_solution)[changed_var] = new_word_for_var;
 
-        //remove atoms from T  
+        // Remove atoms from T  
         auto it = T->begin();
         while (it != T->end()) {
             if (it->var == changed_var && it->index > missing_atom.index)
@@ -1601,73 +1627,83 @@ namespace smt::noodler {
         }
     }
 
-    bool DecisionProcedure::isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
-         int idx, const std::set<Atom>& T) {
+    bool DecisionProcedure::isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, 
+        int idx, const std::set<Atom>& T) {
         bool is_left_atom = T.count(left_side[idx]);
         bool is_right_atom = T.count(right_side[idx]);
-        //std::cout << "Check halffull " << idx << " - " << is_left_atom << "," << is_right_atom << std::endl;
         if((is_left_atom && !is_right_atom) || (!is_left_atom && is_right_atom))
             return true;
         else
             return false;
     }
 
-    mata::Word DecisionProcedure::get_shortest_word(const mata::nfa::Nfa& aut) {
-
-        struct Pred {
+    std::optional<mata::Word> DecisionProcedure::get_some_shortest_word(const mata::nfa::Nfa& aut) {
+        
+        //Predecessor state and the symbol used to reach the current state.
+        struct Predecessor {
             mata::nfa::State prev;
             mata::Symbol sym;
         };
-        mata::Word w;
 
-        const size_t n = aut.num_of_states();
+        //Resulting word
+        mata::Word res;
+        const size_t num_of_states = aut.num_of_states();
 
-        std::queue<mata::nfa::State> q;
-        std::vector<int> dist(n, -1);
-        std::vector<Pred> pred(n);
+        std::queue<mata::nfa::State> worklist;
+        std::vector<int> dist(num_of_states, -1);
+        std::vector<Predecessor> pred(num_of_states);
 
         // Initialize BFS from all initial states
-        for (mata::nfa::State s : aut.initial) {
-            dist[s] = 0;
-            q.push(s);
+        for (mata::nfa::State init_state : aut.initial) {
+            dist[init_state] = 0;
+            worklist.push(init_state);
 
-            if (aut.final.contains(s)) {
-                return mata::Word{}; // empty word accepted
+            if (aut.final.contains(init_state)) {
+                return res; // empty word accepted
             }
         }
 
-        // BFS
-        while (!q.empty()) {
-           mata::nfa::State s = q.front();
-            q.pop();
+        // Standard BFS loop
+        while (!worklist.empty()) {
+            // Get the next state in the queue and remove it
+            mata::nfa::State curr_state = worklist.front();
+            worklist.pop();
 
-            int next_dist = dist[s] + 1;
+            // Calculate the distance for any newly discovered states from this node
+            int next_dist = dist[curr_state] + 1;
 
             // Iterate outgoing transitions
-            for (const auto& sym_post : aut.delta[s]) {
-               mata::Symbol a = sym_post.symbol;
+            for (const auto& sym_post : aut.delta[curr_state]) {
+                mata::Symbol transition_sym = sym_post.symbol;
 
-                for (mata::nfa::State t : sym_post.targets) {
-                    if (dist[t] != -1) continue;
+                // Iterate over all destination states for this specific symbol
+                for (mata::nfa::State target_state : sym_post.targets) {
+                    //Skip if the state has already been visited
+                    if (dist[target_state] != -1) continue;
 
-                    dist[t] = next_dist;
-                    pred[t] = { s, a };
+                    dist[target_state] = next_dist; //Mark state as visited
+                    pred[target_state] = { curr_state, transition_sym }; // Store made transition
 
-                    if (aut.final.contains(t)) {
+                    // Check if the newly reached state is an accepting state
+                    if (aut.final.contains(target_state)) {
+
                         // reconstruct shortest word
-                        for (mata::nfa::State x = t; dist[x] > 0; x = pred[x].prev) {
-                            w.push_back(pred[x].sym);
+                        for (mata::nfa::State backtrack_state = target_state; dist[backtrack_state] > 0;
+                             backtrack_state = pred[backtrack_state].prev) {
+                            res.push_back(pred[backtrack_state].sym);
                         }
-                        std::reverse(w.begin(), w.end());
-                        return w;
+                        //Reverse the backtracked word
+                        std::reverse(res.begin(), res.end());
+                        return res;
                     }
 
-                    q.push(t);
+                    // If 'target_state' is not a final state, push it to the queue to explore its transitions later
+                    worklist.push(target_state);
                 }
             }
         }
 
-        return w; // language empty
+        return res; // language empty
     }
 
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {

@@ -307,11 +307,22 @@ namespace smt::noodler {
          */
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
-        //SCC helper functions
+        /**
+         * @brief Find dependencies among inclusion
+         * 
+         * @return std::vector<std::vector<int>> 
+         */
         std::vector<std::vector<int>> find_graph_edges();
-        std::vector<std::vector<int>> tarjan(std::vector<std::vector<int>> *adjacency_list);
 
-        //struct for atoms in cycled inclusions
+        /**
+         * @brief Tarjans algorithm for finding SCC from inclusions
+         * 
+         * @param adjacency_list 
+         * @return std::vector<std::vector<int>> 
+         */
+        std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> *adjacency_list);
+
+        /// struct for atoms in cycled inclusions
         struct Atom {
             BasicTerm var;
             int index;
@@ -328,12 +339,34 @@ namespace smt::noodler {
                 return index < other.index;
             }
         };
+       
+        /**
+         * @brief Updates the word assignment for the variable at position 
+         *        @p p by copying the aligned slice from the opposite side, then removes its stale suffix atoms from @p T.
+         * 
+         * @param p 
+         * @param missing_left 
+         * @param left_side 
+         * @param right_side 
+         * @param scc_solution 
+         * @param T 
+         */
         void get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
                     std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
+        /**
+         * @brief Determines if the atom pair on the same index is half full (exactly one of them is in T)
+         * 
+         * @param left_side 
+         * @param right_side 
+         * @param idx 
+         * @param T 
+         * @return true 
+         * @return false 
+         */
         bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
 
-        //get shortest words of all vars in scc 
-        mata::Word get_shortest_word(const mata::nfa::Nfa& aut);
+        /// Returns one of the shortest words of @p aut 
+        std::optional<mata::Word> get_some_shortest_word(const mata::nfa::Nfa& aut);
         
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;

@@ -630,16 +630,16 @@ namespace smt::noodler {
 
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(membership) };
-            mata::nfa::Nfa nfa{ regex::conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, make_complement, make_complement) };
+            std::shared_ptr<const mata::nfa::Nfa> nfa = regex::conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, make_complement, make_complement);
             auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
                 //  with the previously existing.
                 aut_ass_it->second = std::make_shared<mata::nfa::Nfa>(
-                        mata::nfa::reduce(mata::nfa::intersection(nfa, *aut_ass_it->second)));
+                        mata::nfa::reduce(mata::nfa::intersection(*nfa, *aut_ass_it->second)));
 
             } else { // We create a regular constraint for the current variable for the first time.
-                aut_assignment[term] = std::make_shared<mata::nfa::Nfa>(std::forward<mata::nfa::Nfa>(std::move(nfa)));
+                aut_assignment[term] = std::make_shared<mata::nfa::Nfa>(*nfa);
             }
 
             // we also need to gather transducer constraints for the var
@@ -723,18 +723,18 @@ namespace smt::noodler {
             regex::extract_symbols(right_side, m_util_s, alph);
 
             // construct NFAs for both sides
-            mata::nfa::Nfa nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
-            mata::nfa::Nfa nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m ,alph, false );
+            std::shared_ptr<const mata::nfa::Nfa> nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
+            std::shared_ptr<const mata::nfa::Nfa> nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m ,alph, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv;
             // for the case that one side is empty, we just need to check if the other automaton is empty
-            if (nfa1.num_of_states() == 0) {
-                are_equiv = nfa2.is_lang_empty();
-            } else if (nfa2.num_of_states() == 0) {
-                are_equiv = nfa1.is_lang_empty();
+            if (nfa1->num_of_states() == 0) {
+                are_equiv = nfa2->is_lang_empty();
+            } else if (nfa2->num_of_states() == 0) {
+                are_equiv = nfa1->is_lang_empty();
             } else {
-                are_equiv = mata::nfa::are_equivalent(nfa1, nfa2);
+                are_equiv = mata::nfa::are_equivalent(*nfa1, *nfa2);
             }
             if ((is_equation && !are_equiv) || (!is_equation && are_equiv)) {
                 // the language (dis)equation does not hold => block it and return

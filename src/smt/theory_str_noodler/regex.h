@@ -160,7 +160,7 @@ namespace smt::noodler::regex {
      * @param[in] make_complement Whether to make complement of the passed @p expr instead.
      * @return The resulting regex.
      */
-    [[nodiscard]] mata::nfa::Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
                                              const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
 
     /**

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <memory>
 
 #include "util/z3_exception.h"
 
@@ -167,13 +168,13 @@ namespace smt::noodler::regex {
         }
     }
 
-    [[nodiscard]] Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] std::shared_ptr<const Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const Alphabet& alphabet, bool determinize, bool make_complement) {
 
         if (m_util_s.str.is_string_term(expression)) {
             zstring result;
             if (m_util_s.str.is_string(expression, result)) {
-                return AutAssignment::create_word_nfa(result);
+                return std::make_shared<Nfa>(AutAssignment::create_word_nfa(result));
             } else {
                 util::throw_error("We can convert to NFA only string literals");
             }
@@ -464,7 +465,7 @@ namespace smt::noodler::regex {
         }
 
         STRACE(str_create_nfa, tout << final_result;);
-        return final_result;
+        return std::make_shared<Nfa>(final_result);
     }
 
     [[nodiscard]] RegexInfo get_regex_info(const app *expression, const seq_util& m_util_s) {
@@ -1076,7 +1077,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::All);
                 ex = to_app(a1);
@@ -1087,7 +1088,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::Single);
                 ex = to_app(a1);

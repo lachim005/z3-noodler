@@ -1,4 +1,6 @@
 #include <cassert>
+#include <memory>
+#include <unordered_map>
 
 #include "util/z3_exception.h"
 
@@ -167,19 +169,48 @@ namespace smt::noodler::regex {
         }
     }
 
-    [[nodiscard]] Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+
+    static std::array<std::unordered_map<app*, std::shared_ptr<Nfa>>, 3> aut_caches;
+
+    [[nodiscard]] std::shared_ptr<Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
                                   const Alphabet& alphabet, bool determinize, bool make_complement) {
 
         if (m_util_s.str.is_string_term(expression)) {
             zstring result;
             if (m_util_s.str.is_string(expression, result)) {
-                return AutAssignment::create_word_nfa(result);
+                return std::make_shared<Nfa>(AutAssignment::create_word_nfa(result));
             } else {
                 util::throw_error("We can convert to NFA only string literals");
             }
         }
 
         SASSERT(m_util_s.is_re(expression));
+
+        auto cache_idx = make_complement ? 2 : determinize ? 1 : 0;
+        auto &aut_cache = aut_caches[cache_idx];
+        auto &normal_cache = aut_caches[0];
+
+        if (aut_cache.contains(expression)) {
+            return aut_cache[expression];
+        }
+
+        if ((determinize || make_complement) && normal_cache.contains(expression)) {
+            std::shared_ptr<Nfa> final_result;
+            if(determinize && !make_complement) { // if we need to complement, we will determinize anyway
+                final_result = std::make_shared<Nfa>(mata::nfa::minimize(*normal_cache[expression]));
+            }
+
+            // Whether to create complement of the final automaton.
+            if (make_complement) {
+                STRACE(str_create_nfa, tout << "Complemented NFA:" << std::endl;);
+                final_result = std::make_shared<Nfa>(mata::nfa::complement(*normal_cache[expression], alphabet.get_mata_alphabet(), { 
+                    {"algorithm", "classical"},
+                    //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
+                    }));
+            }
+            aut_cache[expression] = final_result;
+            return final_result;
+        }
 
         // to simulate recursive calls of conv_to_nfa on arguments of expression, we use postorder
         // traversal of the ast for expression
@@ -444,26 +475,29 @@ namespace smt::noodler::regex {
 
         SASSERT(results_stack.size() == 1);
 
-        mata::nfa::Nfa final_result = std::move(results_stack.top());
+        std::shared_ptr<mata::nfa::Nfa> final_result = std::make_shared<mata::nfa::Nfa>(std::move(results_stack.top()));
+        normal_cache[expression] = final_result;
+        if (!determinize && !make_complement) return final_result;
 
         if(determinize && !make_complement) { // if we need to complement, we will determinize anyway
             STRACE(str_create_nfa_reduce, 
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
                 tout << final_result;
             );
-            final_result = mata::nfa::minimize(final_result);
+            final_result = std::make_shared<mata::nfa::Nfa>(mata::nfa::minimize(*final_result));
         }
 
         // Whether to create complement of the final automaton.
         if (make_complement) {
             STRACE(str_create_nfa, tout << "Complemented NFA:" << std::endl;);
-            final_result = mata::nfa::complement(final_result, alphabet.get_mata_alphabet(), { 
+            final_result = std::make_shared<mata::nfa::Nfa>(mata::nfa::complement(*final_result, alphabet.get_mata_alphabet(), { 
                 {"algorithm", "classical"}, 
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
-                });
+                }));
         }
 
-        STRACE(str_create_nfa, tout << final_result;);
+        STRACE(str_create_nfa, tout << *final_result;);
+        aut_cache[expression] = final_result;
         return final_result;
     }
 
@@ -1076,7 +1110,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::All);
                 ex = to_app(a1);
@@ -1087,7 +1121,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::Single);
                 ex = to_app(a1);

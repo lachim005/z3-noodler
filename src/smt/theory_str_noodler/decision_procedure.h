@@ -353,15 +353,9 @@ namespace smt::noodler {
          */
         void get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
                     std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
+
         /**
-         * @brief Determines if the atom pair on the same index is half full (exactly one of them is in T)
-         * 
-         * @param left_side 
-         * @param right_side 
-         * @param idx 
-         * @param T 
-         * @return true 
-         * @return false 
+         * @brief Determines if the atom pair on the same index @p idx is half full (exactly one of them is in @p T)
          */
         bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
 

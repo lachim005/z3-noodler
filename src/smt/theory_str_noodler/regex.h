@@ -1,9 +1,12 @@
 #ifndef _NOODLER_REGEX_H_
 #define _NOODLER_REGEX_H_
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <mata/alphabet.hh>
 #include <set>
 #include <stack>
 #include <map>
@@ -53,9 +56,14 @@ namespace smt::noodler::regex {
     private:
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
-        std::size_t hash = 0;
 
-        static const unsigned SIZE_T_BITS = sizeof(size_t) * CHAR_BIT;
+        uint64_t hash = 0;
+        inline void add_or_remove_from_hash(mata::Symbol s) {
+            // FX Hash (rolling hash function)
+            uint64_t x = s;
+            const uint64_t k = 0x517cc1b727220a95ULL;
+            hash ^= (x ^ (x >> 32)) * k;
+        }
 
     public:
         Alphabet() = default;
@@ -64,19 +72,19 @@ namespace smt::noodler::regex {
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
         inline bool operator==(const Alphabet& a) const { return alphabet == a.alphabet; }
-        inline std::size_t get_hash() const { return hash; }
+        inline uint64_t get_hash() const { return hash; }
 
         Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
                 alphabet.insert(s);
-                hash ^= 1 << s % SIZE_T_BITS;
+                add_or_remove_from_hash(s);
             }
         }
         
         Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(symbol);
-                hash ^= 1 << symbol % SIZE_T_BITS;
+                add_or_remove_from_hash(symbol);
             }
         }
 
@@ -97,7 +105,9 @@ namespace smt::noodler::regex {
 
         void insert(const mata::Symbol s) {
             SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
-            if (alphabet.insert(s).second) hash ^= 1 << s % SIZE_T_BITS;
+            if (alphabet.insert(s).second) {
+                add_or_remove_from_hash(s);
+            }
             mata_alphabet.add_new_symbol(s);
         }
 
@@ -112,7 +122,9 @@ namespace smt::noodler::regex {
         bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
 
         void erase(const mata::Symbol s) {
-            if (alphabet.erase(s) > 0) hash ^= 1 << s % SIZE_T_BITS;
+            if (alphabet.erase(s) > 0) {
+                add_or_remove_from_hash(s);
+            }
             mata_alphabet.erase(s);
         }
 
@@ -151,16 +163,15 @@ namespace smt::noodler::regex {
             return zstring(word.size(), word.data());
         }
     };
-}
 
-template<>
-struct std::hash<smt::noodler::regex::Alphabet> {
-    std::size_t operator()(const smt::noodler::regex::Alphabet& k) const {
-        return k.get_hash();
-    }
-};
-
-namespace smt::noodler::regex {
+    /**
+     * @brief Can be used in hash tables for hashing alphabets
+     */
+    struct AlphabetHasher {
+        std::size_t operator()(const Alphabet& k) const {
+            return k.get_hash();
+        }
+    };
 
     /**
      * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
@@ -186,7 +197,7 @@ namespace smt::noodler::regex {
             N_CACHES
         };
         using CacheForAlphabet = std::array<std::unordered_map<app*, std::shared_ptr<const Nfa>>, N_CACHES>;
-        using AutomataCache = std::unordered_map<Alphabet, CacheForAlphabet>;
+        using AutomataCache = std::unordered_map<Alphabet, CacheForAlphabet, AlphabetHasher>;
 
         AutomataCache aut_cache;
 

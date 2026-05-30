@@ -151,6 +151,16 @@ namespace smt::noodler::regex {
             return zstring(word.size(), word.data());
         }
     };
+}
+
+template<>
+struct std::hash<smt::noodler::regex::Alphabet> {
+    std::size_t operator()(const smt::noodler::regex::Alphabet& k) const {
+        return k.get_hash();
+    }
+};
+
+namespace smt::noodler::regex {
 
     /**
      * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
@@ -160,17 +170,39 @@ namespace smt::noodler::regex {
      */
     void extract_symbols(expr* const ex, const seq_util& m_util_s, Alphabet& alphabet);
 
-    /**
-     * Convert expression @p expr to NFA.
-     * @param[in] expression Expression to be converted to NFA.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
-     * @param[in] determinize Determinize intermediate automata
-     * @param[in] make_complement Whether to make complement of the passed @p expr instead.
-     * @return The resulting regex.
-     */
-    [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                             const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
+    class NfaConstructor {
+    private:
+        using Nfa = mata::nfa::Nfa;
+        /// Used internaly by conv_to_nfa when the automaton isn't in a cache
+        [[nodiscard]] std::shared_ptr<Nfa> create_nfa_for_expr(app *expression, const seq_util& m_util_s, const ast_manager& m, const Alphabet& alphabet);
+
+        // For every alphabet, we have 3 caches
+        // One is used for the automata representing the given expression
+        // The other two are for their complemented and determinized versions
+        enum {
+            INITIAL_CACHE,
+            DETERMINIZED_CACHE,
+            COMPLEMENTED_CACHE,
+            N_CACHES
+        };
+        using CacheForAlphabet = std::array<std::unordered_map<app*, std::shared_ptr<const Nfa>>, N_CACHES>;
+        using AutomataCache = std::unordered_map<Alphabet, CacheForAlphabet>;
+
+        AutomataCache aut_cache;
+
+    public:
+        /**
+         * Convert expression @p expr to NFA.
+         * @param[in] expression Expression to be converted to NFA.
+         * @param[in] m_util_s Seq util for AST.
+         * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
+         * @param[in] determinize Determinize intermediate automata
+         * @param[in] make_complement Whether to make complement of the passed @p expr instead.
+         * @return The resulting regex.
+         */
+        [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+                                                 const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
+    };
 
     /**
      * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
@@ -305,15 +337,10 @@ namespace smt::noodler::regex {
      * @param mata_alph Mata alphabet containing symbols from the current instance
      * @param[out] transducer_preds Newly created transducer constraints
      */
-    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, Formula& transducer_preds);
+    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s,
+            obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, NfaConstructor &nfa_constructor,
+            Formula& transducer_preds);
 
 }
-
-template<>
-struct std::hash<smt::noodler::regex::Alphabet> {
-    std::size_t operator()(const smt::noodler::regex::Alphabet& k) const {
-        return k.get_hash();
-    }
-};
 
 #endif

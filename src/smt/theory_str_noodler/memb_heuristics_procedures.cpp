@@ -28,7 +28,7 @@ namespace smt::noodler {
                 regex::extract_symbols(regex, m_util_s, alph);
                 alph.insert_dummy_if_not_full();
 
-                std::shared_ptr<const mata::nfa::Nfa> nfa{ regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
+                std::shared_ptr<const mata::nfa::Nfa> nfa{ nfa_constructor.conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false) };
 
                 if (produce_model) {
                     mata::nfa::Run model_run;
@@ -73,7 +73,7 @@ namespace smt::noodler {
         regex::extract_symbols(regex, m_util_s, alph);
         alph.insert_dummy_if_not_full();
 
-        std::shared_ptr<const mata::nfa::Nfa> reg_nfa = regex::conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false);
+        std::shared_ptr<const mata::nfa::Nfa> reg_nfa = nfa_constructor.conv_to_nfa(to_app(regex), m_util_s, m, alph, false, false);
 
         mata::Word word;
         if (is_regex_positive) {
@@ -110,7 +110,7 @@ namespace smt::noodler {
 
             bool first = true;
             for (auto& reg : list_of_normal_regs) {
-                intersection = mata::nfa::intersection(*regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
+                intersection = mata::nfa::intersection(*nfa_constructor.conv_to_nfa(reg, m_util_s, m, alph, false, false), intersection);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && intersection.num_of_states() < regex::RED_BOUND)
                 {
@@ -127,7 +127,7 @@ namespace smt::noodler {
             mata::nfa::Nfa unionn; // initialize to empty automaton
             first = true;
             for (auto& reg : list_of_compl_regs) {
-                unionn = mata::nfa::union_nondet(*regex::conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
+                unionn = mata::nfa::union_nondet(*nfa_constructor.conv_to_nfa(reg, m_util_s, m, alph, false, false), unionn);
                 if (!first // for first iteration we won't do reduction, as it would just be done twice, once in conv_to_nfa and once here
                     && unionn.num_of_states() < regex::RED_BOUND)
                 {

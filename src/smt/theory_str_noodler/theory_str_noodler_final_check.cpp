@@ -148,7 +148,7 @@ namespace smt::noodler {
                     noodler_var,
                     std::get<1>(reg_data),
                     std::get<2>(reg_data),
-                    m_util_s, m, m_params.m_produce_models
+                    m_util_s, m, nfa_constructor, m_params.m_produce_models
                 );
                 this->statistics.at("single-memb-heur").num_start++;
                 lbool result = dec_proc->compute_next_solution();
@@ -536,16 +536,16 @@ namespace smt::noodler {
             }
             Predicate inst = this->conv_eq_pred(ctx.mk_eq_atom(we.first, we.second));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, alph, instance);
-            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(we.first), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
+            regex::gather_transducer_constraints(to_app(we.second), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
             instance.add_predicate(inst);
         }
 
         for (const auto& wd : this->m_word_diseq_todo_rel) {
             Predicate inst = this->conv_eq_pred(m.mk_not(ctx.mk_eq_atom(wd.first, wd.second)));
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, alph, instance);
-            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(wd.first), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
+            regex::gather_transducer_constraints(to_app(wd.second), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
             instance.add_predicate(inst);
         }
 
@@ -555,18 +555,18 @@ namespace smt::noodler {
             util::collect_terms(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, left);
             util::collect_terms(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, right);
             // gather transducer constraints occurring in the concatenation
-            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, alph, instance);
-            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.first), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
+            regex::gather_transducer_constraints(to_app(not_contains.second), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
             Predicate inst = Predicate::create_not_contains(left, right);
             instance.add_predicate(inst);
         }
 
         for (const auto& conv : this->m_conversion_todo) {
-            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(var_name.at(conv.string_var)), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
         }
 
         for (const auto& len: len_vars) {
-            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(to_app(len), m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
         }
 
         return instance;
@@ -630,7 +630,7 @@ namespace smt::noodler {
 
             // If the regular constraint is in a negative form, create a complement of the regular expression instead.
             const bool make_complement{ !std::get<2>(membership) };
-            std::shared_ptr<const mata::nfa::Nfa> nfa = regex::conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, make_complement, make_complement);
+            std::shared_ptr<const mata::nfa::Nfa> nfa = nfa_constructor.conv_to_nfa(to_app(std::get<1>(membership)), m_util_s, m, alph, make_complement, make_complement);
             auto aut_ass_it{ aut_assignment.find(term) };
             if (aut_ass_it != aut_assignment.end()) {
                 // This variable already has some regular constraints. Hence, we create an intersection of the new one
@@ -643,7 +643,7 @@ namespace smt::noodler {
             }
 
             // we also need to gather transducer constraints for the var
-            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, alph, instance);
+            regex::gather_transducer_constraints(var_app, m, this->m_util_s, this->predicate_replace, alph, nfa_constructor, instance);
         }
 
         // create sigma star automaton for our alphabet
@@ -723,8 +723,8 @@ namespace smt::noodler {
             regex::extract_symbols(right_side, m_util_s, alph);
 
             // construct NFAs for both sides
-            std::shared_ptr<const mata::nfa::Nfa> nfa1 = regex::conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
-            std::shared_ptr<const mata::nfa::Nfa> nfa2 = regex::conv_to_nfa(to_app(right_side), m_util_s, m ,alph, false );
+            std::shared_ptr<const mata::nfa::Nfa> nfa1 = nfa_constructor.conv_to_nfa(to_app(left_side), m_util_s, m, alph, false );
+            std::shared_ptr<const mata::nfa::Nfa> nfa2 = nfa_constructor.conv_to_nfa(to_app(right_side), m_util_s, m ,alph, false );
 
             // check if NFAs are equivalent (if we have equation) or not (if we have disequation)
             bool are_equiv;
@@ -1085,7 +1085,7 @@ namespace smt::noodler {
             var_to_list_of_regexes_and_complement_flag[var].push_back(std::make_pair(false, reg));
         }
 
-        dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m, m_params.m_produce_models);
+        dec_proc = std::make_shared<MultMembHeuristicProcedure>(var_to_list_of_regexes_and_complement_flag, alph, m_util_s, m, nfa_constructor, m_params.m_produce_models);
         this->statistics.at("multi-memb-heur").num_start++;
         lbool result = dec_proc->compute_next_solution();
 

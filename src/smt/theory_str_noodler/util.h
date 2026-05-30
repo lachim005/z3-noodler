@@ -19,7 +19,6 @@
 #include "ast/seq_decl_plugin.h"
 #include "util/scoped_vector.h"
 #include "util/union_find.h"
-#include "ast/rewriter/seq_rewriter.h"
 #include "ast/rewriter/th_rewriter.h"
 #include "ast/for_each_expr.h"
 

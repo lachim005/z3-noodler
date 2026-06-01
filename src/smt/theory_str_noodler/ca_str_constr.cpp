@@ -819,7 +819,7 @@ namespace smt::noodler::ca {
             std::optional<LenNode> word_power_solution = try_notcontains_word_power_heuristic(all_predicates, actual_var_assignment);
             if (word_power_solution.has_value()) {
                 STRACE(str_not_contains, tout << "* Word-power heuristic applied: returning |needle| > |haystack|\n";);
-                return { word_power_solution.value(), LenNodePrecision::UNDERAPPROX };
+                return { word_power_solution.value(), LenNodePrecision::PRECISE };
             }
         }
 

@@ -1349,7 +1349,7 @@ namespace smt::noodler {
                         unsigned var_length = 0;
                         if(var.is_variable()){
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_some_shortest_word(var_nfa);
+                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_shortest_word(var_nfa);
                             if (possible_w.has_value()) {
                                 mata::Word w = possible_w.value(); 
                                 
@@ -1385,7 +1385,7 @@ namespace smt::noodler {
                         unsigned var_length = 0;
                         if(var.is_variable()){
                             const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_some_shortest_word(var_nfa);
+                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_shortest_word(var_nfa);
                             if (possible_w.has_value()) {
                                 mata::Word w = possible_w.value(); 
                                 

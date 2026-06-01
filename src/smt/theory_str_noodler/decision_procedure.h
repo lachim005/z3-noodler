@@ -310,15 +310,16 @@ namespace smt::noodler {
         /**
          * @brief Find dependencies among inclusion
          * 
-         * @return std::vector<std::vector<int>> 
+         * @return A list where each index represents a node in the inclusion graph,
+         *  storing the indexes of the nodes it directly includes 
          */
         std::vector<std::vector<int>> find_graph_edges();
 
         /**
          * @brief Tarjans algorithm for finding SCC from inclusions
          * 
-         * @param adjacency_list 
-         * @return std::vector<std::vector<int>> 
+         * @param adjacency_list Indexes of directly connected inclusions for each inclusion
+         * @return Strongly connected components for each inclusion
          */
         std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> *adjacency_list);
 
@@ -344,12 +345,12 @@ namespace smt::noodler {
          * @brief Updates the word assignment for the variable at position 
          *        @p p by copying the aligned slice from the opposite side, then removes its stale suffix atoms from @p T.
          * 
-         * @param p 
-         * @param missing_left 
-         * @param left_side 
-         * @param right_side 
-         * @param scc_solution 
-         * @param T 
+         * @param p              Index of the half-full position in left_side/right_side.
+         * @param missing_left   True if the missing atom is on the left side, false if on the right.
+         * @param left_side      Atom sequence for the left-hand side of the equation.
+         * @param right_side     Atom sequence for the right-hand side of the equation.
+         * @param scc_solution   Variable-to-word mapping
+         * @param T              Resolved atom set
          */
         void get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
                     std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
@@ -359,9 +360,6 @@ namespace smt::noodler {
          */
         bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
 
-        /// Returns one of the shortest words of @p aut 
-        std::optional<mata::Word> get_some_shortest_word(const mata::nfa::Nfa& aut);
-        
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;
         // vars for which we already called get_model() at least once (used for cyclicity detection, will be removed when get_model() can handle cycles in inclusions)

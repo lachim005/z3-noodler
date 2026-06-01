@@ -421,16 +421,25 @@ namespace smt::noodler {
         bool is_flat(const BasicTerm& t) const;
 
         /**
-         * @brief Check if the language of @p t is of the form w* for some non-empty word w,
-         * i.e., L(t) = {ε, w, ww, www, ...}.
+         * @brief If the language of @p t is of the form w* for some non-empty word w,
+         * return the base word w; otherwise return std::nullopt.
          *
-         * Minimizes the automaton for @p t and checks whether the resulting minimal DFA
-         * is a simple cycle whose unique initial state is also the unique final state.
+         * Minimizes and trims the automaton for @p t, then checks whether it is a simple
+         * cycle whose unique initial state is also the unique final state.  If so, the
+         * symbols along the cycle give the base word w.
+         *
+         * @param t Term
+         * @return The base word w such that L(t) = w*, or std::nullopt if not applicable.
+         */
+        std::optional<mata::Word> get_word_power_base(const BasicTerm& t) const;
+
+        /**
+         * @brief Check if the language of @p t is of the form w* for some non-empty word w.
          *
          * @param t Term
          * @return true iff L(t) = w* for some non-empty word w
          */
-        bool is_lang_word_power(const BasicTerm& t) const;
+        bool is_lang_word_power(const BasicTerm& t) const { return get_word_power_base(t).has_value(); }
 
     };
 

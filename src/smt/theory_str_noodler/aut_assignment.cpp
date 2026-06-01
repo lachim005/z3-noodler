@@ -249,32 +249,34 @@ namespace smt::noodler {
         return is_there_some_dummy;
     }
 
-    bool AutAssignment::is_lang_word_power(const BasicTerm& t) const {
+    std::optional<mata::Word> AutAssignment::get_word_power_base(const BasicTerm& t) const {
         mata::nfa::Nfa aut = mata::nfa::minimize(*this->at(t));
         aut.trim();
 
         // The unique initial state must also be the unique final state
-        if (aut.initial.size() != 1 || aut.final.size() != 1) return false;
-        if (*aut.initial.begin() != *aut.final.begin()) return false;
+        if (aut.initial.size() != 1 || aut.final.size() != 1) return std::nullopt;
+        if (*aut.initial.begin() != *aut.final.begin()) return std::nullopt;
 
         // Walk the unique-successor chain from the initial state; each state must have
         // exactly one outgoing symbol (no dummy) leading to exactly one target.
         // The walk must return to the start after visiting every reachable state exactly once.
         mata::nfa::State start = *aut.initial.begin();
         mata::nfa::State cur   = start;
+        mata::Word word;
         std::set<mata::nfa::State> visited;
         visited.insert(cur);
 
         while (true) {
             const auto& state_post = aut.delta[cur];
-            if (state_post.size() != 1) return false;
+            if (state_post.size() != 1) return std::nullopt;
             const auto& sym_post = *state_post.begin();
-            if (sym_post.num_of_targets() != 1) return false;
-            if (util::is_dummy_symbol(sym_post.symbol)) return false;
+            if (sym_post.num_of_targets() != 1) return std::nullopt;
+            if (util::is_dummy_symbol(sym_post.symbol)) return std::nullopt;
 
+            word.push_back(sym_post.symbol);
             mata::nfa::State next = *sym_post.targets.begin();
-            if (next == start) return true;         // closed simple cycle
-            if (visited.count(next)) return false;  // premature cycle not through start
+            if (next == start) return word;                 // closed simple cycle — return base word
+            if (visited.count(next)) return std::nullopt;  // premature cycle not through start
             visited.insert(next);
             cur = next;
         }

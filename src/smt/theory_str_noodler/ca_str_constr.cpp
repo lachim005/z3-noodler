@@ -763,14 +763,27 @@ namespace smt::noodler::ca {
      *         or std::nullopt otherwise.
      */
     std::optional<LenNode> try_notcontains_word_power_heuristic(const std::vector<Predicate>& not_contains_predicates, const AutAssignment& aut_assignment) {
+        // Require every variable across all predicates to be a power of the *same* base word w.
+        // Under this condition not-contains(haystack, needle) holds iff |needle| > |haystack|:
+        // haystack = w^k, needle = w^j, and w^j is a substring of w^k iff j <= k.
+        std::optional<mata::Word> common_base;
         for (const Predicate& pred : not_contains_predicates) {
             for (const BasicTerm& t : pred.get_haystack()) {
-                if (!aut_assignment.count(t) || !aut_assignment.is_lang_word_power(t)) return std::nullopt;
+                if (!aut_assignment.count(t)) return std::nullopt;
+                auto base = aut_assignment.get_word_power_base(t);
+                if (!base.has_value()) return std::nullopt;
+                if (!common_base.has_value()) common_base = base;
+                else if (*common_base != *base) return std::nullopt;
             }
             for (const BasicTerm& t : pred.get_needle()) {
-                if (!aut_assignment.count(t) || !aut_assignment.is_lang_word_power(t)) return std::nullopt;
+                if (!aut_assignment.count(t)) return std::nullopt;
+                auto base = aut_assignment.get_word_power_base(t);
+                if (!base.has_value()) return std::nullopt;
+                if (!common_base.has_value()) common_base = base;
+                else if (*common_base != *base) return std::nullopt;
             }
         }
+        if (!common_base.has_value()) return std::nullopt;
         return try_making_rhs_longer_than_lhs(not_contains_predicates, aut_assignment);
     }
 

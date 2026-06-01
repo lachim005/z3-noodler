@@ -411,14 +411,26 @@ namespace smt::noodler {
         }
 
         /**
-         * @brief Check if the automaton corresponding to @p t is flat. 
-         * Flat automaton is an NFA whose every SCC is a simple loop. Basically each state in an 
+         * @brief Check if the automaton corresponding to @p t is flat.
+         * Flat automaton is an NFA whose every SCC is a simple loop. Basically each state in an
          * SCC has at most one successor within this SCC.
-         * 
-         * @param t Term 
+         *
+         * @param t Term
          * @return true <-> the corresponding automaton is flat
          */
         bool is_flat(const BasicTerm& t) const;
+
+        /**
+         * @brief Check if the language of @p t is of the form w* for some non-empty word w,
+         * i.e., L(t) = {ε, w, ww, www, ...}.
+         *
+         * Minimizes the automaton for @p t and checks whether the resulting minimal DFA
+         * is a simple cycle whose unique initial state is also the unique final state.
+         *
+         * @param t Term
+         * @return true iff L(t) = w* for some non-empty word w
+         */
+        bool is_lang_word_power(const BasicTerm& t) const;
 
     };
 

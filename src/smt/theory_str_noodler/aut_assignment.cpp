@@ -249,6 +249,37 @@ namespace smt::noodler {
         return is_there_some_dummy;
     }
 
+    bool AutAssignment::is_lang_word_power(const BasicTerm& t) const {
+        mata::nfa::Nfa aut = mata::nfa::minimize(*this->at(t));
+        aut.trim();
+
+        // The unique initial state must also be the unique final state
+        if (aut.initial.size() != 1 || aut.final.size() != 1) return false;
+        if (*aut.initial.begin() != *aut.final.begin()) return false;
+
+        // Walk the unique-successor chain from the initial state; each state must have
+        // exactly one outgoing symbol (no dummy) leading to exactly one target.
+        // The walk must return to the start after visiting every reachable state exactly once.
+        mata::nfa::State start = *aut.initial.begin();
+        mata::nfa::State cur   = start;
+        std::set<mata::nfa::State> visited;
+        visited.insert(cur);
+
+        while (true) {
+            const auto& state_post = aut.delta[cur];
+            if (state_post.size() != 1) return false;
+            const auto& sym_post = *state_post.begin();
+            if (sym_post.num_of_targets() != 1) return false;
+            if (util::is_dummy_symbol(sym_post.symbol)) return false;
+
+            mata::nfa::State next = *sym_post.targets.begin();
+            if (next == start) return true;         // closed simple cycle
+            if (visited.count(next)) return false;  // premature cycle not through start
+            visited.insert(next);
+            cur = next;
+        }
+    }
+
     std::optional<mata::Symbol> AutAssignment::replace_dummy_with_new_symbol() {
         SASSERT(alphabet.contains(util::get_dummy_symbol()));
         mata::Symbol new_symbol = regex::Alphabet(alphabet).get_unused_symbol();

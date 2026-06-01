@@ -752,6 +752,28 @@ namespace smt::noodler::ca {
         return result;
     }
 
+    /**
+     * @brief Heuristic for not-contains when every variable's language is of the form w* for some word w.
+     *
+     * If all variables occurring in @p not_contains_predicates have a language of the form w* (a simple
+     * word-power language), not-contains(haystack, needle) is guaranteed to hold whenever |needle| > |haystack|.
+     * The returned formula captures exactly this sufficient condition.
+     *
+     * @return The formula |needle| > |haystack| (as an underapproximation) if the heuristic applies,
+     *         or std::nullopt otherwise.
+     */
+    std::optional<LenNode> try_notcontains_word_power_heuristic(const std::vector<Predicate>& not_contains_predicates, const AutAssignment& aut_assignment) {
+        for (const Predicate& pred : not_contains_predicates) {
+            for (const BasicTerm& t : pred.get_haystack()) {
+                if (!aut_assignment.count(t) || !aut_assignment.is_lang_word_power(t)) return std::nullopt;
+            }
+            for (const BasicTerm& t : pred.get_needle()) {
+                if (!aut_assignment.count(t) || !aut_assignment.is_lang_word_power(t)) return std::nullopt;
+            }
+        }
+        return try_making_rhs_longer_than_lhs(not_contains_predicates, aut_assignment);
+    }
+
     std::pair<LenNode, LenNodePrecision> get_lia_for_not_contains(const Formula& formula, const AutAssignment& var_assignment, bool use_tag_proc) {
         if (formula.get_predicates().empty()) {
             return { LenNode(LenFormulaType::TRUE), LenNodePrecision::PRECISE };
@@ -776,6 +798,15 @@ namespace smt::noodler::ca {
             std::optional<LenNode> heuristic_solution = try_solving_notcontains_with_finite_rhs({not_contains_with_literals}, actual_var_assignment);
             if (heuristic_solution.has_value()) {
                 return { heuristic_solution.value(), LenNodePrecision::PRECISE };
+            }
+
+            // Word-power heuristic: if every variable's language is w* for some word w,
+            // not-contains(haystack, needle) holds whenever |needle| > |haystack|.
+            const std::vector<Predicate>& all_predicates = formula.get_predicates();
+            std::optional<LenNode> word_power_solution = try_notcontains_word_power_heuristic(all_predicates, actual_var_assignment);
+            if (word_power_solution.has_value()) {
+                STRACE(str_not_contains, tout << "* Word-power heuristic applied: returning |needle| > |haystack|\n";);
+                return { word_power_solution.value(), LenNodePrecision::UNDERAPPROX };
             }
         }
 

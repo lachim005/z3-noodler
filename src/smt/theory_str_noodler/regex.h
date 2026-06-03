@@ -200,6 +200,9 @@ namespace smt::noodler::regex {
         using AutomataCache = std::unordered_map<Alphabet, CacheForAlphabet, AlphabetHasher>;
 
         AutomataCache aut_cache;
+        // For each app* key in the automata cache, we also store a reference to it to ensure
+        // the pointer doesn't get garbage collected, which could cause problems if you are very unlucky
+        std::vector<app_ref> pinned_refs{};
 
     public:
         /**
@@ -211,7 +214,7 @@ namespace smt::noodler::regex {
          * @param[in] make_complement Whether to make complement of the passed @p expr instead.
          * @return The resulting regex.
          */
-        [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+        [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, ast_manager& m,
                                                  const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
     };
 

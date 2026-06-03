@@ -442,7 +442,7 @@ namespace smt::noodler::regex {
         return std::make_shared<Nfa>(std::move(results_stack.top()));
     }
 
-    [[nodiscard]] std::shared_ptr<const Nfa> NfaConstructor::conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
+    [[nodiscard]] std::shared_ptr<const Nfa> NfaConstructor::conv_to_nfa(app *expression, const seq_util& m_util_s, ast_manager& m,
                                   const Alphabet& alphabet, bool determinize, bool make_complement) {
         if (!aut_cache.contains(alphabet)) {
             aut_cache[alphabet] = {};
@@ -468,6 +468,7 @@ namespace smt::noodler::regex {
         } else {
             final_result = create_nfa_for_expr(expression, m_util_s, m, alphabet);
             initial_auts_cache[expression] = final_result;
+            pinned_refs.push_back(app_ref(expression, m));
         }
 
         if(determinize && !make_complement) { // if we need to complement, we will determinize anyway

@@ -308,7 +308,7 @@ namespace smt::noodler {
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
         /**
-         * @brief Find dependencies among inclusion
+         * @brief Find dependencies among inclusion (edges of the inclusion graph)
          * 
          * @return A list where each index represents a node in the inclusion graph,
          *  storing the indexes of the nodes it directly includes 
@@ -323,42 +323,77 @@ namespace smt::noodler {
          */
         std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> *adjacency_list);
 
-        /// struct for atoms in cycled inclusions
+        /// @brief struct for atoms in cycled inclusions solving used in atomic equations
         struct Atom {
-            BasicTerm var;
-            int index;
+            BasicTerm term; // Term from which the atom is created
+            int index; // Relative index of the atom in the term
 
-            Atom(BasicTerm v, int i) : var(v), index(i) {}
+            Atom(BasicTerm t, int i) : term(t), index(i) {}
 
             bool operator==(const Atom& other) const {
-                return var == other.var && index == other.index;
+                return term == other.term && index == other.index;
             }
 
             bool operator<(const Atom& other) const {
-                if (var < other.var) return true;
-                if (other.var < var) return false;
+                if (term < other.term) return true;
+                if (other.term < term) return false;
                 return index < other.index;
             }
         };
-       
+
+        /// @brief Data used for solving the atomic equation and getting correct word assigment
+        struct AtomicEquationContext
+        {
+            std::vector<Atom> *left_side; // Atoms on the left side of the atomic equation
+            std::vector<Atom> *right_side; // Atoms on the right side of the atomic equation
+
+            std::set<Atom> *T; //Atom subset for tracking progress
+            unsigned int *T_max_size; //Count of all atoms in the atomic equation
+
+            std::map<BasicTerm, mata::Word> *scc_solution; // Resulting assigment for each term in scc
+        };
+
         /**
          * @brief Updates the word assignment for the variable at position 
          *        @p p by copying the aligned slice from the opposite side, then removes its stale suffix atoms from @p T.
          * 
-         * @param p              Index of the half-full position in left_side/right_side.
-         * @param missing_left   True if the missing atom is on the left side, false if on the right.
-         * @param left_side      Atom sequence for the left-hand side of the equation.
-         * @param right_side     Atom sequence for the right-hand side of the equation.
-         * @param scc_solution   Variable-to-word mapping
-         * @param T              Resolved atom set
+         * @param p                 Index of the half-full position in left_side/right_side.
+         * @param missing_left      True if the missing atom is on the left side, false if on the right.
          */
-        void get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side, const std::vector<Atom>& right_side,
-                    std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T);
+        void get_assignment(int p, bool missing_left, AtomicEquationContext equation_context);
 
         /**
          * @brief Determines if the atom pair on the same index @p idx is half full (exactly one of them is in @p T)
          */
         bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
+
+        /** @brief Split terms in the inclusion to atoms, 
+                create left and right side of the atomic equation and assign some random shortest word to each variable
+        */
+        void create_atomic_equation(Predicate incl, AtomicEquationContext equation_context);
+
+        /**
+         * Computing model for cycle based on theorems 1 and 2 in paper "Word equations in synergy with regular constraints
+         * (extended version) https://doi.org/10.1007/s10601-025-09379-w.
+         * 
+         * Algorithm is then specifically implemented from lemmas 3 and 4, where we take a set of inclusions that are cyclically
+         * dependent on each other and create a "atomic equation". We find a random shortest word for each variable and split it
+         * based on its length to atoms, then we put together all atoms on the right and left sides of the inclusions to create the equation.
+         * 
+         * In the atomic equation we recognize three states of a pair of atoms at a specific index:
+         * - Full: Both of the atoms are already in the subset for resolved atoms called T
+         * - Half-full: One of the atoms atoms in T and the other one outside, a missing atom 
+         * - Empty: None of the atoms was yet resolved (both are 'missing')
+         * 
+         * To find the correct word for each variable we repeat the following until all positions are full:
+         * - If a half-full position exists, take the leftmost one, update the variable owning
+         *   the missing atom by copying the aligned slice from the opposite side (Lemma 4).
+         * - If no half-full position exists, pick any unresolved atom from an empty position
+         *   and add it to T without changing any assignment (Lemma 3).
+         * 
+         * @param scc Indexes of strongly connected inclusions for a given inclusion 
+         */
+        void get_model_for_cycle(std::vector<int> *scc);
 
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;

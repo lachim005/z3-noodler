@@ -1294,21 +1294,8 @@ namespace smt::noodler {
 
         //Look for all edges in the inclusion graph
         std::vector<std::vector<int>> adjacency_list = find_graph_edges();
-    
-        STRACE(str_scc_debug,
-            int idx = 0;
-            tout << "Adjacency of all inclusions:" << std::endl;
-            for(std::vector<int> x : adjacency_list){
-                tout << idx << " = ";
-                for (const auto& val : x) {
-                    tout << val << " ";
-                }
-                tout << std::endl; 
-                idx++;
-            }
-        );
         
-        //Find all scc in depentent inclusions 
+        //Find all strongly connected components (cycles) in the inclusion graph
         std::vector<std::vector<int>> sccs = tarjan(&adjacency_list);
 
         STRACE(str_scc_debug,
@@ -1324,210 +1311,35 @@ namespace smt::noodler {
             }
         );
 
-        //Get used alphabet
-        regex::Alphabet alph(solution.aut_ass.get_alphabet());
-
-        //Solve all SCC
+        //Get model for each cycle among the inclusions
         for(std::vector<int> scc_list : sccs){
+            //SCC of size one has just one inclusion and that is not a cycle
             if(scc_list.size() > 1){
-                std::vector<Atom> left_side;
-                std::vector<Atom> right_side;
-
-                std::set<Atom> T; //Atom subset for tracking progress
-                unsigned int T_max_size = 0;
-
-                // Resulting assigment for each term in scc
-                std::map<BasicTerm, mata::Word> scc_solution;
-
-                // Create atomic equations
-                STRACE(str_scc_debug, tout << "Creating atomic equations." << std::endl;);
-                for(int inclIdx: scc_list){
-
-                    Predicate incl = *next(solution.inclusions.begin(), inclIdx);
-                    for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Left)){ 
-                        //is var
-                        unsigned var_length = 0;
-                        if(var.is_variable()){
-                            const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_shortest_word(var_nfa);
-                            if (possible_w.has_value()) {
-                                mata::Word w = possible_w.value(); 
-                                
-                                //Add var to solution and inc T_max_size
-                                var_length = alph.get_string_from_mata_word(w).length();
-                                if(!scc_solution.count(var)){
-                                    scc_solution[var] = w;
-                                    T_max_size += var_length;
-                                }
-                            } else {
-                                STRACE(str_scc_debug, tout << "No shortest word exists!" << std::endl;);
-                                continue;
-                            }
-                        }
-                        //is literal
-                        else{
-                            //add literal to solution and inc T_max_size
-                            var_length = var.get_name().length();
-                            if(!scc_solution.count(var)){
-                                scc_solution[var] = util::get_mata_word_zstring(var.get_name());
-                                T_max_size += var_length;
-                            }
-                        }
-                        //Add atom to atomic equation (left side)
-                        for(unsigned idx = 0; idx < var_length; idx++){
-                            Atom a(var,idx);
-                            left_side.push_back(a);
-                        }
-                    }
-
-                    for(BasicTerm var: incl.get_side(Predicate::EquationSideType::Right)){
-                        //is var
-                        unsigned var_length = 0;
-                        if(var.is_variable()){
-                            const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(var);
-                            std::optional<mata::Word> possible_w = solution.aut_ass.at(var)->get_shortest_word(var_nfa);
-                            if (possible_w.has_value()) {
-                                mata::Word w = possible_w.value(); 
-                                
-                                //Add var to solution and inc T_max_size
-                                var_length = alph.get_string_from_mata_word(w).length();
-                                if(!scc_solution.count(var)){
-                                    scc_solution[var] = w;
-                                    T_max_size += var_length;
-                                }
-                            } else {
-                                STRACE(str_scc_debug, tout << "No shortest word exists!" << std::endl;);
-                                continue;
-                            }
-                        }
-                        //is literal
-                        else{
-                            //Add literal to solution and inc T_max_size
-                            var_length = var.get_name().length();
-                            if(!scc_solution.count(var)){
-                                scc_solution[var] = util::get_mata_word_zstring(var.get_name());
-                                T_max_size += var_length;
-                            }
-                        }
-                        //Add atom to atomic equation (right side)
-                        for(unsigned idx = 0; idx < var_length; idx++){
-                            Atom a(var,idx);
-                            right_side.push_back(a);
-                        }
-                    }
-                }
-                       
-                STRACE(str_scc_debug, 
-                    int idx;
-                    tout << "Left side: " << std::endl;
-                    for(const Atom atom : left_side)
-                    {
-                        tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
-                    }
-                    tout << std::endl;
-                    tout << "Right side: " << std::endl;
-                    for(const Atom atom : right_side)
-                    {
-                        tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
-                    }
-                    tout << std::endl;
-                );
-
-                STRACE(str_scc_debug,
-                    tout << "Random Assignment for all variables:" << std::endl;
-                    for(auto const& [var, word] : scc_solution)
-                    {
-                        tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
-                    }
-                
-                    tout << "Started resolving atomic equations" << std::endl;
-                );
-                
-                // Find correct words
-                while(T.size() < T_max_size){
-                    STRACE(str_scc_debug, tout << "T: "<< T.size() << "/" << T_max_size << std::endl;);
-                    
-                    // Get leftmost half full atom pair's index
-                    int left_most_index = -1;
-                    for (int i = 0; i < left_side.size(); i++) {
-                        if (isHalfFull(left_side, right_side, i, T))
-                        {
-                            left_most_index = i;
-                            break;
-                        }
-                    }
-
-                    STRACE(str_scc_debug, tout << "left_most_index: " << left_most_index << std::endl;);
-                    STRACE(str_scc_debug, 
-                         tout << "Elements in T: " << left_most_index << std::endl;
-                        for (const auto& atom : T) {
-                            tout << "[" << atom.var.get_name() << " , " << atom.index  << "] ";
-                        });
-                    
-                    // If there is a half full atom pair
-                    if (left_most_index != -1) {
-                        bool missing_left = !T.count(left_side[left_most_index]);
-                        Atom add_atom = missing_left
-                            ? left_side[left_most_index]
-                            : right_side[left_most_index];
-                        
-                        // update the variable's word by copying from the opposite side,
-                        // then mark the newly resolved atom as part of T.
-                        get_assignment(left_most_index, missing_left, left_side, right_side,
-                                        &scc_solution, &T);
-                        
-                        // Insert atom to T
-                        T.insert(add_atom);
-
-                    } 
-                    // If there is no half full pair in the equation
-                    else {
-                        // Add any unresolved atom — consistency is preserved regardless of which atom we pick here.
-                        for (unsigned pos = 0; pos < left_side.size(); pos++) {
-                            if (!T.count(left_side[pos])) {
-                                T.insert(left_side[pos]);
-                                break;
-                            }
-                            if (!T.count(right_side[pos])) {
-                                T.insert(right_side[pos]);
-                                break;
-                            }
-                        }
-                    }                   
-                }
-
-                STRACE(str_scc_debug, tout << "Var Assigment!" << std::endl;);
-                for(auto const& [var, word] : scc_solution){
-                    STRACE(str_scc_debug, if(var.is_variable()) tout << var.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;);
-                    if(var.is_variable()){
-                        update_model_and_aut_ass(var, alph.get_string_from_mata_word(word));
-                    }
-                }
-
+                get_model_for_cycle(&scc_list);
             }
-        }   
-
+        }
     }
 
     std::vector<std::vector<int>> DecisionProcedure::find_graph_edges() {
         std::vector<std::vector<int>> adjacency_list;
         //Look throught all inclusions for variable matches
-        int idxRight = 0;
-        int idxLeft = 0;
+        int idx_right = 0;
+        int idx_left = 0;
         
         //foreach inclusion's right side
-        for (Predicate inclLeft : solution.inclusions) {
+        for (Predicate incl_left : solution.inclusions) {
             adjacency_list.push_back({});
 
             //pair with each inclusion's left side
-            idxRight = 0;
-           for(Predicate inclRight : solution.inclusions){
+            idx_right = 0;
+            for(Predicate incl_right : solution.inclusions){
                 //Is there an edge from L -> R
-                if(solution.is_dependent(inclLeft.get_side_vars(Predicate::EquationSideType::Left), inclRight.get_side_vars(Predicate::EquationSideType::Right)))
-                    adjacency_list[idxLeft].push_back(idxRight);           
-                idxRight++;
-           }
-           idxLeft++;
+                if(solution.is_dependent(incl_left.get_side_vars(Predicate::EquationSideType::Left),
+                    incl_right.get_side_vars(Predicate::EquationSideType::Right)))
+                    adjacency_list[idx_left].push_back(idx_right);           
+                idx_right++;
+            }
+           idx_left++;
         }
         return adjacency_list;
     }
@@ -1590,38 +1402,37 @@ namespace smt::noodler {
         return result;
     }
 
-    void DecisionProcedure::get_assignment(int p, bool missing_left, const std::vector<Atom>& left_side,
-        const std::vector<Atom>& right_side, std::map<BasicTerm, mata::Word>* scc_solution, std::set<Atom> *T) {
-        Atom missing_atom = missing_left ? left_side[p] : right_side[p];
+    void DecisionProcedure::get_assignment(int p, bool missing_left, AtomicEquationContext equation_context) {
+        Atom missing_atom = missing_left ? (*equation_context.left_side)[p] : (*equation_context.right_side)[p];
         
         // Var that would be changed
-        BasicTerm changed_var = missing_atom.var;
+        BasicTerm changed_var = missing_atom.term;
 
         // Get word from opposite side
-        std::vector<Atom> opposite_side = missing_left ? right_side : left_side;
+        std::vector<Atom> opposite_side = missing_left ? *equation_context.right_side : *equation_context.left_side;
         mata::Word opposite_word;
 
         for (const Atom &atom_at_idx : opposite_side) {
             // Concat word
-            const mata::Word& word = (*scc_solution)[atom_at_idx.var];
+            const mata::Word& word = (*equation_context.scc_solution)[atom_at_idx.term];
             opposite_word.push_back(word[atom_at_idx.index]);
         }
         
         // Get word for var (change scc_solution)
         int start_in_pattern = p - missing_atom.index;
-        int var_length = (*scc_solution)[changed_var].size(); 
+        int var_length = (*equation_context.scc_solution)[changed_var].size(); 
 
         mata::Word new_word_for_var;
         for (int i = 0; i < var_length; i++) {
             new_word_for_var.push_back(opposite_word[start_in_pattern + i]);
         }
-        (*scc_solution)[changed_var] = new_word_for_var;
+        (*equation_context.scc_solution)[changed_var] = new_word_for_var;
 
-        // Remove atoms from T  
-        auto it = T->begin();
-        while (it != T->end()) {
-            if (it->var == changed_var && it->index > missing_atom.index)
-                it = T->erase(it);
+        // Remove atoms of resolved variable that were already in T with a higher relative index than the new atom  
+        auto it = equation_context.T->begin();
+        while (it != equation_context.T->end()) {
+            if (it->term == changed_var && it->index > missing_atom.index)
+                it = equation_context.T->erase(it);
             else
                 ++it;
         }
@@ -1629,13 +1440,149 @@ namespace smt::noodler {
 
     bool DecisionProcedure::isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, 
         int idx, const std::set<Atom>& T) {
-        bool is_left_atom = T.count(left_side[idx]);
-        bool is_right_atom = T.count(right_side[idx]);
+        // Check if atoms on specific index in atomic equation are in T 
+        bool is_left_atom = T.contains(left_side[idx]);
+        bool is_right_atom = T.contains(right_side[idx]);
+        // Return true if just one of the atomic pair is in T
         if((is_left_atom && !is_right_atom) || (!is_left_atom && is_right_atom))
             return true;
         else
             return false;
     }
+
+    void DecisionProcedure::create_atomic_equation(Predicate incl, AtomicEquationContext equation_context){
+        // Map the side type to a pointer of its corresponding target vector
+        std::pair<Predicate::EquationSideType, std::vector<Atom>*> side_configs[] = {
+            {Predicate::EquationSideType::Left, equation_context.left_side},
+            {Predicate::EquationSideType::Right, equation_context.right_side}
+        };
+
+        // Iterate through the configs: first Left, then Right
+        for(const auto& [side, target_collection_ptr] : side_configs) {
+            std::vector<Atom>& target_collection = *target_collection_ptr; // Dereference for cleaner syntax below
+            
+            for(BasicTerm term: incl.get_side(side)) {
+                mata::Word some_shortest_word;
+                
+                //If random word was already assigned to var than use it to create atoms 
+                if(equation_context.scc_solution->contains(term)) {
+                    some_shortest_word = (*equation_context.scc_solution)[term];
+                } 
+                else {
+                    //Else if the term is a variable find a random shortest word
+                    if(term.is_variable()) {
+                        const mata::nfa::Nfa& var_nfa = *solution.aut_ass.at(term);
+                        some_shortest_word = solution.aut_ass.at(term)->get_shortest_word(var_nfa).value();
+                    } 
+                    // For literal use their name for creating atoms
+                    else {
+                        some_shortest_word = util::get_mata_word_zstring(term.get_name());
+                    }
+                    
+                    //Store newly found word and icrement T_max_size
+                    (*equation_context.scc_solution)[term] = some_shortest_word;
+                    *equation_context.T_max_size += some_shortest_word.size();
+                }
+                
+                // Add atoms to right side of the atomic equation
+                for(unsigned idx = 0; idx < some_shortest_word.size(); idx++) {
+                    target_collection.emplace_back(term, idx);
+                }
+            }
+        }
+    }
+
+    void DecisionProcedure::get_model_for_cycle(std::vector<int> *scc){
+        //Get alphabet used for strace debugging and model updating
+        const regex::Alphabet& alph(solution.aut_ass.get_alphabet());
+
+        std::vector<Atom> left_side;
+        std::vector<Atom> right_side;
+
+        std::set<Atom> T; //Atom subset for tracking progress
+        unsigned int T_max_size = 0; //Count of all atoms in the atomic equations
+
+        // Resulting assigment for each term in scc
+        std::map<BasicTerm, mata::Word> scc_solution;
+        
+        // Fill helper struct used for clean parameter passing
+        AtomicEquationContext atomic_equation_context;
+        atomic_equation_context.left_side =  &left_side;
+        atomic_equation_context.right_side =  &right_side;
+        atomic_equation_context.T = &T;
+        atomic_equation_context.T_max_size = &T_max_size;
+        atomic_equation_context.scc_solution = &scc_solution; 
+
+        // Create atomic equations
+        STRACE(str_scc_debug, tout << "Creating atomic equations." << std::endl;);
+        for(int incl_idx: *scc){
+
+            Predicate incl = *next(solution.inclusions.begin(), incl_idx);
+            create_atomic_equation(incl, atomic_equation_context);
+        }
+                
+
+        STRACE(str_scc_debug,
+            tout << "Random Assignment for all variables:" << std::endl;
+            for(auto const& [term, word] : scc_solution)
+            {
+                tout << term.get_name() << " - " << alph.get_string_from_mata_word(word) << std::endl;
+            }
+        
+            tout << "Started resolving atomic equations" << std::endl;
+        );
+        
+        // Find correct word assigment for all vars in SCC
+        while(T.size() < T_max_size){            
+            // Get leftmost half full atom pair's index
+            int left_most_index = -1;
+            for (int i = 0; i < left_side.size(); i++) {
+                if (isHalfFull(left_side, right_side, i, T))
+                {
+                    left_most_index = i;
+                    break;
+                }
+            }
+            
+            // If there is a half full atom pair
+            if (left_most_index != -1) {
+                bool missing_left = !T.count(left_side[left_most_index]);
+                Atom add_atom = missing_left
+                    ? left_side[left_most_index]
+                    : right_side[left_most_index];
+                
+                // Update the variable's word by copying from the opposite side, 
+                // and remove all atoms of resolved variable with higher index from T
+                get_assignment(left_most_index, missing_left, atomic_equation_context);
+                
+                // Insert the newly resolved atom to T
+                T.insert(add_atom);
+
+            } 
+            // If there is no half full pair in the equation
+            else {
+                // Add any unresolved atom — consistency is preserved regardless of which atom we pick here
+                for (unsigned pos = 0; pos < left_side.size(); pos++) {
+                    if (!T.count(left_side[pos])) {
+                        T.insert(left_side[pos]);
+                        break;
+                    }
+                    if (!T.count(right_side[pos])) {
+                        T.insert(right_side[pos]);
+                        break;
+                    }
+                }
+            }                   
+        }
+
+        //Update the model with correct word for each variable 
+        for(auto const& [term, word] : scc_solution){
+            if(term.is_variable()){
+                update_model_and_aut_ass(term, alph.get_string_from_mata_word(word));
+            }
+        }
+    }
+
 
     zstring DecisionProcedure::get_model(BasicTerm var, const std::map<BasicTerm,rational>& arith_model) {
         init_model(arith_model);

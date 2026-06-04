@@ -756,11 +756,11 @@ namespace smt::noodler::ca {
      * @brief Heuristic for not-contains when every variable's language is of the form w* for some word w.
      *
      * If all variables occurring in @p not_contains_predicates have a language of the form w* (a simple
-     * word-power language), not-contains(haystack, needle) is guaranteed to hold whenever |needle| > |haystack|.
-     * The returned formula captures exactly this sufficient condition.
+     * word-power language) and all share the same base word w, then not-contains(haystack, needle)
+     * is equivalent to |needle| > |haystack| (since haystack = w^k and needle = w^j, and w^j is a substring
+     * of w^k iff j <= k).
      *
-     * @return The formula |needle| > |haystack| (as an underapproximation) if the heuristic applies,
-     *         or std::nullopt otherwise.
+     * @return The formula |needle| > |haystack| if the heuristic applies, or std::nullopt otherwise.
      */
     std::optional<LenNode> try_notcontains_word_power_heuristic(const std::vector<Predicate>& not_contains_predicates, const AutAssignment& aut_assignment) {
         // Require every variable across all predicates to be a power of the *same* base word w.

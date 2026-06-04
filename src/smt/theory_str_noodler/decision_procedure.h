@@ -321,7 +321,7 @@ namespace smt::noodler {
          * @param adjacency_list Indexes of directly connected inclusions for each inclusion
          * @return Strongly connected components for each inclusion
          */
-        std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> *adjacency_list);
+        std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> &adjacency_list);
 
         /// @brief struct for atoms in cycled inclusions solving used in atomic equations
         struct Atom {
@@ -344,41 +344,48 @@ namespace smt::noodler {
         /// @brief Data used for solving the atomic equation and getting correct word assigment
         struct AtomicEquationContext
         {
-            std::vector<Atom> *left_side; // Atoms on the left side of the atomic equation
-            std::vector<Atom> *right_side; // Atoms on the right side of the atomic equation
+            std::vector<Atom> left_side; // Atoms on the left side of the atomic equation
+            std::vector<Atom> right_side; // Atoms on the right side of the atomic equation
 
-            std::set<Atom> *T; //Atom subset for tracking progress
-            unsigned int *T_max_size; //Count of all atoms in the atomic equation
+            std::set<Atom> solved_atoms; //Atom subset for tracking progress
+            unsigned int num_of_atoms = 0; //Count of all unique atoms in the atomic equation
 
-            std::map<BasicTerm, mata::Word> *scc_solution; // Resulting assigment for each term in scc
+            std::map<BasicTerm, mata::Word> scc_solution; // Resulting assigment for each term in scc
         };
 
         /**
          * @brief Updates the word assignment for the variable at position 
          *        @p p by copying the aligned slice from the opposite side, then removes its stale suffix atoms from @p T.
          * 
-         * @param p                 Index of the half-full position in left_side/right_side.
-         * @param missing_left      True if the missing atom is on the left side, false if on the right.
+         * @param position          Index of the half-full position in left_side/right_side.
+         * @param missing_side      Side of the atomic equation on which the atomis not in solved_atoms
          */
-        void get_assignment(int p, bool missing_left, AtomicEquationContext equation_context);
+        void synchronize_word_on_position(int position, Predicate::EquationSideType missing_side, AtomicEquationContext& equation_context);
 
         /**
          * @brief Determines if the atom pair on the same index @p idx is half full (exactly one of them is in @p T)
          */
-        bool isHalfFull(const std::vector<Atom>& left_side, const std::vector<Atom>& right_side, int idx, const std::set<Atom>& T);
-
-        /** @brief Split terms in the inclusion to atoms, 
-                create left and right side of the atomic equation and assign some random shortest word to each variable
-        */
-        void create_atomic_equation(Predicate incl, AtomicEquationContext equation_context);
+        bool is_half_full(int position, const AtomicEquationContext& equation_context);
 
         /**
-         * Computing model for cycle based on theorems 1 and 2 in paper "Word equations in synergy with regular constraints
-         * (extended version) https://doi.org/10.1007/s10601-025-09379-w.
+         * @brief Split terms in the inclusion to atoms, 
+         * create left or right side of the atomic equation and assign some random shortest word to each variable
+         * 
+         * @param incl Inclusion from which we are creating the equation
+         * @param inclusion_side Which side of the equation do we create
+         */
+        void get_side_of_atomic_equation(const Predicate& incl, Predicate::EquationSideType inclusion_side, AtomicEquationContext& equation_context);
+
+        /**
+         * Initialize models of variables occuring in an SCC of the inclusion graph based on theorems 1 and 2 in paper
+         * "Word equations in synergy with regular constraints (extended version)", see https://doi.org/10.1007/s10601-025-09379-w.
          * 
          * Algorithm is then specifically implemented from lemmas 3 and 4, where we take a set of inclusions that are cyclically
-         * dependent on each other and create a "atomic equation". We find a random shortest word for each variable and split it
+         * dependent on each other and create an "atomic equation". We find a random shortest word for each variable and split it
          * based on its length to atoms, then we put together all atoms on the right and left sides of the inclusions to create the equation.
+         * For example, if the SCC contains inclusions "xy ⊆ zx", "zx ⊆ xy", "yy ⊆ zz", "zz ⊆ yy", we have two equations
+         * "xy = zx" and "yy = zz" (both inclusions of each equations should be in the SCC), and we join them into
+         * one equation "xyyy = zxzz" for which we want to get the model (using the shortest words).
          * 
          * In the atomic equation we recognize three states of a pair of atoms at a specific index:
          * - Full: Both of the atoms are already in the subset for resolved atoms called T
@@ -388,12 +395,12 @@ namespace smt::noodler {
          * To find the correct word for each variable we repeat the following until all positions are full:
          * - If a half-full position exists, take the leftmost one, update the variable owning
          *   the missing atom by copying the aligned slice from the opposite side (Lemma 4).
-         * - If no half-full position exists, pick any unresolved atom from an empty position
+         * - If no half-full position exists, pick leftmost unresolved atom from an empty position
          *   and add it to T without changing any assignment (Lemma 3).
          * 
          * @param scc Indexes of strongly connected inclusions for a given inclusion 
          */
-        void get_model_for_cycle(std::vector<int> *scc);
+        void get_model_for_cyclic_SCC(const std::vector<int> &scc);
 
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;

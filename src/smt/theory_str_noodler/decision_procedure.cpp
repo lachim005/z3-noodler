@@ -1447,7 +1447,7 @@ namespace smt::noodler {
     }
 
     void DecisionProcedure::get_side_of_atomic_equation(const Predicate& incl, Predicate::EquationSideType inclusion_side, AtomicEquationContext& equation_context){            
-        for(BasicTerm term: incl.get_side(inclusion_side)) {
+        for (const BasicTerm& term: incl.get_side(inclusion_side)) {
             mata::Word some_shortest_word;
             
             //If random word was already assigned to var than use it to create atoms 

@@ -84,6 +84,7 @@ namespace smt::noodler {
         arith_util m_util_a;
         seq_util m_util_s;
         seq_factory* m_seq_factory = nullptr;
+        regex::NfaConstructor nfa_constructor{};
 
         // has input formula quantifiers?
         bool input_has_quantifiers = false;

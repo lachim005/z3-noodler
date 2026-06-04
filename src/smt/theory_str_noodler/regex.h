@@ -1,8 +1,12 @@
 #ifndef _NOODLER_REGEX_H_
 #define _NOODLER_REGEX_H_
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <list>
+#include <mata/alphabet.hh>
 #include <set>
 #include <stack>
 #include <map>
@@ -53,22 +57,34 @@ namespace smt::noodler::regex {
         std::set<mata::Symbol> alphabet;
         mata::EnumAlphabet mata_alphabet;
 
+        uint64_t hash = 0;
+        inline void add_or_remove_from_hash(mata::Symbol s) {
+            // FX Hash (rolling hash function)
+            uint64_t x = s;
+            const uint64_t k = 0x517cc1b727220a95ULL;
+            hash ^= (x ^ (x >> 32)) * k;
+        }
+
     public:
         Alphabet() = default;
         Alphabet(const Alphabet&) = default;
         Alphabet(Alphabet&&) = default;
         Alphabet& operator=(const Alphabet&) = default;
         Alphabet& operator=(Alphabet&&) = default;
+        inline bool operator==(const Alphabet& a) const { return alphabet == a.alphabet; }
+        inline uint64_t get_hash() const { return hash; }
 
         Alphabet(mata::EnumAlphabet alph) : alphabet(), mata_alphabet(std::move(alph)) {
             for (const mata::Symbol& s : mata_alphabet.get_alphabet_symbols()) {
                 alphabet.insert(s);
+                add_or_remove_from_hash(s);
             }
         }
         
         Alphabet(std::set<mata::Symbol> alph) : alphabet(std::move(alph)) {
             for (const auto& symbol : alphabet) {
                 this->mata_alphabet.add_new_symbol(symbol);
+                add_or_remove_from_hash(symbol);
             }
         }
 
@@ -80,6 +96,7 @@ namespace smt::noodler::regex {
         void clear() {
             alphabet.clear();
             mata_alphabet.clear();
+            hash = 0;
         }
 
         size_t size() const { return alphabet.size(); }
@@ -88,7 +105,9 @@ namespace smt::noodler::regex {
 
         void insert(const mata::Symbol s) {
             SASSERT(s <= zstring::max_char() || s == util::get_dummy_symbol());
-            alphabet.insert(s);
+            if (alphabet.insert(s).second) {
+                add_or_remove_from_hash(s);
+            }
             mata_alphabet.add_new_symbol(s);
         }
 
@@ -103,7 +122,9 @@ namespace smt::noodler::regex {
         bool contains(const mata::Symbol s) const { return alphabet.contains(s); }
 
         void erase(const mata::Symbol s) {
-            alphabet.erase(s);
+            if (alphabet.erase(s) > 0) {
+                add_or_remove_from_hash(s);
+            }
             mata_alphabet.erase(s);
         }
 
@@ -144,6 +165,15 @@ namespace smt::noodler::regex {
     };
 
     /**
+     * @brief Can be used in hash tables for hashing alphabets
+     */
+    struct AlphabetHasher {
+        std::size_t operator()(const Alphabet& k) const {
+            return k.get_hash();
+        }
+    };
+
+    /**
      * Extract symbols from a given expression @p ex. Append to the output parameter @p alphabet.
      * @param[in] ex Expression to be checked for symbols.
      * @param[in] m_util_s Seq util for AST.
@@ -151,17 +181,42 @@ namespace smt::noodler::regex {
      */
     void extract_symbols(expr* const ex, const seq_util& m_util_s, Alphabet& alphabet);
 
-    /**
-     * Convert expression @p expr to NFA.
-     * @param[in] expression Expression to be converted to NFA.
-     * @param[in] m_util_s Seq util for AST.
-     * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
-     * @param[in] determinize Determinize intermediate automata
-     * @param[in] make_complement Whether to make complement of the passed @p expr instead.
-     * @return The resulting regex.
-     */
-    [[nodiscard]] mata::nfa::Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                             const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
+    class NfaConstructor {
+    private:
+        using Nfa = mata::nfa::Nfa;
+        /// Used internaly by conv_to_nfa when the automaton isn't in a cache
+        [[nodiscard]] std::shared_ptr<Nfa> create_nfa_for_expr(app *expression, const seq_util& m_util_s, const ast_manager& m, const Alphabet& alphabet);
+
+        // For every alphabet, we have 3 caches
+        // One is used for the automata representing the given expression
+        // The other two are for their complemented and determinized versions
+        enum {
+            INITIAL_CACHE,
+            DETERMINIZED_CACHE,
+            COMPLEMENTED_CACHE,
+            N_CACHES
+        };
+        using CacheForAlphabet = std::array<std::unordered_map<app*, std::shared_ptr<const Nfa>>, N_CACHES>;
+        using AutomataCache = std::unordered_map<Alphabet, CacheForAlphabet, AlphabetHasher>;
+
+        AutomataCache aut_cache;
+        // For each app* key in the automata cache, we also store a reference to it to ensure
+        // the pointer doesn't get garbage collected, which could cause problems if you are very unlucky
+        std::vector<app_ref> pinned_refs{};
+
+    public:
+        /**
+         * Convert expression @p expr to NFA.
+         * @param[in] expression Expression to be converted to NFA.
+         * @param[in] m_util_s Seq util for AST.
+         * @param[in] alphabet Alphabet to be used in re.allchar (SMT2: '.') expressions.
+         * @param[in] determinize Determinize intermediate automata
+         * @param[in] make_complement Whether to make complement of the passed @p expr instead.
+         * @return The resulting regex.
+         */
+        [[nodiscard]] std::shared_ptr<const mata::nfa::Nfa> conv_to_nfa(app *expression, const seq_util& m_util_s, ast_manager& m,
+                                                 const Alphabet& alphabet, bool determinize = false, bool make_complement = false);
+    };
 
     /**
      * @brief Get basic information about the regular expression in the form of RegexInfo (see the description above). 
@@ -296,7 +351,9 @@ namespace smt::noodler::regex {
      * @param mata_alph Mata alphabet containing symbols from the current instance
      * @param[out] transducer_preds Newly created transducer constraints
      */
-    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, Formula& transducer_preds);
+    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s,
+            obj_map<expr, expr*>& pred_replace, const Alphabet& mata_alph, NfaConstructor &nfa_constructor,
+            Formula& transducer_preds);
 
 }
 

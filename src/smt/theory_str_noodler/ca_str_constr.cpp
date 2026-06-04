@@ -767,22 +767,21 @@ namespace smt::noodler::ca {
         // Under this condition not-contains(haystack, needle) holds iff |needle| > |haystack|:
         // haystack = w^k, needle = w^j, and w^j is a substring of w^k iff j <= k.
         std::optional<mata::Word> common_base;
+
+        std::set<BasicTerm> used_terms;
         for (const Predicate& pred : not_contains_predicates) {
-            for (const BasicTerm& t : pred.get_haystack()) {
-                if (!aut_assignment.contains(t)) return std::nullopt;
-                auto base = aut_assignment.get_word_power_base(t);
-                if (!base.has_value()) return std::nullopt;
-                if (!common_base.has_value()) common_base = base;
-                else if (*common_base != *base) return std::nullopt;
-            }
-            for (const BasicTerm& t : pred.get_needle()) {
-                if (!aut_assignment.contains(t)) return std::nullopt;
-                auto base = aut_assignment.get_word_power_base(t);
-                if (!base.has_value()) return std::nullopt;
-                if (!common_base.has_value()) common_base = base;
-                else if (*common_base != *base) return std::nullopt;
-            }
+            used_terms.insert(pred.get_haystack().begin(), pred.get_haystack().end());
+            used_terms.insert(pred.get_needle().begin(), pred.get_needle().end());
         }
+
+        for (const BasicTerm& t : used_terms) {
+            if (!aut_assignment.contains(t)) return std::nullopt;
+            auto base = aut_assignment.get_word_power_base(t);
+            if (!base.has_value()) return std::nullopt;
+            if (!common_base.has_value()) common_base = base;
+            else if (*common_base != *base) return std::nullopt;
+        }
+
         if (!common_base.has_value()) return std::nullopt;
         return try_making_rhs_longer_than_lhs(not_contains_predicates, aut_assignment);
     }

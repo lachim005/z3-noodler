@@ -276,7 +276,7 @@ namespace smt::noodler {
             word.push_back(sym_post.symbol);
             mata::nfa::State next = *sym_post.targets.begin();
             if (next == start) return word;                 // closed simple cycle — return base word
-            if (visited.count(next)) return std::nullopt;  // premature cycle not through start
+            if (visited.contains(next)) return std::nullopt;  // premature cycle not through start
             visited.insert(next);
             cur = next;
         }

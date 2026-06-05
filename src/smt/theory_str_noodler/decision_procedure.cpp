@@ -1420,8 +1420,8 @@ namespace smt::noodler {
         //Copy values from opposite side of the equation
         mata::Word new_word_for_var;
         for (int i = 0; i < var_length; i++) {
-
-            new_word_for_var.push_back(equation_context.scc_solution[opposite_side[start_in_pattern + i].term][opposite_side[start_in_pattern + i].index]);
+            const Atom& atom_on_opposite_side = opposite_side[start_in_pattern + i];
+            new_word_for_var.push_back(equation_context.scc_solution[atom_on_opposite_side.term][atom_on_opposite_side.index]);
         }
         equation_context.scc_solution[changed_var] = new_word_for_var;
 

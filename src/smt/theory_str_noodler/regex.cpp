@@ -1,4 +1,6 @@
 #include <cassert>
+#include <memory>
+#include <unordered_map>
 
 #include "util/z3_exception.h"
 
@@ -167,13 +169,12 @@ namespace smt::noodler::regex {
         }
     }
 
-    [[nodiscard]] Nfa conv_to_nfa(app *expression, const seq_util& m_util_s, const ast_manager& m,
-                                  const Alphabet& alphabet, bool determinize, bool make_complement) {
-
+    [[nodiscard]] std::shared_ptr<Nfa> NfaConstructor::create_nfa_for_expr(app *expression, const seq_util& m_util_s, const ast_manager& m,
+                                  const Alphabet& alphabet) {
         if (m_util_s.str.is_string_term(expression)) {
             zstring result;
             if (m_util_s.str.is_string(expression, result)) {
-                return AutAssignment::create_word_nfa(result);
+                return std::make_shared<Nfa>(AutAssignment::create_word_nfa(result));
             } else {
                 util::throw_error("We can convert to NFA only string literals");
             }
@@ -244,12 +245,7 @@ namespace smt::noodler::regex {
                 } else if (m_util_s.re.is_complement(cur_expr)) { // Handle complement.
                     SASSERT(num_of_regex_arguments_of_cur_expr == 1);
                     result = std::move(arg_nfas.at(0));
-                    if (cur_expr == expression) { // if we are processing root
-                        // According to make_complement, we do complement at the end, so we just invert it
-                        make_complement = !make_complement;
-                    } else {
-                        result = mata::nfa::complement(result, alphabet.get_mata_alphabet(), {{"algorithm", "classical"}});
-                    }
+                    result = mata::nfa::complement(result, alphabet.get_mata_alphabet(), {{"algorithm", "classical"}});
                 } else if (m_util_s.re.is_derivative(cur_expr)) { // Handle derivative.
                     util::throw_error("derivative is unsupported");
                 } else if (m_util_s.re.is_diff(cur_expr)) { // Handle diff.
@@ -443,26 +439,56 @@ namespace smt::noodler::regex {
         }
 
         SASSERT(results_stack.size() == 1);
+        return std::make_shared<Nfa>(std::move(results_stack.top()));
+    }
 
-        mata::nfa::Nfa final_result = std::move(results_stack.top());
+    [[nodiscard]] std::shared_ptr<const Nfa> NfaConstructor::conv_to_nfa(app *expression, const seq_util& m_util_s, ast_manager& m,
+                                  const Alphabet& alphabet, bool determinize, bool make_complement) {
+        if (!aut_cache.contains(alphabet)) {
+            aut_cache[alphabet] = {};
+        }
+        auto &cache_for_alphabet = aut_cache[alphabet];
+
+        // There are multiple caches (so we can cache the complemented and determinized automata),
+        // so we pick the correct one here
+        auto cache_index = make_complement ? COMPLEMENTED_CACHE :
+                           determinize ? DETERMINIZED_CACHE :
+                           INITIAL_CACHE;
+        auto &final_auts_cache = cache_for_alphabet[cache_index];
+
+        // Check if the automaton is in the proper cache
+        if (final_auts_cache.contains(expression)) return final_auts_cache[expression];
+
+        // For automata made before making their complements/determinization
+        auto &initial_auts_cache = cache_for_alphabet[INITIAL_CACHE];
+
+        std::shared_ptr<const Nfa> final_result;
+        if (initial_auts_cache.contains(expression)) {
+            final_result = initial_auts_cache[expression];
+        } else {
+            final_result = create_nfa_for_expr(expression, m_util_s, m, alphabet);
+            initial_auts_cache[expression] = final_result;
+            pinned_refs.push_back(app_ref(expression, m));
+        }
 
         if(determinize && !make_complement) { // if we need to complement, we will determinize anyway
-            STRACE(str_create_nfa_reduce, 
+            STRACE(str_create_nfa_reduce,
                 tout << "--------------" << "NFA for: " << mk_pp(const_cast<app*>(expression), const_cast<ast_manager&>(m)) << " that is going to be minimized" << "---------------" << std::endl;
                 tout << final_result;
             );
-            final_result = mata::nfa::minimize(final_result);
+            final_result = std::make_shared<Nfa>(mata::nfa::minimize(*final_result));
         }
 
         // Whether to create complement of the final automaton.
         if (make_complement) {
             STRACE(str_create_nfa, tout << "Complemented NFA:" << std::endl;);
-            final_result = mata::nfa::complement(final_result, alphabet.get_mata_alphabet(), { 
-                {"algorithm", "classical"}, 
+            final_result = std::make_shared<Nfa>(mata::nfa::complement(*final_result, alphabet.get_mata_alphabet(), { 
+                {"algorithm", "classical"},
                 //{"minimize", "true"} // it seems that minimizing during complement causes more TOs in benchmarks
-                });
+                }));
         }
 
+        final_auts_cache[expression] = final_result;
         STRACE(str_create_nfa, tout << final_result;);
         return final_result;
     }
@@ -1014,7 +1040,9 @@ namespace smt::noodler::regex {
         return result;
     }
 
-    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s, obj_map<expr, expr*>& pred_replace, const regex::Alphabet& alph, Formula& transducer_preds) {
+    void gather_transducer_constraints(app* ex, ast_manager& m, const seq_util& m_util_s,
+                                       obj_map<expr, expr*>& pred_replace, const regex::Alphabet& alph,
+                                       NfaConstructor &nfa_constructor, Formula& transducer_preds) {
         if (m_util_s.str.is_string(ex)) { // Handle string literals.
             return;
         }
@@ -1022,7 +1050,7 @@ namespace smt::noodler::regex {
         if (util::is_variable(ex)) {
             for (const auto& key_value : pred_replace) {
                 if (to_app(key_value.m_value) == ex) {
-                    gather_transducer_constraints(to_app(key_value.m_key), m, m_util_s, pred_replace, alph, transducer_preds);
+                    gather_transducer_constraints(to_app(key_value.m_key), m, m_util_s, pred_replace, alph, nfa_constructor, transducer_preds);
                 }
             }
             return;
@@ -1031,8 +1059,8 @@ namespace smt::noodler::regex {
         expr * a1 = nullptr, *a2 = nullptr, *a3 = nullptr;
 
         if (m_util_s.str.is_concat(ex, a1, a2)) {
-            gather_transducer_constraints(to_app(a1), m, m_util_s, pred_replace, alph, transducer_preds);
-            gather_transducer_constraints(to_app(a2), m, m_util_s, pred_replace, alph, transducer_preds);
+            gather_transducer_constraints(to_app(a1), m, m_util_s, pred_replace, alph, nfa_constructor, transducer_preds);
+            gather_transducer_constraints(to_app(a2), m, m_util_s, pred_replace, alph, nfa_constructor, transducer_preds);
             return;
         }
 
@@ -1076,7 +1104,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *nfa_constructor.conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::All);
                 ex = to_app(a1);
@@ -1087,7 +1115,7 @@ namespace smt::noodler::regex {
                 }
 
                 // construct NFA corresponding to the regex find
-                mata::nfa::Nfa find_nfa = conv_to_nfa(to_app(a2), m_util_s, m, alph);
+                mata::nfa::Nfa find_nfa = *nfa_constructor.conv_to_nfa(to_app(a2), m_util_s, m, alph);
 
                 find_and_replace.emplace_back(find_nfa, replace, mata::applications::strings::replace::ReplaceMode::Single);
                 ex = to_app(a1);
@@ -1098,7 +1126,7 @@ namespace smt::noodler::regex {
 
         if (!find_and_replace.empty()) {
             // recursively call on nested parameters
-            gather_transducer_constraints(ex, m, m_util_s, pred_replace, alph, transducer_preds);
+            gather_transducer_constraints(ex, m, m_util_s, pred_replace, alph, nfa_constructor, transducer_preds);
 
             // collect and replace replace_(re)_all argument with a concatenation of basic terms
             std::vector<BasicTerm> side {};

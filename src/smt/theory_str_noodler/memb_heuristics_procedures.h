@@ -20,14 +20,17 @@ namespace smt::noodler {
         expr_ref regex;
         bool is_regex_positive;
         const seq_util& m_util_s;
-        const ast_manager& m;
+        ast_manager& m;
+        regex::NfaConstructor &nfa_constructor;
         bool produce_model;
         std::unordered_set<BasicTerm> init_length_vars {};
 
         std::optional<zstring> model;
     public:
-        MembHeuristicProcedure(BasicTerm var, expr_ref regex, bool is_regex_positive, const seq_util& m_util_s, const ast_manager& m, bool produce_model)
-            : var(var), regex(regex), is_regex_positive(is_regex_positive), m_util_s(m_util_s), m(m), produce_model(produce_model) {}
+        MembHeuristicProcedure(BasicTerm var, expr_ref regex, bool is_regex_positive, const seq_util& m_util_s,
+                ast_manager& m, regex::NfaConstructor &nfa_constructor, bool produce_model)
+            : var(var), regex(regex), is_regex_positive(is_regex_positive), m_util_s(m_util_s), m(m),
+            nfa_constructor(nfa_constructor), produce_model(produce_model) {}
 
         lbool compute_next_solution() override;
 
@@ -43,14 +46,18 @@ namespace smt::noodler {
         std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag;
         regex::Alphabet alph;
         const seq_util& m_util_s;
-        const ast_manager& m;
+        ast_manager& m;
+        regex::NfaConstructor &nfa_constructor;
         bool produce_model;
         std::unordered_set<BasicTerm> init_length_vars {};
 
         std::map<BasicTerm, zstring> models;
     public:
-        MultMembHeuristicProcedure(std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag, regex::Alphabet alph, const seq_util& m_util_s, const ast_manager& m, bool produce_model)
-            : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s), m(m), produce_model(produce_model) {}
+        MultMembHeuristicProcedure(std::map<BasicTerm, std::vector<std::pair<bool,app*>>> var_to_list_of_regexes_and_complement_flag,
+                regex::Alphabet alph, const seq_util& m_util_s, ast_manager& m,
+                regex::NfaConstructor &nfa_constructor, bool produce_model)
+            : var_to_list_of_regexes_and_complement_flag(var_to_list_of_regexes_and_complement_flag), alph(alph), m_util_s(m_util_s),
+            m(m), nfa_constructor(nfa_constructor), produce_model(produce_model) {}
 
         lbool compute_next_solution() override;
 

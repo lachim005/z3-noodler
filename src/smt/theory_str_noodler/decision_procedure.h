@@ -385,7 +385,12 @@ namespace smt::noodler {
          * based on its length to atoms, then we put together all atoms on the right and left sides of the inclusions to create the equation.
          * For example, if the SCC contains inclusions "xy ⊆ zx", "zx ⊆ xy", "yy ⊆ zz", "zz ⊆ yy", we have two equations
          * "xy = zx" and "yy = zz" (both inclusions of each equations should be in the SCC), and we join them into
-         * one equation "xyyy = zxzz" for which we want to get the model (using the shortest words).
+         * one equation "xyyy = zxzz" for which we want to get the model (using the shortest words). Assume that
+         * shortest words accepted by x have length |x|=3 and by y and z to have length |y|=|z|=2. We therefore create
+         * for the left and the right side the following sequences of atoms:
+         * left side:  [x,0][x,1][x,2][y,0][y,1][y,0][y,1][y,0][y,1]
+         * right side:[z,0][z,1][x,0][x,1][x,2][z,0][z,1][z,0][z,1]
+         * where the opposite atoms (representing the value of variable on the position) must match.
          * 
          * In the atomic equation we recognize three states of a pair of atoms at a specific index:
          * - Full: Both of the atoms are already in the subset for resolved atoms called T

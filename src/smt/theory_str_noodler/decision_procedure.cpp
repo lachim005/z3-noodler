@@ -1464,7 +1464,7 @@ namespace smt::noodler {
                     some_shortest_word = util::get_mata_word_zstring(term.get_name());
                 }
                 
-                //Store newly found word and icrement T_max_size
+                //Store newly found word and icrement num_of_atoms
                 equation_context.scc_solution[term] = some_shortest_word;
                 equation_context.num_of_atoms += some_shortest_word.size();
             }

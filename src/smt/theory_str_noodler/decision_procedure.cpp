@@ -1327,12 +1327,12 @@ namespace smt::noodler {
         int idx_left = 0;
         
         //foreach inclusion's right side
-        for (Predicate incl_left : solution.inclusions) {
+        for (const Predicate& incl_left : solution.inclusions) {
             adjacency_list.push_back({});
 
             //pair with each inclusion's left side
             idx_right = 0;
-            for(Predicate incl_right : solution.inclusions){
+            for (const Predicate& incl_right : solution.inclusions){
                 //Is there an edge from L -> R
                 if(solution.is_dependent(incl_left.get_side_vars(Predicate::EquationSideType::Left),
                     incl_right.get_side_vars(Predicate::EquationSideType::Right)))

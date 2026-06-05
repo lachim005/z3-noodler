@@ -1413,7 +1413,7 @@ namespace smt::noodler {
         // Get word from opposite side
         std::vector<Atom> opposite_side = missing_side == Predicate::EquationSideType::Left
                                         ? equation_context.right_side : equation_context.left_side;
-                                                
+
         int start_in_pattern = position - missing_atom.index; // Get starting position of variable from which the missing atom is 
         int var_length = equation_context.scc_solution[changed_var].size(); // Length of the given variable (num of its atoms)
 
@@ -1421,7 +1421,7 @@ namespace smt::noodler {
         mata::Word new_word_for_var;
         for (int i = 0; i < var_length; i++) {
 
-            new_word_for_var.push_back(equation_context.scc_solution[opposite_side[start_in_pattern].term][start_in_pattern + i]);
+            new_word_for_var.push_back(equation_context.scc_solution[opposite_side[start_in_pattern + i].term][opposite_side[start_in_pattern + i].index]);
         }
         equation_context.scc_solution[changed_var] = new_word_for_var;
 

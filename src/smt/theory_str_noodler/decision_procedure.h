@@ -307,6 +307,106 @@ namespace smt::noodler {
          */
         void init_model(const std::map<BasicTerm,rational>& arith_model);
 
+        /**
+         * @brief Find dependencies among inclusion (edges of the inclusion graph)
+         * 
+         * @return A list where each index represents a node in the inclusion graph,
+         *  storing the indexes of the nodes it directly includes 
+         */
+        std::vector<std::vector<int>> find_graph_edges();
+
+        /**
+         * @brief Tarjans algorithm for finding SCC from inclusions
+         * 
+         * @param adjacency_list Indexes of directly connected inclusions for each inclusion
+         * @return Strongly connected components for each inclusion
+         */
+        std::vector<std::vector<int>> tarjan(const std::vector<std::vector<int>> &adjacency_list);
+
+        /// @brief struct for atoms in cycled inclusions solving used in atomic equations
+        struct Atom {
+            BasicTerm term; // Term from which the atom is created
+            int index; // Relative index of the atom in the term
+
+            Atom(BasicTerm t, int i) : term(t), index(i) {}
+
+            bool operator==(const Atom& other) const {
+                return term == other.term && index == other.index;
+            }
+
+            bool operator<(const Atom& other) const {
+                if (term < other.term) return true;
+                if (other.term < term) return false;
+                return index < other.index;
+            }
+        };
+
+        /// @brief Data used for solving the atomic equation and getting correct word assigment
+        struct AtomicEquationContext
+        {
+            std::vector<Atom> left_side; // Atoms on the left side of the atomic equation
+            std::vector<Atom> right_side; // Atoms on the right side of the atomic equation
+
+            std::set<Atom> solved_atoms; //Atom subset for tracking progress
+            unsigned int num_of_atoms = 0; //Count of all unique atoms in the atomic equation
+
+            std::map<BasicTerm, mata::Word> scc_solution; // Resulting assigment for each term in scc
+        };
+
+        /**
+         * @brief Updates the word assignment for the variable at position 
+         *        @p p by copying the aligned slice from the opposite side, then removes its stale suffix atoms from @p T.
+         * 
+         * @param position          Index of the half-full position in left_side/right_side.
+         * @param missing_side      Side of the atomic equation on which the atomis not in solved_atoms
+         */
+        void synchronize_word_on_position(int position, Predicate::EquationSideType missing_side, AtomicEquationContext& equation_context);
+
+        /**
+         * @brief Determines if the atom pair on the same index @p idx is half full (exactly one of them is in @p T)
+         */
+        bool is_half_full(int position, const AtomicEquationContext& equation_context);
+
+        /**
+         * @brief Split terms in the inclusion to atoms, 
+         * create left or right side of the atomic equation and assign some random shortest word to each variable
+         * 
+         * @param incl Inclusion from which we are creating the equation
+         * @param inclusion_side Which side of the equation do we create
+         */
+        void get_side_of_atomic_equation(const Predicate& incl, Predicate::EquationSideType inclusion_side, AtomicEquationContext& equation_context);
+
+        /**
+         * Initialize models of variables occuring in an SCC of the inclusion graph based on theorems 1 and 2 in paper
+         * "Word equations in synergy with regular constraints (extended version)", see https://doi.org/10.1007/s10601-025-09379-w.
+         * 
+         * Algorithm is then specifically implemented from lemmas 3 and 4, where we take a set of inclusions that are cyclically
+         * dependent on each other and create an "atomic equation". We find a random shortest word for each variable and split it
+         * based on its length to atoms, then we put together all atoms on the right and left sides of the inclusions to create the equation.
+         * For example, if the SCC contains inclusions "xy ⊆ zx", "zx ⊆ xy", "yy ⊆ zz", "zz ⊆ yy", we have two equations
+         * "xy = zx" and "yy = zz" (both inclusions of each equations should be in the SCC), and we join them into
+         * one equation "xyyy = zxzz" for which we want to get the model (using the shortest words). Assume that
+         * shortest words accepted by x have length |x|=3 and by y and z to have length |y|=|z|=2. We therefore create
+         * for the left and the right side the following sequences of atoms:
+         * left side:  [x,0][x,1][x,2][y,0][y,1][y,0][y,1][y,0][y,1]
+         * right side: [z,0][z,1][x,0][x,1][x,2][z,0][z,1][z,0][z,1]
+         * where the opposite atoms (representing the value of variable on the position) must match.
+         * 
+         * In the atomic equation we recognize three states of a pair of atoms at a specific index:
+         * - Full: Both of the atoms are already in the subset for resolved atoms called T
+         * - Half-full: One of the atoms atoms in T and the other one outside, a missing atom 
+         * - Empty: None of the atoms was yet resolved (both are 'missing')
+         * 
+         * To find the correct word for each variable we repeat the following until all positions are full:
+         * - If a half-full position exists, take the leftmost one, update the variable owning
+         *   the missing atom by copying the aligned slice from the opposite side (Lemma 4).
+         * - If no half-full position exists, pick leftmost unresolved atom from an empty position
+         *   and add it to T without changing any assignment (Lemma 3).
+         * 
+         * @param scc Indexes of strongly connected inclusions for a given inclusion 
+         */
+        void get_model_for_cyclic_SCC(const std::vector<int> &scc);
+
         // keeps already computed models
         std::map<BasicTerm,zstring> model_of_var;
         // vars for which we already called get_model() at least once (used for cyclicity detection, will be removed when get_model() can handle cycles in inclusions)

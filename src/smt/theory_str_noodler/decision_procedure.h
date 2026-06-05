@@ -389,7 +389,7 @@ namespace smt::noodler {
          * shortest words accepted by x have length |x|=3 and by y and z to have length |y|=|z|=2. We therefore create
          * for the left and the right side the following sequences of atoms:
          * left side:  [x,0][x,1][x,2][y,0][y,1][y,0][y,1][y,0][y,1]
-         * right side:[z,0][z,1][x,0][x,1][x,2][z,0][z,1][z,0][z,1]
+         * right side: [z,0][z,1][x,0][x,1][x,2][z,0][z,1][z,0][z,1]
          * where the opposite atoms (representing the value of variable on the position) must match.
          * 
          * In the atomic equation we recognize three states of a pair of atoms at a specific index:

@@ -131,10 +131,10 @@ namespace smt::noodler {
             return false;
         }
 
-        if(p.get_left_side().size() == 1 && single_occurr(p.get_side_vars(Predicate::EquationSideType::Right))) {
+        if(p.get_left_side().size() == 1 && p.get_left_side()[0].is_variable() && single_occurr(p.get_side_vars(Predicate::EquationSideType::Right))) {
             out = p;
             return true;
-        } else if (p.get_right_side().size() == 1 && single_occurr(p.get_side_vars(Predicate::EquationSideType::Left))) {
+        } else if (p.get_right_side().size() == 1 && p.get_right_side()[0].is_variable() && single_occurr(p.get_side_vars(Predicate::EquationSideType::Left))) {
             out = p.get_switched_sides_predicate();
             return true;
         }
@@ -299,10 +299,9 @@ namespace smt::noodler {
     /**
      * @brief Iteratively remove regular predicates.
      * 
-     * A regular predicate is of the form X = X_1 X_2 ... X_n where X_1 ... X_n does not occurr elsewhere in the system.
-     * Formally, L = R is regular if |L| = 1 and each variable from Vars(R) has a single occurrence in the system only.
-     * Regular predicates can be removed from the system provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n) where A(X)
-     * is the automaton assigned to variable X.
+     * A regular predicate is of the form X = X_1 X_2 ... X_n where X is variable and X_1 ... X_n does not occurr elsewhere
+     * in the system. Regular predicates can be removed from the system provided A(X) = A(X) \cap A(X_1).A(X_2)...A(X_n)
+     * where A(X) is the automaton assigned to variable X.
      */
     void FormulaPreprocessor::remove_regular() {
         STRACE(str_prep, tout << "Preprocessing step - remove_regular\n";);

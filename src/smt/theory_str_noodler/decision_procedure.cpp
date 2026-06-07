@@ -1258,6 +1258,32 @@ namespace smt::noodler {
             }
         }
 
+        // We compute here models of variables occuring on cycles
+        // Find all strongly connected components (cycles) in the inclusion graph using tarjan algorithm
+        // We can assume only inclusions and no transducers, as transducers work only for acyclic graphs
+        std::vector<std::vector<int>> sccs = tarjan(find_graph_edges());
+
+        STRACE(str_scc_debug,
+            int idx = 0;
+            tout << "Found strongly connected components" << std::endl;
+            for(std::vector<int> x : sccs){
+                tout << "scc - " << idx << " = ";
+                for (const auto& val : x) {
+                    tout << val << " ";
+                }
+                tout << std::endl;
+                idx++;
+            }
+        );
+
+        //Get model for each SCC
+        for(std::vector<int> scc_list : sccs){
+            //SCC of size one has just one inclusion and that is not a cycle
+            if(scc_list.size() > 1){
+                get_model_for_cyclic_SCC(scc_list);
+            }
+        }
+
         is_model_initialized = true;
 
         STRACE(str_model,
@@ -1291,33 +1317,6 @@ namespace smt::noodler {
                 tout << std::endl;
             }
         );
-
-        //Look for all edges in the inclusion graph
-        std::vector<std::vector<int>> adjacency_list = find_graph_edges();
-        
-        //Find all strongly connected components (cycles) in the inclusion graph
-        std::vector<std::vector<int>> sccs = tarjan(adjacency_list);
-
-        STRACE(str_scc_debug,
-            int idx = 0;
-            tout << "Found strongly connected components" << std::endl;
-            for(std::vector<int> x : sccs){
-                tout << "scc - " << idx << " = ";
-                for (const auto& val : x) {
-                    tout << val << " ";
-                }
-                tout << std::endl;
-                idx++;
-            }
-        );
-
-        //Get model for each cycle among the inclusions
-        for(std::vector<int> scc_list : sccs){
-            //SCC of size one has just one inclusion and that is not a cycle
-            if(scc_list.size() > 1){
-                get_model_for_cyclic_SCC(scc_list);
-            }
-        }
     }
 
     std::vector<std::vector<int>> DecisionProcedure::find_graph_edges() {

@@ -1199,8 +1199,8 @@ namespace smt::noodler {
             }
         }
 
-        // get string representing the integer of length len, where either it is padded by leading zeroes (pad == true) or trailing zeroes (pad == false)
-        auto get_string_from_integer = [](const rational& len, const rational& integer, bool pad) {
+        // get string representing the integer of length len, possibly padded with leading zeroes
+        auto get_string_from_integer = [](const rational& len, const rational& integer) {
             if (len == 0) {
                 return zstring();
             } else {
@@ -1208,11 +1208,7 @@ namespace smt::noodler {
                 SASSERT(len >= res.length());
                 // pad to_int_str with leading/trailing zeros until we reach the desired length
                 while (len.get_unsigned() != res.length()) {
-                    if (pad) {
-                        res = zstring("0") + res;
-                    } else {
-                        res = res + zstring("0");
-                    }
+                    res = zstring("0") + res;
                 }
                 return res;
             }
@@ -1236,7 +1232,7 @@ namespace smt::noodler {
                     mata::nfa::Nfa only_digits = AutAssignment::digit_automaton_with_epsilon();
                     nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, solution.aut_ass.complement_aut(only_digits)).trim());
                 } else {
-                    update_model_and_aut_ass(var, get_string_from_integer(len, to_int_value, true));
+                    update_model_and_aut_ass(var, get_string_from_integer(len, to_int_value));
                 }
             }
 
@@ -1249,12 +1245,38 @@ namespace smt::noodler {
                     const mata::nfa::Nfa non_number = solution.aut_ass.complement_aut(mata::nfa::union_nondet(AutAssignment::digit_automaton_with_epsilon(), AutAssignment::decimal_automaton()));
                     nfa = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*nfa, non_number).trim());
                 } else if (to_int_value != -1) {
-                    update_model_and_aut_ass(var, get_string_from_integer(len, to_int_value, true));
+                    update_model_and_aut_ass(var, get_string_from_integer(len, to_int_value));
                 } else {
-                    zstring whole_string = get_string_from_integer(dot_position, arith_model.at(conversion_handler.whole_part_of(var)), true);
-                    zstring decimal_string = get_string_from_integer(len-dot_position-1, arith_model.at(conversion_handler.decimal_part_of(var)), false);
+                    zstring whole_string = get_string_from_integer(dot_position, arith_model.at(conversion_handler.whole_part_of(var)));
+                    zstring decimal_string = get_string_from_integer(len-dot_position-1, arith_model.at(conversion_handler.decimal_part_of(var)));
                     update_model_and_aut_ass(var, whole_string + zstring(".") + decimal_string);
                 }
+            }
+        }
+
+        // We compute here models of variables occuring on cycles
+        // Find all strongly connected components (cycles) in the inclusion graph using tarjan algorithm
+        // We can assume only inclusions and no transducers, as transducers work only for acyclic graphs
+        std::vector<std::vector<int>> sccs = tarjan(find_graph_edges());
+
+        STRACE(str_scc_debug,
+            int idx = 0;
+            tout << "Found strongly connected components" << std::endl;
+            for(std::vector<int> x : sccs){
+                tout << "scc - " << idx << " = ";
+                for (const auto& val : x) {
+                    tout << val << " ";
+                }
+                tout << std::endl;
+                idx++;
+            }
+        );
+
+        //Get model for each SCC
+        for(std::vector<int> scc_list : sccs){
+            //SCC of size one has just one inclusion and that is not a cycle
+            if(scc_list.size() > 1){
+                get_model_for_cyclic_SCC(scc_list);
             }
         }
 
@@ -1291,33 +1313,6 @@ namespace smt::noodler {
                 tout << std::endl;
             }
         );
-
-        //Look for all edges in the inclusion graph
-        std::vector<std::vector<int>> adjacency_list = find_graph_edges();
-        
-        //Find all strongly connected components (cycles) in the inclusion graph
-        std::vector<std::vector<int>> sccs = tarjan(adjacency_list);
-
-        STRACE(str_scc_debug,
-            int idx = 0;
-            tout << "Found strongly connected components" << std::endl;
-            for(std::vector<int> x : sccs){
-                tout << "scc - " << idx << " = ";
-                for (const auto& val : x) {
-                    tout << val << " ";
-                }
-                tout << std::endl;
-                idx++;
-            }
-        );
-
-        //Get model for each cycle among the inclusions
-        for(std::vector<int> scc_list : sccs){
-            //SCC of size one has just one inclusion and that is not a cycle
-            if(scc_list.size() > 1){
-                get_model_for_cyclic_SCC(scc_list);
-            }
-        }
     }
 
     std::vector<std::vector<int>> DecisionProcedure::find_graph_edges() {

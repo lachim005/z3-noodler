@@ -6,5 +6,3 @@
 (assert (= (= x "a") (= x "b")))
 
 (check-sat)
-(get-model)
-

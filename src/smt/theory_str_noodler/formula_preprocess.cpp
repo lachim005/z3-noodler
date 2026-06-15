@@ -1635,7 +1635,6 @@ namespace smt::noodler {
             // we have x != literal -> remove literal from the language of x and remove the disequality
             if (left_side.size() == 1 && left_side[0].is_variable() && (right_side.size() < 1 || (right_side.size() == 1 && right_side[0].is_literal()))) {
                 BasicTerm var = left_side[0];
-                if(right_side.size() < 1 || (right_side.size() == 1 && right_side[0].is_literal())) {
                 this->aut_ass[var] = std::make_shared<mata::nfa::Nfa>(mata::nfa::intersection(*this->aut_ass.at(var), this->aut_ass.complement_aut(aut_right)));
                 rem_ids.insert(pr.first);
                 continue;

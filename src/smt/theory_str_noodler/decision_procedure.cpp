@@ -1,3 +1,6 @@
+#include <climits>
+#include <cmath>
+#include <mata/nfa/nfa.hh>
 #include <queue>
 #include <utility>
 #include <algorithm>
@@ -109,10 +112,73 @@ namespace smt::noodler {
                 return { l_true, some_skipped };
             }
 
-            // we will now process one inclusion from the inclusion graph which is at front
+            // we will now process one inclusion from the inclusion graph which is the most suitable
             // i.e. we will update automata assignments and substitutions so that this inclusion is fulfilled
-            Predicate predicate_to_process = element_to_process.predicates_to_process.front();
-            element_to_process.predicates_to_process.pop_front();
+
+            unsigned long max_score = 0;
+            unsigned long max_score_item_idx = 0;
+            bool max_is_initial = false;
+            for (size_t candidate_idx = 0; candidate_idx < element_to_process.predicates_to_process.size(); candidate_idx++) {
+                Predicate& candidate = element_to_process.predicates_to_process[candidate_idx];
+
+                // Checks if the inclusion has any ingoing connections
+                auto cand_right_vars = candidate.get_right_set();
+                bool has_ingoing_connections = false;
+                for (size_t incl_idx = 0; incl_idx < element_to_process.predicates_to_process.size(); incl_idx++) {
+                    if (candidate_idx == incl_idx) { continue; }
+                    Predicate& incl = element_to_process.predicates_to_process[incl_idx];
+                    if (SolvingState::is_dependent(incl.get_left_set(), cand_right_vars)) {
+                        has_ingoing_connections = true;
+                        break;
+                    }
+                }
+
+                if (has_ingoing_connections && max_is_initial) { continue; }
+
+                // Now, we will calculate the score of this inclusion
+
+                // Stolen from https://github.com/VeriFIT/z3-noodler/pull/237
+                unsigned num_of_splits_on_left = candidate.get_left_side().size();
+                unsigned num_of_splits_on_right = 0;
+                bool last_was_length = true;
+                for (const BasicTerm& right_var : candidate.get_right_side()) {
+                    if (element_to_process.length_sensitive_vars.contains(right_var)) {
+                        ++num_of_splits_on_right;
+                        last_was_length = true;
+                    } else {
+                        if (last_was_length) {
+                            ++num_of_splits_on_right;
+                        }
+                        last_was_length = false;
+                    }
+                }
+
+                // Sums the amount of states on each side
+                unsigned right_states = 0;
+                unsigned left_states = 0;
+                for (auto x : candidate.get_right_side())
+                {
+                    right_states += element_to_process.aut_ass.at(x)->num_of_states();
+                }
+                for (auto x : candidate.get_left_side())
+                {
+                    left_states += element_to_process.aut_ass.at(x)->num_of_states();
+                }
+
+                unsigned long score = std::pow(right_states + 1, num_of_splits_on_left) * std::pow(left_states + 1, num_of_splits_on_right);
+
+                // We want to save an inclusion with the least score
+                // but we prefer inclusions with no ingoing connections
+                if (score > max_score || (!has_ingoing_connections && !max_is_initial)) {
+                    max_score = score;
+                    max_score_item_idx = candidate_idx;
+                    max_is_initial = !has_ingoing_connections;
+                }
+            }
+
+            Predicate predicate_to_process = element_to_process.predicates_to_process[max_score_item_idx];
+            element_to_process.predicates_to_process[max_score_item_idx] = element_to_process.predicates_to_process.back();
+            element_to_process.predicates_to_process.pop_back();
 
             if (predicate_to_process.is_equation()) { // inclusion
                 process_inclusion(predicate_to_process, element_to_process);
@@ -953,7 +1019,7 @@ namespace smt::noodler {
         set_initial_variables(equations_and_transducers, init_solving_state);
 
         if (!equations_and_transducers.get_predicates().empty()) {
-            FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers);
+            FormulaGraph incl_graph = FormulaGraph::create_inclusion_graph(equations_and_transducers, init_solving_state.length_sensitive_vars, init_solving_state.aut_ass);
             for (const FormulaGraphNode &node : incl_graph.get_nodes()) {
                 Predicate node_pred = node.get_real_predicate();
                 if (node_pred.is_equation()) { // inclusion

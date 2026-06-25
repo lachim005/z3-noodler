@@ -25,6 +25,7 @@ Eternal glory to Yu-Fang.
 #include "smt/smt_kernel.h"
 #include "smt/smt_theory.h"
 #include "smt/smt_arith_value.h"
+#include "smt/theory_str_noodler/aut_assignment.h"
 #include "util/scoped_vector.h"
 #include "util/union_find.h"
 #include "ast/rewriter/seq_rewriter.h"
@@ -503,7 +504,7 @@ namespace smt::noodler {
          * @param init_length_sensitive_vars Length variables
          * @return true <-> suitable for Nielsen-based decision procedure
          */
-        bool is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars) const;
+        bool is_nielsen_suitable(const Formula& instance, const std::unordered_set<BasicTerm>& init_length_sensitive_vars, const AutAssignment& init_aut_ass) const;
 
         /**
          * @brief Check if the current instance is suitable for underapproximation.

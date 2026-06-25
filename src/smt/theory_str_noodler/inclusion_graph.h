@@ -5,8 +5,10 @@
 #include <optional>
 #include <deque>
 #include <algorithm>
+#include <unordered_set>
 
 #include "formula.h"
+#include "smt/theory_str_noodler/aut_assignment.h"
 
 namespace smt::noodler {
 
@@ -270,7 +272,7 @@ namespace smt::noodler {
         /**
          * @brief Create an inclusion graph from splitting graph
          */
-        static FormulaGraph create_inclusion_graph(FormulaGraph& simplified_splitting_graph);
+        static FormulaGraph create_inclusion_graph(FormulaGraph& simplified_splitting_graph, const std::unordered_set<BasicTerm>& length_vars, const AutAssignment& aut_ass);
 
 
         /**
@@ -284,7 +286,7 @@ namespace smt::noodler {
          * @param formula must contain only equations and transducers
          * @return the inclusion graph 
          */
-        static FormulaGraph create_inclusion_graph(const Formula& formula);
+        static FormulaGraph create_inclusion_graph(const Formula& formula, const std::unordered_set<BasicTerm>& length_vars, const AutAssignment& aut_ass);
 
         /**
          * Print the inclusion graph in a DOT format.
